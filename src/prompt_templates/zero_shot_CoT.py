@@ -211,8 +211,8 @@ REQUIREMENTS:
     # ==================== STAGE 2 PROMPTS ====================
 
    def _get_stage2_system_prompt_vi(self) -> str:
-        """Vietnamese system prompt for Stage 2 (JSON extraction)."""
-        return """Bạn là một công cụ xử lý văn bản có nhiệm vụ chuyển đổi một bài phân tích thành cấu trúc JSON được chỉ định.
+       """Vietnamese system prompt for Stage 2 (JSON extraction)."""
+       return """Bạn là một công cụ xử lý văn bản có nhiệm vụ chuyển đổi một bài phân tích thành cấu trúc JSON được chỉ định.
 
 JSON OUTPUT FORMAT:
 {
