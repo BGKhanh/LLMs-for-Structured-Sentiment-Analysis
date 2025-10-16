@@ -236,7 +236,7 @@ QUAN TRỌNG:
 """
 
 
-   def _get_stage2_user_prompt(
+    def _get_stage2_user_prompt(
         self,
         text: str,
         sent_id: str,
