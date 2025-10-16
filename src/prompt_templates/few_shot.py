@@ -2,6 +2,7 @@ from typing import Dict, Any, List, Tuple, Optional
 import random
 from .base import BasePromptTemplate
 import json
+from torch.utils.data import Dataset
 
 class FewShotPrompt(BasePromptTemplate):
     """
