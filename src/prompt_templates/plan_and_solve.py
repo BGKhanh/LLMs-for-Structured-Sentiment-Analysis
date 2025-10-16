@@ -217,8 +217,8 @@ Hãy thực hiện một phân tích chi tiết theo các bước sau:
     # ==================== ENGLISH USER PROMPTS ====================
     
     def _get_user_prompt_ps_en(self, text: str, sent_id: str) -> str:
-    """English user prompt for PS (basic)."""
-    return f"""Analyze the sentiment for the following text (sent_id: {sent_id}):
+        """English user prompt for PS (basic)."""
+        return f"""Analyze the sentiment for the following text (sent_id: {sent_id}):
 "{text}"
 
 Let's break down this problem. First, let's understand the issue and plan the solution. Then, execute the plan to solve the problem in the following steps:
@@ -227,9 +227,9 @@ Next, execute that plan step-by-step to provide a detailed analysis.
 Finally, summarize all analyses into a single JSON block.
 """
 
-def _get_user_prompt_ps_plus_en(self, text: str, sent_id: str) -> str:
-    """English user prompt for PS+ (enhanced)."""
-    return f"""Analyze the sentiment for the following text (sent_id: {sent_id}):
+    def _get_user_prompt_ps_plus_en(self, text: str, sent_id: str) -> str:
+        """English user prompt for PS+ (enhanced)."""
+        return f"""Analyze the sentiment for the following text (sent_id: {sent_id}):
 "{text}"
 
 Perform a detailed analysis following these steps:
