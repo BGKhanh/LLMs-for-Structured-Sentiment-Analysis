@@ -6,7 +6,7 @@ import time
 import torch
 from typing import Tuple, Dict, Any, List
 from transformers import Gemma3ForConditionalGeneration, AutoProcessor
-from .base import BaseModel
+from .BaseModel import BaseModel
 
 
 class GemmaModel(BaseModel):
