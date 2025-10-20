@@ -7,7 +7,7 @@ Defines the complete structure of config.yaml with type hints and defaults.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Literal
+from typing import Optional, Literal, Dict, Any
 
 
 @dataclass
