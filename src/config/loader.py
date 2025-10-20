@@ -9,7 +9,7 @@ and resolving file paths.
 
 import yaml
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Any
 from .schema import Config
 
 
