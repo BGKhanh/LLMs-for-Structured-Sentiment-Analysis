@@ -1,0 +1,54 @@
+# configs/base.yaml
+#
+# Base configuration with default values.
+# Experiment configs can override these values.
+
+# Random seed for reproducibility
+seed: 42
+
+# Experiment metadata
+experiment:
+  name: "base_experiment"
+  description: "Base configuration template"
+  version: "1.0"
+
+# Model configuration
+model:
+  name: "gemma"  # Options: gemma, mistral, qwen, llama
+  model_id: "google/gemma-3-4b-it"
+  torch_dtype: "float32"  # Options: float32, float16, bfloat16
+  device_map: "auto"
+  max_tokens: 1024
+  do_sample: false
+  temperature: 0.1
+  trust_remote_code: true
+
+# Data configuration
+data:
+  dataset_path: "data/dev.json"
+  batch_size: 8
+  num_samples: null  # null = all samples, or specify a number
+  shuffle: false
+
+# Prompt configuration
+prompt:
+  technique: "rereading"  # Options: rereading, few_shot, few_shot_cot, zero_shot_cot, plan_solve
+  language: "vi"  # Options: vi, en
+  
+  # Few-shot parameters (used if technique is few_shot or few_shot_cot)
+  n_shot: 0
+  examples_pool_path: null
+  
+  # Plan-and-solve parameters (used if technique is plan_solve)
+  plus_mode: false  # true for PS+, false for PS
+
+# Output configuration
+output:
+  output_dir: "results/"
+  output_file: "results.json"
+  save_metadata: true
+  save_config_copy: true
+  overwrite: false
+
+# Processing configuration
+cleanup_frequency: 10  # GPU cleanup every N batches

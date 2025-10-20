@@ -41,22 +41,35 @@ class GemmaModel(BaseModel):
         super().__init__(config)
         self.model_class = Gemma3ForConditionalGeneration
     
+
     def load_model(self) -> None:
         """Load Gemma 3 model and processor."""
         if self.is_loaded:
             print("✅ Model already loaded!")
             return
         
-        model_id = self.config["model_id"]
+        # Support both dict and ModelConfig object
+        if hasattr(self.config, 'model_id'):
+            # ModelConfig object
+            model_id = self.config.model_id
+            pretrained_kwargs = self.config.get_from_pretrained_kwargs()
+        else:
+            # Dict (backward compatible)
+            model_id = self.config["model_id"]
+            import torch
+            pretrained_kwargs = {
+                "device_map": self.config.get("device_map", "auto"),
+                "torch_dtype": getattr(torch, self.config.get("torch_dtype", "float32")),
+                "trust_remote_code": self.config.get("trust_remote_code", True)
+            }
+        
         print(f"🔧 Loading Gemma model: {model_id}")
         
         try:
             # Load model
             self.model = self.model_class.from_pretrained(
                 model_id,
-                device_map=self.config.get("device_map", "auto"),
-                torch_dtype=self.config.get("torch_dtype", torch.float32),
-                trust_remote_code=self.config.get("trust_remote_code", True)
+                **pretrained_kwargs
             ).eval()
             
             # Load processor
@@ -65,39 +78,24 @@ class GemmaModel(BaseModel):
             self.is_loaded = True
             print("✅ Gemma model and processor loaded successfully!")
             
-            # Print device info
             if hasattr(self.model, 'hf_device_map'):
                 print(f"📍 Device map: {self.model.hf_device_map}")
             
         except Exception as e:
             raise RuntimeError(f"Failed to load Gemma model: {str(e)}")
-    
-    def generate_single(
-        self,
-        system_prompt: str,
-        user_prompt: str
-    ) -> Tuple[str, float]:
-        """
-        Generate response for single input.
-        
-        Args:
-            system_prompt: System instruction
-            user_prompt: User query
-        
-        Returns:
-            Tuple of (raw_response, generation_time_seconds)
-        """
+
+
+    def generate_single(self, system_prompt: str, user_prompt: str) -> Tuple[str, float]:
+        """Generate response for single input."""
         if not self.is_loaded:
             self.load_model()
         
-        # Build messages in Gemma chat format
         messages = [
             {"role": "system", "content": [{"type": "text", "text": system_prompt}]},
             {"role": "user", "content": [{"type": "text", "text": user_prompt}]}
         ]
         
         try:
-            # Apply chat template and tokenize
             inputs = self.processor.apply_chat_template(
                 messages,
                 add_generation_prompt=True,
@@ -108,21 +106,29 @@ class GemmaModel(BaseModel):
             
             input_len = inputs["input_ids"].shape[-1]
             
+            # Get generation kwargs
+            if hasattr(self.config, 'get_generation_kwargs'):
+                # ModelConfig object
+                gen_kwargs = self.config.get_generation_kwargs()
+            else:
+                # Dict (backward compatible)
+                gen_kwargs = {
+                    "max_new_tokens": self.config.get("max_tokens", 2048),
+                    "do_sample": self.config.get("do_sample", False),
+                }
+                if self.config.get("do_sample"):
+                    gen_kwargs["temperature"] = self.config.get("temperature", 0.1)
+            
             # Generate
             start_time = time.time()
             with torch.inference_mode(), torch.autocast(device_type="cuda"):
                 generation = self.model.generate(
                     **inputs,
-                    max_new_tokens=self.config.get("max_tokens", 2048),
-                    do_sample=self.config.get("do_sample", False),
-                    temperature=self.config.get("temperature", 0.1) if self.config.get("do_sample") else None
+                    **gen_kwargs  # ✅ Use helper method
                 )
-                # Extract only the generated part (exclude input)
                 generation = generation[0][input_len:]
             
             generation_time = time.time() - start_time
-            
-            # Decode
             response = self.processor.decode(generation, skip_special_tokens=True)
             
             return response, generation_time
@@ -130,32 +136,26 @@ class GemmaModel(BaseModel):
         except Exception as e:
             print(f"❌ Error in generate_single: {str(e)}")
             return "{}", 0.0
-    
-    def generate_batch(
-        self,
-        batch_messages: List[List[Dict[str, Any]]]
-    ) -> Tuple[List[str], float]:
-        """
-        Generate responses for batch inputs (optimized for throughput).
-        
-        Args:
-            batch_messages: List of message lists
-                Example: [
-                    [
-                        {"role": "system", "content": [{"type": "text", "text": "..."}]},
-                        {"role": "user", "content": [{"type": "text", "text": "..."}]}
-                    ],
-                    ...
-                ]
-        
-        Returns:
-            Tuple of (list_of_raw_responses, total_batch_time)
-        """
+
+
+    def generate_batch(self, batch_messages: List[List[Dict[str, Any]]]) -> Tuple[List[str], float]:
+        """Generate responses for batch inputs."""
         if not self.is_loaded:
             self.load_model()
         
         try:
-            # Apply chat template for batch
+            # Get generation kwargs
+            if hasattr(self.config, 'get_generation_kwargs'):
+                gen_kwargs = self.config.get_generation_kwargs()
+            else:
+                gen_kwargs = {
+                    "max_new_tokens": self.config.get("max_tokens", 2048),
+                    "do_sample": self.config.get("do_sample", False),
+                }
+                if self.config.get("do_sample"):
+                    gen_kwargs["temperature"] = self.config.get("temperature", 0.1)
+            
+            # Apply chat template
             start_time = time.time()
             inputs = self.processor.apply_chat_template(
                 batch_messages,
@@ -170,24 +170,19 @@ class GemmaModel(BaseModel):
             with torch.inference_mode(), torch.autocast(device_type="cuda"):
                 generated_outputs = self.model.generate(
                     **inputs,
-                    max_new_tokens=self.config.get("max_tokens", 2048),
-                    do_sample=self.config.get("do_sample", False),
-                    temperature=self.config.get("temperature", 0.1) if self.config.get("do_sample") else None
+                    **gen_kwargs  # ✅ Use helper method
                 )
             
             batch_time = time.time() - start_time
             
-            # Extract generated tokens (exclude input)
+            # Extract and decode
             output_ids = generated_outputs[:, inputs.input_ids.shape[1]:]
-            
-            # Decode batch
             batch_responses = self.processor.batch_decode(output_ids, skip_special_tokens=True)
             
             return batch_responses, batch_time
             
         except Exception as e:
             print(f"❌ Error in generate_batch: {str(e)}")
-            # Return empty responses for all items in batch
             return ["{}"] * len(batch_messages), 0.0
     
     def extract_response(self, raw_response: str) -> str:

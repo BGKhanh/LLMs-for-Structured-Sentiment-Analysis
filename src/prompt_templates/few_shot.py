@@ -194,7 +194,6 @@ FORMAT JSON OUTPUT:
   ]
 }
 
-QUAN TRỌNG: CHỈ TRẢ VỀ JSON, KHÔNG GIẢI THÍCH THÊM, KHÔNG TRÌNH BÀY QUÁ TRÌNH SUY LUẬN.
 """
     
     def _get_user_prompt_vi(self, text: str, sent_id: str) -> str:
@@ -270,7 +269,6 @@ JSON OUTPUT FORMAT:
   ]
 }
 
-IMPORTANT: RETURN ONLY THE JSON, PROVIDE NO FURTHER EXPLANATION, DO NOT SHOW THE REASONING PROCESS.
 """
     
     def _get_user_prompt_en(self, text: str, sent_id: str) -> str:
