@@ -2,7 +2,7 @@
 # Configuration file for inference experiments
 # =============================================
 
-seed: 42
+random_seed: 42
 cleanup_frequency: 10
 
 experiment:
