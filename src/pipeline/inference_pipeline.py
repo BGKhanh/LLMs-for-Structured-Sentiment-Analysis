@@ -112,9 +112,9 @@ class InferencePipeline:
             self.dataset = json.load(f)
         
         # Apply n_sample limit if specified
-        if self.config.data.n_sample > 0:
+        if self.config.data.num_samples > 0:
             original_len = len(self.dataset)
-            self.dataset = self.dataset[:self.config.data.n_sample]
+            self.dataset = self.dataset[:self.config.data.num_samples]
             print(f"  📊 Limited to {len(self.dataset)}/{original_len} samples")
         else:
             print(f"  📊 Loaded {len(self.dataset)} samples")
@@ -127,12 +127,12 @@ class InferencePipeline:
         
         technique = self.config.prompt.technique
         print(f"  🎯 Technique: {technique}")
-        print(f"  🌐 Language: {'English' if self.config.prompt.eng else 'Vietnamese'}")
+        print(f"  🌐 Language: {'English' if self.config.prompt.language == 'en' else 'Vietnamese'}")
         
         # Get examples pool path if needed
         examples_pool_path = None
         if technique in ["few_shot", "few_shot_cot"]:
-            if self.config.data.examples_pool_path:
+            if self.config.data.examples_pool:
                 examples_pool_path = self.config.data.get_examples_pool_path()
                 print(f"  📚 Examples pool: {examples_pool_path}")
         
