@@ -48,13 +48,13 @@ class ConfigValidator:
     
     def _validate_model(self):
         """Validate model configuration."""
-        # Check max_tokens
-        if self.config.model.max_tokens < 1:
-            self.errors.append("max_tokens must be >= 1")
+        # Check max_new_tokens
+        if self.config.model.max_new_tokens < 1:
+            self.errors.append("max_new_tokens must be >= 1")
         
-        if self.config.model.max_tokens > 4096:
+        if self.config.model.max_new_tokens > 4096:
             self.warnings.append(
-                f"Large max_tokens ({self.config.model.max_tokens}) may be slow"
+                f"Large max_new_tokens ({self.config.model.max_new_tokens}) may be slow"
             )
         
         # Check temperature with do_sample
