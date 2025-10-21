@@ -495,7 +495,7 @@ class InferencePipeline:
     ):
         """Factory method for prompt templates."""
         technique = self.config.prompt.technique
-        eng = self.config.prompt.eng
+        eng = True if self.config.prompt.language == 'en' else False
         
         if technique == "few_shot":
             return FewShotPrompt(
