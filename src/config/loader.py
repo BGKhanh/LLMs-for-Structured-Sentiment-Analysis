@@ -39,29 +39,6 @@ def load_yaml(path: str) -> Dict[str, Any]:
         raise ValueError(f"Invalid YAML in {path}: {e}")
 
 
-def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Deep merge two dictionaries.
-    
-    Args:
-        base: Base dictionary
-        override: Dictionary with override values
-        
-    Returns:
-        Merged dictionary (base values overridden by override)
-    """
-    merged = base.copy()
-    
-    for key, value in override.items():
-        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
-            # Recursively merge nested dictionaries
-            merged[key] = deep_merge(merged[key], value)
-        else:
-            # Override value
-            merged[key] = value
-    
-    return merged
-
 
 def resolve_paths(config_dict: Dict[str, Any], project_root: Path) -> Dict[str, Any]:
     """
@@ -125,26 +102,14 @@ def load_config(
     
     print(f"Loading config from: {config_path}")
     
-    # Load base config
-    base_dict = {}
-    base_path = project_root / base_config_path
-    if base_path.exists():
-        print(f"Loading base config from: {base_config_path}")
-        base_dict = load_yaml(str(base_path))
-    else:
-        print(f"⚠️  Base config not found: {base_config_path}, using defaults")
-    
     # Load experiment config
     exp_dict = load_yaml(config_path)
     
-    # Merge configs (experiment overrides base)
-    merged_dict = deep_merge(base_dict, exp_dict)
-    
     # Resolve relative paths
-    merged_dict = resolve_paths(merged_dict, project_root)
+    exp_resolved_dict = resolve_paths(exp_dict, project_root)
     
     # Convert to Config object
-    config = Config.from_dict(merged_dict)
+    config = Config.from_dict(exp_resolved_dict)
     
     print(f"✅ Config loaded: {config.experiment.name}")
     
