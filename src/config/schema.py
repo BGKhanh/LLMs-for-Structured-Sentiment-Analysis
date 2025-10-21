@@ -190,7 +190,7 @@ class Config:
             Config object
         """
         return cls(
-            seed=config_dict.get('random_seed', 42),
+            random_seed=config_dict.get('random_seed', 42),
             experiment=ExperimentConfig(**config_dict.get('experiment', {})),
             model=ModelConfig(**config_dict.get('model', {})),
             data=DataConfig(**config_dict.get('data', {})),
