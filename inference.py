@@ -76,7 +76,7 @@ def main():
         print(f"  Experiment : {config.experiment.name}")
         print(f"  Model      : {config.model.name} ({config.model.model_id})")
         print(f"  Technique  : {config.prompt.technique}")
-        print(f"  Language   : {'English' if config.prompt.eng else 'Vietnamese'}")
+        print(f"  Language   : {'English' if config.prompt.language == 'en' else 'Vietnamese'}")
         print(f"  Dataset    : {config.data.dataset}")
         if config.data.n_sample > 0:
             print(f"  N-samples  : {config.data.n_sample}")
