@@ -170,7 +170,7 @@ class OutputConfig:
 @dataclass
 class Config:
     """Complete configuration for inference."""
-    seed: int = 42
+    random_seed: int = 42
     experiment: ExperimentConfig = field(default_factory=ExperimentConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     data: DataConfig = field(default_factory=DataConfig)
