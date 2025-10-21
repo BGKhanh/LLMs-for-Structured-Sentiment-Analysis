@@ -28,6 +28,9 @@ Examples:
   
   # Short form
   python inference.py -c configs/experiments/exp_few_shot_3.yaml
+  
+  # Validate config only
+  python inference.py -c configs/experiments/test.yaml --validate-only
         """
     )
     
@@ -68,18 +71,45 @@ def main():
         # Load and validate config
         print("🔍 Loading and validating configuration...")
         config = load_config(str(config_path))
-        validate_config(config)
-        print("✅ Configuration validated successfully!\n")
+        is_valid = validate_config(config)
+        
+        if not is_valid:
+            print("\n❌ Configuration validation failed!")
+            sys.exit(1)
+        
+        print("\n✅ Configuration validated successfully!")
         
         # Show config summary
-        print("📋 Configuration Summary:")
+        print("\n📋 Configuration Summary:")
+        print("-" * 80)
         print(f"  Experiment : {config.experiment.name}")
-        print(f"  Model      : {config.model.name} ({config.model.model_id})")
+        print(f"  Description: {config.experiment.description}")
+        print(f"  Model      : {config.model.name}")
+        print(f"  Model ID   : {config.model.model_id}")
         print(f"  Technique  : {config.prompt.technique}")
         print(f"  Language   : {'English' if config.prompt.language == 'en' else 'Vietnamese'}")
         print(f"  Dataset    : {config.data.dataset}")
-        if config.data.n_sample > 0:
-            print(f"  N-samples  : {config.data.n_sample}")
+        
+        # ✅ FIX: Sử dụng num_samples thay vì n_sample
+        if config.data.num_samples is not None:
+            print(f"  N-samples  : {config.data.num_samples}")
+        else:
+            print(f"  N-samples  : ALL")
+        
+        print(f"  Batch size : {config.data.batch_size}")
+        
+        # Show few-shot info if applicable
+        if config.prompt.technique in ["few_shot", "few_shot_cot"]:
+            print(f"  N-shot     : {config.prompt.n_shot}")
+            if config.prompt.n_shot > 0:
+                print(f"  Examples   : {config.data.examples_pool}")
+        
+        # Show plan-solve mode if applicable
+        if config.prompt.technique == "plan_solve":
+            mode = "PS+" if config.prompt.plus_mode else "PS"
+            print(f"  Mode       : {mode}")
+        
+        print("-" * 80)
         print()
         
         # If validate-only mode, exit here
@@ -112,19 +142,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
-    
-    
-
-
-# Bước 1: Tạo config file
-# Option A: Dùng configuration.py (interactive)
-# python configuration.py
-# Trả lời các câu hỏi
-# File sẽ được tạo tự động
-
-# Option B: Tạo thủ công
-# Tạo file YAML trong configs/experiments/ theo template trên. Xem trong ./src/configuration.py
-
-# Bước 2: Run inference
-# python inference.py --config configs/experiments/exp_test_rereading.yaml
