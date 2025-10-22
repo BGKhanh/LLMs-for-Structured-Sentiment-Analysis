@@ -124,7 +124,7 @@ class GemmaModel(BaseModel):
             with torch.inference_mode(), torch.autocast(device_type="cuda"):
                 generation = self.model.generate(
                     **inputs,
-                    **gen_kwargs  # ✅ Use helper method
+                    **gen_kwargs  
                 )
                 generation = generation[0][input_len:]
             
@@ -138,8 +138,26 @@ class GemmaModel(BaseModel):
             return "{}", 0.0
 
 
-    def generate_batch(self, batch_messages: List[List[Dict[str, Any]]]) -> Tuple[List[str], float]:
-        """Generate responses for batch inputs."""
+    def generate_batch(
+        self, 
+        inputs: Union[List[List[Dict[str, Any]]], Dict[str, torch.Tensor]]
+    ) -> Tuple[List[str], float]:
+        """
+        Generate responses for batch inputs.
+        
+        Supports two input modes:
+        1. Tokenized inputs (Dict) - from DataLoader (efficient, no re-tokenization)
+        2. Raw messages (List) - for manual batching (e.g., multi-stage CoT)
+        
+        Args:
+            inputs: Either:
+                - Dict[str, torch.Tensor]: Tokenized inputs from collator
+                  {'input_ids': tensor, 'attention_mask': tensor}
+                - List[List[Dict]]: Raw messages for chat template
+        
+        Returns:
+            Tuple of (batch_responses, generation_time)
+        """
         if not self.is_loaded:
             self.load_model()
         
@@ -155,35 +173,56 @@ class GemmaModel(BaseModel):
                 if self.config.get("do_sample"):
                     gen_kwargs["temperature"] = self.config.get("temperature", 0.1)
             
-            # Apply chat template
             start_time = time.time()
-            inputs = self.processor.apply_chat_template(
-                batch_messages,
-                add_generation_prompt=True,
-                tokenize=True,
-                return_tensors="pt",
-                padding=True,
-                return_dict=True
-            ).to(self.model.device)
             
-            # Batch generation
+            # ===== MODE DETECTION =====
+            if isinstance(inputs, dict):
+                # Mode 1: Tokenized inputs from DataLoader
+                # Already tokenized, just move to device
+                tokenized_inputs = {
+                    k: v.to(self.model.device) if isinstance(v, torch.Tensor) else v
+                    for k, v in inputs.items()
+                    if k in ['input_ids', 'attention_mask']
+                }
+                input_length = tokenized_inputs['input_ids'].shape[1]
+                
+            else:
+                # Mode 2: Raw messages (manual batching)
+                # Need to apply chat template
+                tokenized_inputs = self.processor.apply_chat_template(
+                    inputs,  # List of message lists
+                    add_generation_prompt=True,
+                    tokenize=True,
+                    return_tensors="pt",
+                    padding=True,
+                    return_dict=True
+                ).to(self.model.device)
+                input_length = tokenized_inputs['input_ids'].shape[1]
+            
+            # ===== BATCH GENERATION =====
             with torch.inference_mode(), torch.autocast(device_type="cuda"):
                 generated_outputs = self.model.generate(
-                    **inputs,
-                    **gen_kwargs  # ✅ Use helper method
+                    **tokenized_inputs,
+                    **gen_kwargs
                 )
             
             batch_time = time.time() - start_time
             
-            # Extract and decode
-            output_ids = generated_outputs[:, inputs.input_ids.shape[1]:]
+            # ===== DECODE OUTPUTS =====
+            # Extract only new tokens (remove input)
+            output_ids = generated_outputs[:, input_length:]
             batch_responses = self.processor.batch_decode(output_ids, skip_special_tokens=True)
             
             return batch_responses, batch_time
             
         except Exception as e:
             print(f"❌ Error in generate_batch: {str(e)}")
-            return ["{}"] * len(batch_messages), 0.0
+            # Return empty responses based on input type
+            if isinstance(inputs, dict):
+                batch_size = inputs['input_ids'].shape[0]
+            else:
+                batch_size = len(inputs)
+            return ["{}"] * batch_size, 0.0
     
     def extract_response(self, raw_response: str) -> str:
         """

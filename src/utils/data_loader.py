@@ -123,11 +123,16 @@ class SentimentCollator:
                 - texts: Original texts
                 - sent_ids: Sentence IDs
                 - opinions: Ground truth opinions
+                - system_prompts: System prompts for each sample  
+                - user_prompts: User prompts for each sample      
         """
         # Extract components
         texts = [item["text"] for item in batch]
         sent_ids = [item["sent_id"] for item in batch]
         opinions = [item["opinions"] for item in batch]
+        
+        system_prompts = [item["system_prompt"] for item in batch]
+        user_prompts = [item["user_prompt"] for item in batch]
         
         # Build messages for chat template
         batch_messages = []
@@ -152,7 +157,9 @@ class SentimentCollator:
             **inputs,  # input_ids, attention_mask, etc.
             "texts": texts,
             "sent_ids": sent_ids,
-            "opinions": opinions
+            "opinions": opinions,
+            "system_prompts": system_prompts,
+            "user_prompts": user_prompts       
         }
 
 

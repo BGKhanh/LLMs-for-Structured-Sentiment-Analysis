@@ -16,7 +16,7 @@ experiment:
 model:
   name: "gemma"  # Options: gemma, mistral, qwen, llama
   model_id: "google/gemma-3-4b-it"
-  torch_dtype: "float32"  # Options: float32, float16, bfloat16
+  dtype: "float32"  # Options: float32, float16, bfloat16
   device_map: "auto"
   max_tokens: 1024
   do_sample: false

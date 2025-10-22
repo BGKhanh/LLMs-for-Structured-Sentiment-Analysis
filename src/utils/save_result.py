@@ -5,6 +5,10 @@ Results saving utilities.
 
 Saves inference results with organized directory structure:
 results/{model_name}/{experiment_name}/
+    ├── result.json       # Processed results
+    ├── config.json       # Full config copy
+    ├── metadata.json     # Runtime info only (simplified)
+    └── debug_info.json   # Prompts + raw responses (always saved)
 """
 
 import json
@@ -18,6 +22,7 @@ def save_experiment_results(
     results: List[Dict[str, Any]],
     config: 'Config',
     statistics: Optional[Dict[str, Any]] = None,
+    raw_results: Optional[List[Dict[str, Any]]] = None,
     results_dir: str = "results"
 ) -> Dict[str, str]:
     """
@@ -28,13 +33,15 @@ def save_experiment_results(
         └── {model_name}/
             └── {experiment_name}/
                 ├── result.json      # Inference results
-                ├── metadata.json    # Experiment metadata
-                └── config.json      # Config copy
+                ├── config.json      # Config copy
+                ├── metadata.json    # Runtime metadata (simplified)
+                └── debug_info.json  # Prompts + raw responses
     
     Args:
         results: List of inference results (SemEval format)
         config: Config object
-        statistics: Optional statistics dict
+        statistics: Optional statistics dict from pipeline
+        raw_results: Optional raw results from pipeline (for debug_info)
         results_dir: Base results directory
         
     Returns:
@@ -43,6 +50,7 @@ def save_experiment_results(
             'result_file': '...',
             'metadata_file': '...',
             'config_file': '...',
+            'debug_file': '...',
             'experiment_dir': '...'
         }
     
@@ -64,6 +72,7 @@ def save_experiment_results(
     result_file = experiment_dir / "result.json"
     metadata_file = experiment_dir / "metadata.json"
     config_file = experiment_dir / "config.json"
+    debug_file = experiment_dir / "debug_info.json"
     
     # Check overwrite
     if not config.output.overwrite:
@@ -89,11 +98,20 @@ def save_experiment_results(
         config_dict = config.to_dict()
         _save_json(config_file, config_dict, "Config")
     
+    # Save debug info 
+    print(f"\n💾 Saving debug info...")
+    debug_path = save_debug_info(
+        raw_results=raw_results or [],
+        experiment_dir=experiment_dir,
+        technique=config.prompt.technique
+    )
+    
     # Return saved paths
     saved_paths = {
         'result_file': str(result_file),
         'metadata_file': str(metadata_file) if config.output.save_metadata else None,
         'config_file': str(config_file) if config.output.save_config_copy else None,
+        'debug_file': debug_path,
         'experiment_dir': str(experiment_dir)
     }
     
@@ -125,7 +143,10 @@ def _build_metadata(
     statistics: Optional[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
-    Build metadata dictionary.
+    Build metadata dictionary (SIMPLIFIED - runtime info only).
+    
+    Rationale: Config info is redundant since config.json is saved.
+    Only save runtime-specific information here.
     
     Args:
         config: Config object
@@ -133,7 +154,7 @@ def _build_metadata(
         statistics: Optional statistics from pipeline
         
     Returns:
-        Metadata dictionary
+        Metadata dictionary with runtime info only
     """
     import torch
     import transformers
@@ -144,42 +165,13 @@ def _build_metadata(
     
     # Build metadata
     metadata = {
-        # Experiment info
-        "experiment": {
-            "name": config.experiment.name,
-            "description": config.experiment.description,
-            "version": config.experiment.version,
-            "timestamp": datetime.now().isoformat(),
-        },
+        # Timestamp (unique to this run)
+        "timestamp": datetime.now().isoformat(),
         
-        # Model info
-        "model": {
-            "name": config.model.name,
-            "model_id": config.model.model_id,
-            "dtype": config.model.dtype,
-            "device_map": config.model.device_map,
-            "max_tokens": config.model.max_tokens,
-        },
-        
-        # Data info
-        "data": {
-            "dataset": config.data.dataset,
-            "dataset_path": config.data.get_dataset_path(),
-            "batch_size": config.data.batch_size,
-            "n_sample": config.data.n_sample,
-        },
-        
-        # Prompt info
-        "prompt": {
-            "technique": config.prompt.technique,
-            "language": config.prompt.language,
-            "n_shot": config.prompt.n_shot,
-        },
-        
-        # Statistics
+        # Statistics (runtime metrics)
         "statistics": statistics,
         
-        # Environment info
+        # Environment info (runtime environment)
         "environment": {
             "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
             "torch_version": torch.__version__,
@@ -223,6 +215,169 @@ def _calculate_statistics(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         "avg_opinions_per_sample": round(avg_opinions, 2)
     }
 
+def save_debug_info(
+    raw_results: List[Dict[str, Any]],
+    experiment_dir: Path,
+    technique: str
+) -> str:
+    """
+    Save debug information (prompts + raw responses).
+    
+    Handles both single-stage and multi-stage techniques.
+    Always saves - this is mandatory for debugging and analysis.
+    
+    Args:
+        raw_results: List from pipeline.raw_results
+        experiment_dir: Experiment directory path
+        technique: Prompt technique name
+        
+    Returns:
+        Path to saved debug_info.json file
+        
+    Structure for single-stage:
+        {
+            "technique": "rereading",
+            "is_multi_stage": false,
+            "shared_prompts": {
+                "system_prompt": "..."  # Same for all samples
+            },
+            "samples": [
+                {
+                    "sent_id": "...",
+                    "user_prompt": "...",
+                    "raw_response": "...",
+                    "generation_time": 0.5
+                }
+            ]
+        }
+    
+    Structure for multi-stage (Zero-shot CoT):
+        {
+            "technique": "zero_shot_cot",
+            "is_multi_stage": true,
+            "stage_prompts": {
+                "stage_1": {
+                    "system_prompt": "...",
+                    "purpose": "Generate reasoning"
+                },
+                "stage_2": {
+                    "system_prompt": "...",
+                    "purpose": "Extract structured output"
+                }
+            },
+            "samples": [
+                {
+                    "sent_id": "...",
+                    "stage_1": {
+                        "user_prompt": "...",
+                        "raw_response": "...",
+                        "generation_time": 0.3
+                    },
+                    "stage_2": {
+                        "user_prompt": "...",
+                        "raw_response": "...",
+                        "generation_time": 0.4
+                    }
+                }
+            ]
+        }
+    """
+    if not raw_results:
+        print("   ⚠️  No raw results to save in debug_info")
+        # Create empty debug file
+        debug_data = {
+            "technique": technique,
+            "is_multi_stage": False,
+            "samples": []
+        }
+        debug_file = experiment_dir / "debug_info.json"
+        _save_json(debug_file, debug_data, "Debug info (empty)")
+        return str(debug_file)
+    
+    # Detect if multi-stage
+    is_multi_stage = technique == "zero_shot_cot"
+    
+    debug_data = {
+        "technique": technique,
+        "is_multi_stage": is_multi_stage,
+        "samples": []
+    }
+    
+    if is_multi_stage:
+        # === MULTI-STAGE (Zero-shot CoT) ===
+        
+        # Extract stage-specific shared prompts from first successful sample
+        first_success = next((r for r in raw_results if r.get('success')), None)
+        
+        if first_success and 'stage_1' in first_success and 'stage_2' in first_success:
+            debug_data["stage_prompts"] = {
+                "stage_1": {
+                    "system_prompt": first_success['stage_1'].get('system_prompt', ''),
+                    "purpose": "Generate reasoning"
+                },
+                "stage_2": {
+                    "system_prompt": first_success['stage_2'].get('system_prompt', ''),
+                    "purpose": "Extract structured output"
+                }
+            }
+        
+        # Per-sample data (multi-stage)
+        for result in raw_results:
+            if not result.get('success'):
+                continue
+            
+            sample_data = {
+                "sent_id": result.get('sent_id', 'unknown')
+            }
+            
+            # Stage 1 data
+            if 'stage_1' in result:
+                sample_data["stage_1"] = {
+                    "user_prompt": result['stage_1'].get('user_prompt', ''),
+                    "raw_response": result['stage_1'].get('raw_response', ''),
+                    "generation_time": result['stage_1'].get('generation_time', 0.0)
+                }
+            
+            # Stage 2 data
+            if 'stage_2' in result:
+                sample_data["stage_2"] = {
+                    "user_prompt": result['stage_2'].get('user_prompt', ''),
+                    "raw_response": result['stage_2'].get('raw_response', ''),
+                    "generation_time": result['stage_2'].get('generation_time', 0.0)
+                }
+            
+            debug_data["samples"].append(sample_data)
+    
+    else:
+        # === SINGLE-STAGE ===
+        
+        # Extract shared system prompt from first successful sample
+        first_success = next((r for r in raw_results if r.get('success')), None)
+        
+        if first_success and 'system_prompt' in first_success:
+            debug_data["shared_prompts"] = {
+                "system_prompt": first_success['system_prompt']
+            }
+        
+        # Per-sample data (single-stage)
+        for result in raw_results:
+            if not result.get('success'):
+                continue
+            
+            debug_data["samples"].append({
+                "sent_id": result.get('sent_id', 'unknown'),
+                "user_prompt": result.get('user_prompt', ''),
+                "raw_response": result.get('raw_response', ''),
+                "generation_time": result.get('generation_time', 0.0)
+            })
+    
+    # Save debug info
+    debug_file = experiment_dir / "debug_info.json"
+    _save_json(debug_file, debug_data, "Debug info")
+    
+    print(f"   📊 Saved {len(debug_data['samples'])} samples to debug_info.json")
+    
+    return str(debug_file)
 
 def list_experiments(model_name: Optional[str] = None, results_dir: str = "results") -> List[Dict[str, str]]:
     """
@@ -265,6 +420,7 @@ def list_experiments(model_name: Optional[str] = None, results_dir: str = "resul
                     'result_file': str(result_file),
                     'has_metadata': (exp_dir / "metadata.json").exists(),
                     'has_config': (exp_dir / "config.json").exists(),
+                    'has_debug_info': (exp_dir / "debug_info.json").exists(),  
                 })
     
     return experiments
@@ -288,7 +444,8 @@ def load_experiment_results(
         {
             'results': [...],
             'metadata': {...},
-            'config': {...}
+            'config': {...},
+            'debug_info': {...}
         }
     
     Raises:
@@ -326,4 +483,12 @@ def load_experiment_results(
     else:
         data['config'] = None
     
+    # Load debug info (optional)
+    debug_file = exp_dir / "debug_info.json"
+    if debug_file.exists():
+        with open(debug_file, 'r', encoding='utf-8') as f:
+            data['debug_info'] = json.load(f)
+    else:
+        data['debug_info'] = None
+        
     return data
