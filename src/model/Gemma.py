@@ -4,7 +4,7 @@ import re
 import json
 import time
 import torch
-from typing import Tuple, Dict, Any, List
+from typing import Tuple, Dict, Any, List, Union
 from transformers import Gemma3ForConditionalGeneration, AutoProcessor
 from .BaseModel import BaseModel
 
