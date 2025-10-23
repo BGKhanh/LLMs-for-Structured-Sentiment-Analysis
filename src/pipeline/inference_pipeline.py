@@ -55,6 +55,7 @@ class InferencePipeline:
         # Components (initialized in setup)
         self.model = None
         self.prompt_template = None
+        self.dataloader = None
         self.dataset = None
         
         # Results storage
@@ -93,9 +94,9 @@ class InferencePipeline:
         print("=" * 80)
         
         self._setup_environment()
-        self._load_dataset()
         self._init_prompt_template()
         self._init_model()
+        self._load_dataset()
         
         self.is_setup = True
         print("\n✅ Pipeline setup complete!\n")
@@ -107,28 +108,52 @@ class InferencePipeline:
         print(f"  ✅ Random seed set to {self.config.random_seed}")
     
     def _load_dataset(self):
-        """Công đoạn 3: Load data."""
-        print("\n[2/4] Loading dataset...")
+        """Công đoạn 5: Load data."""
+        print("\n[4/4] Loading dataset...")
         
         dataset_path = self.config.data.get_dataset_path()
         print(f"  📁 Dataset: {dataset_path}")
         
-        with open(dataset_path, 'r', encoding='utf-8') as f:
-            self.dataset = json.load(f)
-        
-        # Apply n_sample limit if specified
-        if self.config.data.num_samples is not None and self.config.data.num_samples > 0:
-            original_len = len(self.dataset)
-            self.dataset = self.dataset[:self.config.data.num_samples]
-            print(f"  📊 Limited to {len(self.dataset)}/{original_len} samples")
+        is_two_stage = (self.config.prompt.technique == "zero_shot_cot")
+
+        if not is_two_stage:
+            self.dataloader = create_sentiment_dataloader(
+                data_path=dataset_path,
+                processor=self.model.processor,
+                prompt_generator=self.prompt_template.get_prompt,
+                batch_size=self.config.data.batch_size,
+                shuffle=False
+            )
+
+            if self.config.data.num_samples is not None and self.config.data.num_samples > 0:
+                original_len = len(self.dataloader.dataset)
+                self.dataloader.dataset.data = self.dataloader.dataset.data[:self.config.data.num_samples]
+                print(f"  📊 Limited to {len(self.dataloader.dataset)}/{original_len} samples")
+            else:
+                print(f"  📊 Loaded {len(self.dataloader.dataset)} samples")
+
+            # Đồng bộ self.dataset để dùng chung
+            self.dataset = self.dataloader.dataset.data
+            self.stats['total_samples'] = len(self.dataset)
+
         else:
-            print(f"  📊 Loaded {len(self.dataset)} samples")
-        
-        self.stats['total_samples'] = len(self.dataset)
+            # Two-stage: cần list cho Stage 1 tuần tự
+            with open(dataset_path, 'r', encoding='utf-8') as f:
+                self.dataset = json.load(f)
+
+            # Apply num_samples
+            if self.config.data.num_samples is not None and self.config.data.num_samples > 0:
+                original_len = len(self.dataset)
+                self.dataset = self.dataset[:self.config.data.num_samples]
+                print(f"  📊 Limited to {len(self.dataset)}/{original_len} samples")
+            else:
+                print(f"  📊 Loaded {len(self.dataset)} samples")
+
+            self.stats['total_samples'] = len(self.dataset)
     
     def _init_prompt_template(self):
-        """Công đoạn 4: Initialize prompt template."""
-        print("\n[3/4] Initializing prompt template...")
+        """Công đoạn 3: Initialize prompt template."""
+        print("\n[2/4] Initializing prompt template...")
         
         technique = self.config.prompt.technique
         print(f"  🎯 Technique: {technique}")
@@ -151,8 +176,8 @@ class InferencePipeline:
         print(f"  ✅ {technique} prompt template ready")
     
     def _init_model(self):
-        """Công đoạn 5: Initialize model."""
-        print("\n[4/4] Initializing model...")
+        """Công đoạn 4: Initialize model."""
+        print("\n[3/4] Initializing model...")
         
         model_name = self.config.model.name
         print(f"  🤖 Model: {model_name}")
@@ -209,45 +234,35 @@ class InferencePipeline:
    
     def _run_single_stage_inference(self):
         """
-        Single-stage inference using DataLoader.
+        Single-stage inference using DataLoader prepared in setup().
         
         Uses data_loader infrastructure for efficient batching.
         Leverages pre-tokenized inputs from collator (no re-tokenization).
         Tracks prompts and timing for debug_info.
         """
-        # Create DataLoader
-        dataloader = create_sentiment_dataloader(
-            data_path=self.config.data.get_dataset_path(),
-            processor=self.model.processor,
-            prompt_generator=self.prompt_template.get_prompt,
-            batch_size=self.config.data.batch_size,
-            shuffle=False
-        )
-        
+        if self.dataloader is None:
+            raise RuntimeError("Dataloader not prepared. Call setup() first.")
+
+        dataloader = self.dataloader
         total_samples = len(dataloader.dataset)
         num_batches = len(dataloader)
         
         print(f"Processing {total_samples} samples in {num_batches} batches (batch_size={self.config.data.batch_size})...")
         
-        # Process batches
         for batch_idx, batch in enumerate(tqdm(dataloader, desc="Inference", unit="batch")):
             try:
-                # Extract metadata from batch
                 texts = batch["texts"]
                 sent_ids = batch["sent_ids"]
                 system_prompts = batch["system_prompts"]
                 user_prompts = batch["user_prompts"]
                 
-                # ✅ Use pre-tokenized inputs from collator (no re-tokenization!)
                 tokenized_inputs = {
                     'input_ids': batch['input_ids'],
                     'attention_mask': batch['attention_mask']
                 }
                 
-                # Generate responses (batch) - Pass tokenized inputs directly
                 batch_responses, gen_time = self.model.generate_batch(tokenized_inputs)
                 
-                # Track timing
                 self.stats['total_generation_time'] += gen_time
                 self.stats['batch_times'].append({
                     'batch_idx': batch_idx,
@@ -256,7 +271,6 @@ class InferencePipeline:
                     'time_per_sample': gen_time / len(texts) if len(texts) > 0 else 0
                 })
                 
-                # Store results with full metadata
                 time_per_sample = gen_time / len(texts) if len(texts) > 0 else 0
                 for text, sent_id, sys_p, usr_p, response in zip(
                     texts, sent_ids, system_prompts, user_prompts, batch_responses
@@ -272,13 +286,11 @@ class InferencePipeline:
                     })
                     self.stats['successful'] += 1
                 
-                # Periodic GPU cleanup
                 if (batch_idx + 1) % self.config.cleanup_frequency == 0:
                     torch.cuda.empty_cache()
-                
+            
             except Exception as e:
                 print(f"\n⚠️  Error processing batch {batch_idx + 1}/{num_batches}: {e}")
-                # Mark all samples in batch as failed
                 for i in range(len(batch["sent_ids"])):
                     self.raw_results.append({
                         'sent_id': batch["sent_ids"][i],
@@ -290,178 +302,150 @@ class InferencePipeline:
     
     def _run_two_stage_inference(self):
         """
-        Zero-shot CoT two-stage inference with DataLoader.
-        
-        Stage 1: Generate reasoning (batched)
-        Stage 2: Extract structured output (batched)
-        
-        Tracks full stage info for debug_info.
+        Zero-shot CoT two-stage inference.
+
+        Stage 1: Generate reasoning (batched with DataLoader)
+        Stage 2: Extract structured output (batched with DataLoader, using preloaded_data)
         """
         batch_size = self.config.data.batch_size
-        total_samples = len(self.dataset)
-        num_batches = (total_samples + batch_size - 1) // batch_size
-        
-        # ===== STAGE 1: Generate Reasoning =====
+
+        # ===== STAGE 1: Generate Reasoning (DataLoader) =====
         print("\n--- STAGE 1: Generate Reasoning ---")
+
+        stage1_dataloader = create_sentiment_dataloader(
+            data_path=None,
+            processor=self.model.processor,
+            prompt_generator=lambda t, s: self.prompt_template.get_prompt(t, s, stage="stage_1"),
+            batch_size=self.config.data.batch_size,
+            shuffle=False,
+            preloaded_data=self.dataset  # dùng đúng subset/thứ tự đã load
+        )
+
+        total_samples = len(stage1_dataloader.dataset)
+        num_batches = len(stage1_dataloader)
         print(f"Processing {total_samples} samples in {num_batches} batches...")
-        
-        stage1_data = []  # Track stage 1 info for each sample
-        
-        for batch_idx in tqdm(range(num_batches), desc="Stage 1", unit="batch"):
-            start_idx = batch_idx * batch_size
-            end_idx = min(start_idx + batch_size, total_samples)
-            batch_samples = self.dataset[start_idx:end_idx]
-            
+
+        for batch_idx, batch in enumerate(tqdm(stage1_dataloader, desc="Stage 1", unit="batch")):
             try:
-                batch_messages = []
-                batch_metadata = []
-                
-                for sample in batch_samples:
-                    text = sample['text']
-                    sent_id = sample['sent_id']
-                    
-                    # Get stage 1 prompts
-                    system_prompt, user_prompt = self.prompt_template.get_prompt(
-                        text, sent_id, stage="stage_1"
-                    )
-                    
-                    messages = [
-                        {"role": "system", "content": [{"type": "text", "text": system_prompt}]},
-                        {"role": "user", "content": [{"type": "text", "text": user_prompt}]}
-                    ]
-                    
-                    batch_messages.append(messages)
-                    batch_metadata.append({
-                        'sent_id': sent_id,
-                        'text': text,
-                        'system_prompt': system_prompt,
-                        'user_prompt': user_prompt
-                    })
-                
-                # Generate stage 1 (reasoning)
-                batch_reasonings, gen_time = self.model.generate_batch(batch_messages)
-                
-                # Track timing
+                tokenized_inputs = {
+                    'input_ids': batch['input_ids'],
+                    'attention_mask': batch['attention_mask']
+                }
+
+                batch_reasonings, gen_time = self.model.generate_batch(tokenized_inputs)
                 self.stats['total_generation_time'] += gen_time
-                time_per_sample = gen_time / len(batch_messages) if len(batch_messages) > 0 else 0
-                
-                # Store stage 1 data
-                for meta, reasoning in zip(batch_metadata, batch_reasonings):
-                    self.reasoning_map[meta['sent_id']] = {
-                        'text': meta['text'],
-                        'system_prompt': meta['system_prompt'],
-                        'user_prompt': meta['user_prompt'],
+                time_per_sample = gen_time / len(batch['sent_ids']) if len(batch['sent_ids']) > 0 else 0
+
+                for sent_id, text, sys_p, usr_p, reasoning in zip(
+                    batch['sent_ids'], batch['texts'], batch['system_prompts'], batch['user_prompts'], batch_reasonings
+                ):
+                    sid = str(sent_id)
+                    self.reasoning_map[sid] = {
+                        'text': text,
+                        'system_prompt': sys_p,
+                        'user_prompt': usr_p,
                         'raw_response': reasoning,
                         'generation_time': time_per_sample
                     }
-                
-                # Periodic GPU cleanup
+
                 if (batch_idx + 1) % self.config.cleanup_frequency == 0:
                     torch.cuda.empty_cache()
-                
+
             except Exception as e:
                 print(f"\n⚠️  Stage 1 error for batch {batch_idx + 1}/{num_batches}: {e}")
-                # Store empty reasoning for failed samples
-                for sample in batch_samples:
-                    self.reasoning_map[sample['sent_id']] = {
-                        'text': sample.get('text', ''),
+                for sent_id, text in zip(batch['sent_ids'], batch['texts']):
+                    sid = str(sent_id)
+                    self.reasoning_map[sid] = {
+                        'text': text,
                         'system_prompt': '',
                         'user_prompt': '',
                         'raw_response': '',
                         'generation_time': 0.0,
                         'error': str(e)
                     }
-        
+
         print(f"✅ Stage 1 complete: {len(self.reasoning_map)} reasonings generated")
-        
-        # ===== STAGE 2: Extract Structured Output =====
+
+        # ===== STAGE 2: Extract Structured Output (DataLoader with preloaded_data) =====
         print("\n--- STAGE 2: Extract Structured Output ---")
+
+        def _stage2_prompt_gen(text: str, sent_id: str):
+            sid = str(sent_id)
+            r = self.reasoning_map.get(sid, {}).get('raw_response', '')
+            if not r:
+                raise ValueError(f"No reasoning from Stage 1 for {sid}")
+            return self.prompt_template.get_prompt(text, sid, stage="stage_2", reasoning=r)
+
+        stage2_dataloader = create_sentiment_dataloader(
+            data_path=None,
+            processor=self.model.processor,
+            prompt_generator=_stage2_prompt_gen,
+            batch_size=self.config.data.batch_size,
+            shuffle=False,
+            preloaded_data=self.dataset  # cùng subset/thứ tự như Stage 1
+        )
+
+        total_samples = len(stage2_dataloader.dataset)
+        num_batches = len(stage2_dataloader)
         print(f"Processing {total_samples} samples in {num_batches} batches...")
-        
-        for batch_idx in tqdm(range(num_batches), desc="Stage 2", unit="batch"):
-            start_idx = batch_idx * batch_size
-            end_idx = min(start_idx + batch_size, total_samples)
-            batch_samples = self.dataset[start_idx:end_idx]
-            
+
+        for batch_idx, batch in enumerate(tqdm(stage2_dataloader, desc="Stage 2", unit="batch")):
             try:
-                batch_messages = []
-                batch_metadata = []
-                
-                for sample in batch_samples:
-                    text = sample['text']
-                    sent_id = sample['sent_id']
-                    
-                    # Get stage 1 data
-                    stage1_data = self.reasoning_map.get(sent_id, {})
-                    reasoning = stage1_data.get('raw_response', '')
-                    
-                    if not reasoning:
-                        raise ValueError(f"No reasoning from Stage 1 for {sent_id}")
-                    
-                    # Get stage 2 prompts
-                    system_prompt, user_prompt = self.prompt_template.get_prompt(
-                        text, sent_id, stage="stage_2", reasoning=reasoning
-                    )
-                    
-                    messages = [
-                        {"role": "system", "content": [{"type": "text", "text": system_prompt}]},
-                        {"role": "user", "content": [{"type": "text", "text": user_prompt}]}
-                    ]
-                    
-                    batch_messages.append(messages)
-                    batch_metadata.append({
-                        'sent_id': sent_id,
-                        'text': text,
-                        'stage_1': stage1_data,  # Full stage 1 info
-                        'stage_2_system_prompt': system_prompt,
-                        'stage_2_user_prompt': user_prompt
-                    })
-                
-                # Generate stage 2 (structured output)
-                batch_responses, gen_time = self.model.generate_batch(batch_messages)
-                
-                # Track timing
+                texts = batch["texts"]
+                sent_ids = batch["sent_ids"]
+                system_prompts = batch["system_prompts"]
+                user_prompts = batch["user_prompts"]
+
+                tokenized_inputs = {
+                    'input_ids': batch['input_ids'],
+                    'attention_mask': batch['attention_mask']
+                }
+
+                batch_responses, gen_time = self.model.generate_batch(tokenized_inputs)
                 self.stats['total_generation_time'] += gen_time
-                time_per_sample = gen_time / len(batch_messages) if len(batch_messages) > 0 else 0
-                
-                # Store results with full multi-stage info
-                for meta, raw_response in zip(batch_metadata, batch_responses):
+                time_per_sample = gen_time / len(texts) if len(texts) > 0 else 0
+
+                for text, sid, sys_p2, usr_p2, response2 in zip(
+                    texts, sent_ids, system_prompts, user_prompts, batch_responses
+                ):
+                    sid_str = str(sid)
+                    st1 = self.reasoning_map.get(sid_str, {})
+                    if not st1 or not st1.get('raw_response'):
+                        raise ValueError(f"No reasoning from Stage 1 for {sid_str}")
+
                     self.raw_results.append({
-                        'sent_id': meta['sent_id'],
-                        'text': meta['text'],
-                        # Stage 1 info
+                        'sent_id': sid_str,
+                        'text': text,
                         'stage_1': {
-                            'system_prompt': meta['stage_1']['system_prompt'],
-                            'user_prompt': meta['stage_1']['user_prompt'],
-                            'raw_response': meta['stage_1']['raw_response'],
-                            'generation_time': meta['stage_1']['generation_time']
+                            'system_prompt': st1.get('system_prompt', ''),
+                            'user_prompt': st1.get('user_prompt', ''),
+                            'raw_response': st1.get('raw_response', ''),
+                            'generation_time': st1.get('generation_time', 0.0)
                         },
-                        # Stage 2 info
                         'stage_2': {
-                            'system_prompt': meta['stage_2_system_prompt'],
-                            'user_prompt': meta['stage_2_user_prompt'],
-                            'raw_response': raw_response,
+                            'system_prompt': sys_p2,
+                            'user_prompt': usr_p2,
+                            'raw_response': response2,
                             'generation_time': time_per_sample
                         },
                         'success': True
                     })
                     self.stats['successful'] += 1
-                
-                # Periodic GPU cleanup
+
                 if (batch_idx + 1) % self.config.cleanup_frequency == 0:
                     torch.cuda.empty_cache()
-                
+
             except Exception as e:
                 print(f"\n⚠️  Stage 2 error for batch {batch_idx + 1}/{num_batches}: {e}")
-                for sample in batch_samples:
+                for i in range(len(batch["sent_ids"])):
                     self.raw_results.append({
-                        'sent_id': sample.get('sent_id', 'unknown'),
-                        'text': sample.get('text', ''),
+                        'sent_id': batch["sent_ids"][i],
+                        'text': batch["texts"][i],
                         'error': str(e),
                         'success': False
                     })
                     self.stats['failed'] += 1
-        
+
         print(f"✅ Stage 2 complete!")
     
     def _postprocess_results(self):

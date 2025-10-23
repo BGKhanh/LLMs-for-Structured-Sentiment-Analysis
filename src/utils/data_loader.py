@@ -15,8 +15,9 @@ class SentimentDataset(Dataset):
     
     def __init__(
         self,
-        data_path: str,
-        prompt_generator: Callable[[str, str], Tuple[str, str]]
+        data_path: Optional[str],
+        prompt_generator: Callable[[str, str], Tuple[str, str]],
+        preloaded_data: Optional[List[Dict[str, Any]]] = None
     ):
         """
         Initialize dataset.
@@ -30,7 +31,8 @@ class SentimentDataset(Dataset):
                              - FewShot: few_shot.get_prompt
                              - ZeroShot CoT Stage 1: lambda t, s: cot.get_prompt(t, s, stage="stage_1")
                              - ZeroShot CoT Stage 2: lambda t, s: cot.get_prompt(t, s, stage="stage_2", reasoning=reasoning_map[s])
-        
+            preloaded_data: List of samples already loaded, usually used for two-stage inference to avoid loading the same dataset twice
+
         Raises:
             FileNotFoundError: If data_path doesn't exist
             
@@ -41,10 +43,16 @@ class SentimentDataset(Dataset):
             - Handling stages (if CoT)
             - Managing reasoning (if CoT stage 2)
         """
-        self.data = self._load_data(data_path)
         self.prompt_generator = prompt_generator
-    
-    def _load_data(self, data_path: str) -> List[Dict[str, Any]]:
+        if preloaded_data is not None:
+            self.data = preloaded_data
+            print(f"✅ Using preloaded dataset: {len(self.data)} samples")
+        else:
+            if not data_path:
+                raise ValueError("Either data_path or preloaded_data must be provided.")
+            self.data = self._load_data(data_path)
+            
+    def _load_data(self, data_path: str, preloaded_data: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
         """Load dataset from JSON file."""
         try:
             with open(data_path, 'r', encoding='utf-8') as f:
@@ -166,12 +174,13 @@ class SentimentCollator:
 
 # Helper function for easy DataLoader creation
 def create_sentiment_dataloader(
-    data_path: str,
+    data_path: Optional[str],
     processor,
     prompt_generator: Callable[[str, str], Tuple[str, str]],
     batch_size: int = 8,
     num_workers: int = 0,
-    shuffle: bool = False
+    shuffle: bool = False,
+    preloaded_data: Optional[List[Dict[str, Any]]] = None
 ):
     """
     Create DataLoader for sentiment analysis.
@@ -183,7 +192,7 @@ def create_sentiment_dataloader(
         batch_size: Batch size
         num_workers: Number of workers for DataLoader
         shuffle: Whether to shuffle data
-        
+        preloaded_data: List of samples already loaded
     Returns:
         DataLoader ready for inference
         
@@ -223,7 +232,8 @@ def create_sentiment_dataloader(
     
     dataset = SentimentDataset(
         data_path=data_path,
-        prompt_generator=prompt_generator
+        prompt_generator=prompt_generator,
+        preloaded_data=preloaded_data
     )
     
     collator = SentimentCollator(processor)
