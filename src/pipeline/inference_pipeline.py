@@ -208,7 +208,7 @@ class InferencePipeline:
         print("🚀 INFERENCE PHASE")
         print("=" * 80)
         
-        self.stats['start_time'] = datetime.now()
+        self.stats['start_time'] = datetime.now().isoformat()
         start_time = time.time()
         
         # Check if Zero-shot CoT (2-stage)
@@ -226,7 +226,7 @@ class InferencePipeline:
         # Postprocess results
         self._postprocess_results()
         
-        self.stats['end_time'] = datetime.now()
+        self.stats['end_time'] = datetime.now().isoformat()
         self.stats['total_time'] = time.time() - start_time
         self.is_completed = True
         
