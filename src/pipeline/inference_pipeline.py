@@ -638,7 +638,7 @@ class InferencePipeline:
         elif technique == "plan_and_solve":
             return PlanAndSolvePrompt(
                 eng=eng,
-                plus=self.config.prompt.plus
+                plus=self.config.prompt.plus_mode
             )
         
         else:
