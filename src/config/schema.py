@@ -146,7 +146,7 @@ class DataConfig:
 class PromptConfig:
     """Prompt technique configuration."""
     technique: Literal["rereading", "few_shot", "few_shot_cot", 
-                      "zero_shot_cot", "plan_solve"] = "rereading"
+                      "zero_shot_cot", "plan_and_solve"] = "rereading"
     language: Literal["vi", "en"] = "vi"
     
     # Few-shot specific parameters

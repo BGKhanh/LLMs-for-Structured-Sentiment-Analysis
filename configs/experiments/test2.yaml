@@ -37,7 +37,7 @@ data:
   num_samples: 32   # null = use all samples
 
 prompt:
-  technique: "plan_solve"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_solve
+  technique: "plan_and_solve"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
   language: "vi"
   n_shot: 0
   examples_pool_path: null
