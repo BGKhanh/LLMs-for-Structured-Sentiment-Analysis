@@ -6,8 +6,8 @@ random_seed: 42
 cleanup_frequency: 10
 
 experiment:
-  name: "test2"
-  description: "Testing 2"
+  name: "test3"
+  description: "Testing 3"
   version: "1.0"
 
 model:
