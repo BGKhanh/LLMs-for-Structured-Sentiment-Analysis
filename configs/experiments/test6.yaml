@@ -6,8 +6,8 @@ random_seed: 42
 cleanup_frequency: 10
 
 experiment:
-  name: "test5"
-  description: "Testing 5"
+  name: "test6"
+  description: "Testing 6"
   version: "1.0"
 
 model:
@@ -33,11 +33,11 @@ data:
   test_dataset_path: "/kaggle/input/vitoed/test.json"
 
   examples_pool: "train"
-  batch_size: 2
+  batch_size: 4
   num_samples: 32   # null = use all samples
 
 prompt:
-  technique: "few_shot_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
+  technique: "zero_shot_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
   language: "vi"
   n_shot: 1
   examples_pool_path: null
