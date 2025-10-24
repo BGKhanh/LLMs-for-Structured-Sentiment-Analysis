@@ -28,6 +28,7 @@ class FewShotCoTPrompt(BasePromptTemplate):
             "reasoning": """
 Bước 1: Xác định các Biểu thức Cảm xúc
 Phát hiện 5 polar expressions: "quay quay cái lồn", "thấy bị bắt nạt", "nói một câu bảo vệ người ta", "tối về lại có người nằm ôm", "cứ cầm điện thoại pin với chả không pin".
+
 Bước 2: Phân tích Tuần tự từng Opinion
 --- Opinion 1: "quay quay cái lồn" ---
 
@@ -112,14 +113,90 @@ Intensity: Standard vì diễn đạt bình thường.
             }
         },
         {
-            "text": "[PLACEHOLDER: Example text 2]",
-            "reasoning": "[PLACEHOLDER: Reasoning 2]",
-            "output": {...}
+            "text": "yêu sắp 2 năm rồi mà không biết người yêu kể chuyện cho nghe là gì 😢 đòi mấy lần toàn kêu không bình thường xịu xịu",
+            "reasoning": """
+Bước 1: Xác định các Biểu thức Cảm xúc
+Phát hiện 3 polar expressions: "yêu sắp 2 năm rồi", "không biết người yêu kể chuyện cho nghe là gì", "đòi mấy lần toàn kêu không bình thường xịu xịu".
+
+Bước 2: Phân tích Tuần tự từng Opinion
+
+--- Opinion 1: "yêu sắp 2 năm rồi" ---
+Source: Không có vì không xuất hiện đại từ nhân xưng rõ ràng.
+Target: Không có vì không có đối tượng cụ thể được nhắc đến.
+Polar_expression: "yêu sắp 2 năm rồi" vì thể hiện mối quan hệ tình cảm lâu dài.
+Polarity: Positive vì việc yêu nhau gần 2 năm thể hiện tình cảm ổn định, bền vững.
+Intensity: Standard vì diễn đạt ở mức độ bình thường, không quá phóng đại.
+
+--- Opinion 2: "không biết người yêu kể chuyện cho nghe là gì" ---
+Source: Không có.
+Target: Không có, "người yêu" ở đây là danh từ chung chỉ đối tượng nhưng không phải target cụ thể trong ngữ cảnh phân tích.
+Polar_expression: "không biết người yêu kể chuyện cho nghe là gì" vì bày tỏ sự thiếu vắng giao tiếp, cảm giác buồn bã (kèm emoji 😢).
+Polarity: Negative vì thể hiện sự thất vọng, thiếu kết nối trong quan hệ.
+Intensity: Standard vì diễn đạt ở mức độ thông thường, không quá gay gắt.
+
+--- Opinion 3: "đòi mấy lần toàn kêu không bình thường xịu xịu" ---
+Source: Không có.
+Target: Không có.
+Polar_expression: "đòi mấy lần toàn kêu không bình thường xịu xịu" vì mô tả phản ứng từ chối của người yêu.
+Polarity: Neutral vì chỉ khách quan mô tả phản ứng mà không mang tính xúc phạm hay khen ngợi rõ ràng, "xịu xịu" có thể hiểu là nhạt nhẽo nhưng không đủ mạnh để đánh giá tiêu cực.
+Intensity: Standard vì diễn đạt bình thường.
+""",
+            "output": {
+                "sent_id": 1834,
+                "text": "yêu sắp 2 năm rồi mà không biết người yêu kể chuyện cho nghe là gì 😢 đòi mấy lần toàn kêu không bình thường xịu xịu",
+                "opinions": [
+                    {
+                        "Source": [],
+                        "Target": [],
+                        "Polar_expression": ["yêu sắp 2 năm rồi"],
+                        "Polarity": "Positive",
+                        "Intensity": "Standard"
+                    },
+                    {
+                        "Source": [],
+                        "Target": [],
+                        "Polar_expression": ["không biết người yêu kể chuyện cho nghe là gì"],
+                        "Polarity": "Negative",
+                        "Intensity": "Standard"
+                    },
+                    {
+                        "Source": [],
+                        "Target": [],
+                        "Polar_expression": ["đòi mấy lần toàn kêu không bình thường xịu xịu"],
+                        "Polarity": "Neutral",
+                        "Intensity": "Standard"
+                    }
+                ]
+            }
         },
         {
-            "text": "[PLACEHOLDER: Example text 3]",
-            "reasoning": "[PLACEHOLDER: Reasoning 3]",
-            "output": {...}
+            "text": "hi vọng câu chuyện admin vừa bịa ra giúp các bạn có thêm niềm tin trong cuộc sống 😂.",
+            "reasoning": """
+Bước 1: Xác định các Biểu thức Cảm xúc
+Phát hiện 1 polar expression: "giúp các bạn có thêm niềm tin trong cuộc sống".
+
+Bước 2: Phân tích Tuần tự từng Opinion
+
+--- Opinion 1: "giúp các bạn có thêm niềm tin trong cuộc sống" ---
+Source: Không có vì không xuất hiện đại từ nhân xưng rõ ràng chỉ người phát biểu.
+Target: "câu chuyện admin vừa bịa ra" vì đây là đối tượng mà cảm xúc hướng tới, là sự vật được nhắc đến trong câu.
+Polar_expression: "giúp các bạn có thêm niềm tin trong cuộc sống" vì thể hiện tác động tích cực, mang lại hy vọng.
+Polarity: Positive vì "có thêm niềm tin" và "giúp đỡ" đều là những yếu tố tích cực, mặc dù có emoji 😂 mang tính châm biếm nhưng bản thân cụm từ vẫn mang nghĩa tích cực.
+Intensity: Standard vì diễn đạt ở mức độ bình thường, không quá phóng đại hay quá nhẹ nhàng.
+""",
+            "output": {
+                "sent_id": 1835,
+                "text": "hi vọng câu chuyện admin vừa bịa ra giúp các bạn có thêm niềm tin trong cuộc sống 😂.",
+                "opinions": [
+                    {
+                        "Source": [],
+                        "Target": ["câu chuyện admin vừa bịa ra"],
+                        "Polar_expression": ["giúp các bạn có thêm niềm tin trong cuộc sống"],
+                        "Polarity": "Positive",
+                        "Intensity": "Standard"
+                    }
+                ]
+            }
         },
         # Add more examples as needed
     ]
@@ -213,7 +290,92 @@ Intensity: Standard because the expression is normal.
                 ]
             }
         },
-        # Add more English examples
+        {
+            "text": "yêu sắp 2 năm rồi mà không biết người yêu kể chuyện cho nghe là gì 😢 đòi mấy lần toàn kêu không bình thường xịu xịu",
+            "reasoning": """
+Step 1: Identify Polar Expressions
+Detected 3 polar expressions: "yêu sắp 2 năm rồi" (been in love for almost 2 years), "không biết người yêu kể chuyện cho nghe là gì" (don't know what it's like to have a lover tell stories), "đòi mấy lần toàn kêu không bình thường xịu xịu" (asking several times, they just say it's not normal, looking dejected/sullen).
+
+Step 2: Sequential Analysis of Each Opinion
+
+--- Opinion 1: "yêu sắp 2 năm rồi" ---
+Source: None, as no clear personal pronouns appear.
+Target: None, as no specific target is mentioned.
+Polar_expression: "yêu sắp 2 năm rồi" (been in love for almost 2 years) as it expresses a long-term romantic relationship.
+Polarity: Positive because being in love for almost 2 years shows stable, lasting affection.
+Intensity: Standard because the expression is at a normal level, not overly exaggerated.
+
+--- Opinion 2: "không biết người yêu kể chuyện cho nghe là gì" ---
+Source: None.
+Target: None, "người yêu" (lover/boyfriend/girlfriend) here is a general noun referring to the subject but not a specific target in the analysis context.
+Polar_expression: "không biết người yêu kể chuyện cho nghe là gì" (don't know what it's like to have a lover tell stories) as it expresses a lack of communication, a feeling of sadness (accompanied by the 😢 emoji).
+Polarity: Negative because it shows disappointment, a lack of connection in the relationship.
+Intensity: Standard because the expression is at a normal level, not too harsh.
+
+--- Opinion 3: "đòi mấy lần toàn kêu không bình thường xịu xịu" ---
+Source: None.
+Target: None.
+Polar_expression: "đòi mấy lần toàn kêu không bình thường xịu xịu" (asking several times, they just say it's not normal, looking dejected/sullen) as it describes the lover's refusal/negative reaction.
+Polarity: Neutral because it objectively describes the reaction without clear insult or praise; "xịu xịu" (dejected/sullen/flat) can be understood as dull but not strong enough to be rated negative.
+Intensity: Standard because the expression is normal.
+""",
+            "output": {
+                "sent_id": 1834,
+                "text": "yêu sắp 2 năm rồi mà không biết người yêu kể chuyện cho nghe là gì 😢 đòi mấy lần toàn kêu không bình thường xịu xịu",
+                "opinions": [
+                    {
+                        "Source": [],
+                        "Target": [],
+                        "Polar_expression": ["yêu sắp 2 năm rồi"],
+                        "Polarity": "Positive",
+                        "Intensity": "Standard"
+                    },
+                    {
+                        "Source": [],
+                        "Target": [],
+                        "Polar_expression": ["không biết người yêu kể chuyện cho nghe là gì"],
+                        "Polarity": "Negative",
+                        "Intensity": "Standard"
+                    },
+                    {
+                        "Source": [],
+                        "Target": [],
+                        "Polar_expression": ["đòi mấy lần toàn kêu không bình thường xịu xịu"],
+                        "Polarity": "Neutral",
+                        "Intensity": "Standard"
+                    }
+                ]
+            }
+        },
+        {
+            "text": "hi vọng câu chuyện admin vừa bịa ra giúp các bạn có thêm niềm tin trong cuộc sống 😂.",
+            "reasoning": """
+Step 1: Identify Polar Expressions
+Detected 1 polar expression: "giúp các bạn có thêm niềm tin trong cuộc sống" (helps you have more faith in life).
+
+Step 2: Sequential Analysis of Each Opinion
+
+--- Opinion 1: "giúp các bạn có thêm niềm tin trong cuộc sống" ---
+Source: None, as no clear personal pronoun explicitly identifies the speaker.
+Target: "câu chuyện admin vừa bịa ra" (the story the admin just fabricated) because this is the object the sentiment is directed at, the entity mentioned in the sentence.
+Polar_expression: "giúp các bạn có thêm niềm tin trong cuộc sống" (helps you have more faith in life) as it expresses a positive effect, bringing hope.
+Polarity: Positive because "have more faith" and "help" are positive elements, although the 😂 emoji suggests sarcasm, the phrase itself still carries a positive meaning.
+Intensity: Standard because the expression is at a normal level, neither overly exaggerated nor too mild.
+""",
+            "output": {
+                "sent_id": 1835,
+                "text": "hi vọng câu chuyện admin vừa bịa ra giúp các bạn có thêm niềm tin trong cuộc sống 😂.",
+                "opinions": [
+                    {
+                        "Source": [],
+                        "Target": ["câu chuyện admin vừa bịa ra"],
+                        "Polar_expression": ["giúp các bạn có thêm niềm tin trong cuộc sống"],
+                        "Polarity": "Positive",
+                        "Intensity": "Standard"
+                    }
+                ]
+            }
+        },
     ]
     
     def __init__(self, eng: bool = False, n_shot: int = 3):
