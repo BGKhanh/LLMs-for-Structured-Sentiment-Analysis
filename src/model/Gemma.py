@@ -141,7 +141,7 @@ class GemmaModel(BaseModel):
     def generate_batch(
         self, 
         inputs: Union[List[List[Dict[str, Any]]], Dict[str, torch.Tensor]]
-    ) -> Tuple[List[str], float]:
+    ) -> Tuple[List[str], float, List[int]]:
         """
         Generate responses for batch inputs.
         
@@ -156,7 +156,7 @@ class GemmaModel(BaseModel):
                 - List[List[Dict]]: Raw messages for chat template
         
         Returns:
-            Tuple of (batch_responses, generation_time)
+            Tuple of (batch_responses, generation_time, output_token_counts)
         """
         if not self.is_loaded:
             self.load_model()
@@ -211,9 +211,29 @@ class GemmaModel(BaseModel):
             # ===== DECODE OUTPUTS =====
             # Extract only new tokens (remove input)
             output_ids = generated_outputs[:, input_length:]
+            
+            # Get special token IDs for proper counting
+            pad_token_id = getattr(self.processor.tokenizer, 'pad_token_id', None)
+            eos_token_id = getattr(self.processor.tokenizer, 'eos_token_id', None)
+        
+            # Count output tokens per sample (exclude PAD and EOS)
+            output_token_counts = []
+            for i in range(output_ids.size(0)):
+                seq = output_ids[i]
+                count = 0
+                for token_id in seq:
+                    tid = token_id.item()
+                    # Stop counting at first PAD or EOS token
+                    if (pad_token_id is not None and tid == pad_token_id) or \
+                    (eos_token_id is not None and tid == eos_token_id):
+                        break
+                    count += 1
+                output_token_counts.append(count)
+                
+            # ===== DECODE OUTPUTS =====
             batch_responses = self.processor.batch_decode(output_ids, skip_special_tokens=True)
             
-            return batch_responses, batch_time
+            return batch_responses, batch_time, output_token_counts
             
         except Exception as e:
             print(f"❌ Error in generate_batch: {str(e)}")

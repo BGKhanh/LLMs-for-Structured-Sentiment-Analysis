@@ -335,7 +335,9 @@ def save_debug_info(
                 sample_data["stage_1"] = {
                     "user_prompt": result['stage_1'].get('user_prompt', ''),
                     "raw_response": result['stage_1'].get('raw_response', ''),
-                    "generation_time": result['stage_1'].get('generation_time', 0.0)
+                    "generation_time": result['stage_1'].get('generation_time', 0.0),
+                    "input_tokens": result['stage_1'].get('input_tokens', 0),      
+                    "output_tokens": result['stage_1'].get('output_tokens', 0)     
                 }
             
             # Stage 2 data
@@ -343,7 +345,9 @@ def save_debug_info(
                 sample_data["stage_2"] = {
                     "user_prompt": result['stage_2'].get('user_prompt', ''),
                     "raw_response": result['stage_2'].get('raw_response', ''),
-                    "generation_time": result['stage_2'].get('generation_time', 0.0)
+                    "generation_time": result['stage_2'].get('generation_time', 0.0),
+                    "input_tokens": result['stage_2'].get('input_tokens', 0),      
+                    "output_tokens": result['stage_2'].get('output_tokens', 0)     
                 }
             
             debug_data["samples"].append(sample_data)
@@ -368,7 +372,9 @@ def save_debug_info(
                 "sent_id": result.get('sent_id', 'unknown'),
                 "user_prompt": result.get('user_prompt', ''),
                 "raw_response": result.get('raw_response', ''),
-                "generation_time": result.get('generation_time', 0.0)
+                "generation_time": result.get('generation_time', 0.0),
+                "input_tokens": result.get('input_tokens', 0),      
+                "output_tokens": result.get('output_tokens', 0)     
             })
     
     # Save debug info

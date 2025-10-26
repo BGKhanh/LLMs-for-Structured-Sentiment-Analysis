@@ -27,7 +27,7 @@ from src.utils import (
 )
 from src.model import GemmaModel
 from src.prompt_templates import *
-# etc.
+
 
 # === MAIN CLASS ===
 class InferencePipeline:
@@ -75,7 +75,9 @@ class InferencePipeline:
             'successful': 0,
             'failed': 0,
             'total_samples': 0,
-            'total_opinions': 0
+            'total_opinions': 0,
+            'total_input_tokens': 0,      
+            'total_output_tokens': 0      
         }
         
         # Flags
@@ -256,14 +258,20 @@ class InferencePipeline:
                 system_prompts = batch["system_prompts"]
                 user_prompts = batch["user_prompts"]
                 
+                # === COUNT INPUT TOKENS FROM BATCH ===
+                input_token_counts = batch['attention_mask'].sum(dim=1).tolist()
+        
                 tokenized_inputs = {
                     'input_ids': batch['input_ids'],
                     'attention_mask': batch['attention_mask']
                 }
                 
-                batch_responses, gen_time = self.model.generate_batch(tokenized_inputs)
+                batch_responses, gen_time, output_token_counts = self.model.generate_batch(tokenized_inputs)
                 
+                # === STATS ===
                 self.stats['total_generation_time'] += gen_time
+                self.stats['total_input_tokens'] += sum(input_token_counts)
+                self.stats['total_output_tokens'] += sum(output_token_counts)
                 self.stats['batch_times'].append({
                     'batch_idx': batch_idx,
                     'batch_size': len(texts),
@@ -272,8 +280,9 @@ class InferencePipeline:
                 })
                 
                 time_per_sample = gen_time / len(texts) if len(texts) > 0 else 0
-                for text, sent_id, sys_p, usr_p, response in zip(
-                    texts, sent_ids, system_prompts, user_prompts, batch_responses
+                for text, sent_id, sys_p, usr_p, response, in_tok, out_tok in zip(
+                    texts, sent_ids, system_prompts, user_prompts, batch_responses,
+                    input_token_counts, output_token_counts
                 ):
                     self.raw_results.append({
                         'sent_id': sent_id,
@@ -282,6 +291,8 @@ class InferencePipeline:
                         'user_prompt': usr_p,
                         'raw_response': response,
                         'generation_time': time_per_sample,
+                        'input_tokens': in_tok,      
+                        'output_tokens': out_tok,    
                         'success': True
                     })
                     self.stats['successful'] += 1
@@ -327,17 +338,26 @@ class InferencePipeline:
 
         for batch_idx, batch in enumerate(tqdm(stage1_dataloader, desc="Stage 1", unit="batch")):
             try:
+                # === COUNT INPUT TOKENS FROM BATCH ===
+                input_token_counts = batch['attention_mask'].sum(dim=1).tolist()
+        
                 tokenized_inputs = {
                     'input_ids': batch['input_ids'],
                     'attention_mask': batch['attention_mask']
                 }
 
-                batch_reasonings, gen_time = self.model.generate_batch(tokenized_inputs)
+                batch_reasonings, gen_time, output_token_counts = self.model.generate_batch(tokenized_inputs)
+                
+                # === STATS ===
                 self.stats['total_generation_time'] += gen_time
+                self.stats['total_input_tokens'] += sum(input_token_counts)
+                self.stats['total_output_tokens'] += sum(output_token_counts)
                 time_per_sample = gen_time / len(batch['sent_ids']) if len(batch['sent_ids']) > 0 else 0
 
-                for sent_id, text, sys_p, usr_p, reasoning in zip(
-                    batch['sent_ids'], batch['texts'], batch['system_prompts'], batch['user_prompts'], batch_reasonings
+                for sent_id, text, sys_p, usr_p, reasoning, in_tok, out_tok in zip(
+                    batch['sent_ids'], batch['texts'], batch['system_prompts'], 
+                    batch['user_prompts'], batch_reasonings,
+                    input_token_counts, output_token_counts
                 ):
                     sid = str(sent_id)
                     self.reasoning_map[sid] = {
@@ -345,7 +365,9 @@ class InferencePipeline:
                         'system_prompt': sys_p,
                         'user_prompt': usr_p,
                         'raw_response': reasoning,
-                        'generation_time': time_per_sample
+                        'generation_time': time_per_sample,
+                        'input_tokens': in_tok,    
+                        'output_tokens': out_tok    
                     }
 
                 if (batch_idx + 1) % self.config.cleanup_frequency == 0:
@@ -396,17 +418,25 @@ class InferencePipeline:
                 system_prompts = batch["system_prompts"]
                 user_prompts = batch["user_prompts"]
 
+                # === COUNT INPUT TOKENS FROM BATCH ===
+                input_token_counts = batch['attention_mask'].sum(dim=1).tolist()
+        
                 tokenized_inputs = {
                     'input_ids': batch['input_ids'],
                     'attention_mask': batch['attention_mask']
                 }
-
-                batch_responses, gen_time = self.model.generate_batch(tokenized_inputs)
+        
+                batch_responses, gen_time, output_token_counts = self.model.generate_batch(tokenized_inputs)
+                
+                # === STATS ===
                 self.stats['total_generation_time'] += gen_time
+                self.stats['total_input_tokens'] += sum(input_token_counts)
+                self.stats['total_output_tokens'] += sum(output_token_counts)
                 time_per_sample = gen_time / len(texts) if len(texts) > 0 else 0
 
-                for text, sid, sys_p2, usr_p2, response2 in zip(
-                    texts, sent_ids, system_prompts, user_prompts, batch_responses
+                for text, sid, sys_p2, usr_p2, response2, in_tok, out_tok in zip(
+                    texts, sent_ids, system_prompts, user_prompts, batch_responses,
+                    input_token_counts, output_token_counts
                 ):
                     sid_str = str(sid)
                     st1 = self.reasoning_map.get(sid_str, {})
@@ -420,13 +450,17 @@ class InferencePipeline:
                             'system_prompt': st1.get('system_prompt', ''),
                             'user_prompt': st1.get('user_prompt', ''),
                             'raw_response': st1.get('raw_response', ''),
-                            'generation_time': st1.get('generation_time', 0.0)
+                            'generation_time': st1.get('generation_time', 0.0),
+                            'input_tokens': st1.get('input_tokens', 0),      # NEW
+                            'output_tokens': st1.get('output_tokens', 0)     # NEW
                         },
                         'stage_2': {
                             'system_prompt': sys_p2,
                             'user_prompt': usr_p2,
                             'raw_response': response2,
-                            'generation_time': time_per_sample
+                            'generation_time': time_per_sample,
+                            'input_tokens': in_tok,      # NEW
+                            'output_tokens': out_tok     # NEW
                         },
                         'success': True
                     })
@@ -579,6 +613,12 @@ class InferencePipeline:
         print(f"Avg Time/Sample: {self.stats.get('avg_sample_time', 0):.2f}s")
         print(f"Avg Batch Time : {self.stats.get('avg_batch_time', 0):.2f}s")
         print("-" * 80)
+        print(f"Total Input Tokens      : {self.stats['total_input_tokens']:,}")
+        print(f"Total Output Tokens     : {self.stats['total_output_tokens']:,}")
+        print(f"Total Tokens            : {self.stats.get('total_tokens', 0):,}")
+        print(f"Avg Input Tokens/Sample : {self.stats.get('avg_input_tokens_per_sample', 0):.2f}")
+        print(f"Avg Output Tokens/Sample: {self.stats.get('avg_output_tokens_per_sample', 0):.2f}")
+        print("-" * 80)
     
     # ========================================================================
     # MAIN ENTRY
@@ -669,4 +709,18 @@ class InferencePipeline:
         )
         self.stats['avg_time_per_sample'] = (
             self.stats['total_time'] / total if total > 0 else 0
+        )
+        
+        self.stats['avg_input_tokens_per_sample'] = (
+            self.stats['total_input_tokens'] / successful if successful > 0 else 0
+        )
+        self.stats['avg_output_tokens_per_sample'] = (
+            self.stats['total_output_tokens'] / successful if successful > 0 else 0
+        )
+        self.stats['total_tokens'] = (
+            self.stats['total_input_tokens'] + self.stats['total_output_tokens']
+        )
+        self.stats['avg_batch_time'] = (
+            sum(b['generation_time'] for b in self.stats['batch_times']) / len(self.stats['batch_times'])
+            if self.stats['batch_times'] else 0
         )
