@@ -1,0 +1,48 @@
+{
+  "random_seed": 42,
+  "experiment": {
+    "name": "Fewshot_experiment_1",
+    "description": "Few-shot technique, experiment 1, n-shot = 1",
+    "version": "1.0"
+  },
+  "model": {
+    "name": "gemma",
+    "model_id": "google/gemma-3-4b-it",
+    "dtype": "float32",
+    "device_map": "auto",
+    "trust_remote_code": true,
+    "max_new_tokens": 4096,
+    "do_sample": false,
+    "temperature": 0.1,
+    "top_p": 0.95,
+    "top_k": 50,
+    "cache_dir": null,
+    "token": null,
+    "revision": "main",
+    "additional_model_kwargs": {}
+  },
+  "data": {
+    "dataset": "dev",
+    "train_dataset_path": "/kaggle/input/vitoed/train.json",
+    "dev_dataset_path": "/kaggle/input/vitoed/dev.json",
+    "test_dataset_path": "/kaggle/input/vitoed/test.json",
+    "examples_pool": "train",
+    "batch_size": 4,
+    "num_samples": null
+  },
+  "prompt": {
+    "technique": "few_shot",
+    "language": "vi",
+    "n_shot": 1,
+    "examples_pool_path": null,
+    "plus_mode": false
+  },
+  "output": {
+    "output_dir": "/kaggle/working/Reasoning-Techniques-on-LLM/results",
+    "output_file": "results.json",
+    "save_metadata": true,
+    "save_config_copy": true,
+    "overwrite": false
+  },
+  "cleanup_frequency": 10
+}
