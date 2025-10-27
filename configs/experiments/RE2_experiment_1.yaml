@@ -34,7 +34,7 @@ data:
 
   examples_pool: "train"
   batch_size: 8
-  num_samples: None   # None = use all samples
+  num_samples: null   # null = use all samples
 
 prompt:
   technique: "rereading"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
