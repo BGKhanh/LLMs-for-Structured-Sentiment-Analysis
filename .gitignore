@@ -213,3 +213,6 @@ data/
 
 # semeval
 semeval22_structured_sentiment
+
+# Results
+results/
