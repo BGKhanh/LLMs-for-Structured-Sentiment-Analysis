@@ -285,7 +285,7 @@ class InferencePipeline:
                     input_token_counts, output_token_counts
                 ):
                     self.raw_results.append({
-                        'sent_id': sent_id,
+                        'sent_id': int(sent_id),
                         'text': text,
                         'system_prompt': sys_p,
                         'user_prompt': usr_p,
@@ -304,7 +304,7 @@ class InferencePipeline:
                 print(f"\n⚠️  Error processing batch {batch_idx + 1}/{num_batches}: {e}")
                 for i in range(len(batch["sent_ids"])):
                     self.raw_results.append({
-                        'sent_id': batch["sent_ids"][i],
+                        'sent_id': int(batch["sent_ids"][i]),
                         'text': batch["texts"][i],
                         'error': str(e),
                         'success': False
@@ -444,23 +444,23 @@ class InferencePipeline:
                         raise ValueError(f"No reasoning from Stage 1 for {sid_str}")
 
                     self.raw_results.append({
-                        'sent_id': sid_str,
+                        'sent_id': int(sid_str),
                         'text': text,
                         'stage_1': {
                             'system_prompt': st1.get('system_prompt', ''),
                             'user_prompt': st1.get('user_prompt', ''),
                             'raw_response': st1.get('raw_response', ''),
                             'generation_time': st1.get('generation_time', 0.0),
-                            'input_tokens': st1.get('input_tokens', 0),      # NEW
-                            'output_tokens': st1.get('output_tokens', 0)     # NEW
+                            'input_tokens': st1.get('input_tokens', 0),      
+                            'output_tokens': st1.get('output_tokens', 0)     
                         },
                         'stage_2': {
                             'system_prompt': sys_p2,
                             'user_prompt': usr_p2,
                             'raw_response': response2,
                             'generation_time': time_per_sample,
-                            'input_tokens': in_tok,      # NEW
-                            'output_tokens': out_tok     # NEW
+                            'input_tokens': in_tok,      
+                            'output_tokens': out_tok     
                         },
                         'success': True
                     })
@@ -473,7 +473,7 @@ class InferencePipeline:
                 print(f"\n⚠️  Stage 2 error for batch {batch_idx + 1}/{num_batches}: {e}")
                 for i in range(len(batch["sent_ids"])):
                     self.raw_results.append({
-                        'sent_id': batch["sent_ids"][i],
+                        'sent_id': int(batch["sent_ids"][i]),
                         'text': batch["texts"][i],
                         'error': str(e),
                         'success': False
@@ -516,7 +516,7 @@ class InferencePipeline:
                 
                 # Store final result
                 self.final_results.append({
-                    'sent_id': result['sent_id'],
+                    'sent_id': int(result['sent_id']),
                     'text': result['text'],
                     'result': processed,
                     'num_opinions': num_opinions
