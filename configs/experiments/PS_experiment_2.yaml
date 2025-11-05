@@ -6,8 +6,8 @@ random_seed: 42
 cleanup_frequency: 10
 
 experiment:
-  name: "Zero_shot_CoT_experiment_2"
-  description: "Zero-shot CoT technique, experiment 2, max new tokens = 2048"
+  name: "PS_experiment_2"
+  description: "Plan and solve technique, experiment 2, plus mode = true"
   version: "1.0"
 
 model:
@@ -33,15 +33,15 @@ data:
   test_dataset_path: "/kaggle/input/vitoed/test.json"
 
   examples_pool: "train"
-  batch_size: 2
+  batch_size: 4
   num_samples: null   # null = use all samples
 
 prompt:
-  technique: "zero_shot_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
+  technique: "plan_and_solve"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
   language: "vi"
-  n_shot: 1
+  n_shot: 0
   examples_pool_path: null
-  plus_mode: false
+  plus_mode: true
 
 output:
   output_dir: "results/"
