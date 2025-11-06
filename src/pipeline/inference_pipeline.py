@@ -124,6 +124,7 @@ class InferencePipeline:
                 processor=self.model.processor,
                 prompt_generator=self.prompt_template.get_prompt,
                 batch_size=self.config.data.batch_size,
+                num_workers=self.config.data.num_workers,
                 shuffle=False
             )
 
@@ -328,6 +329,7 @@ class InferencePipeline:
             processor=self.model.processor,
             prompt_generator=lambda t, s: self.prompt_template.get_prompt(t, s, stage="stage_1"),
             batch_size=self.config.data.batch_size,
+            num_workers=self.config.data.num_workers,
             shuffle=False,
             preloaded_data=self.dataset  # dùng đúng subset/thứ tự đã load
         )
@@ -403,6 +405,7 @@ class InferencePipeline:
             processor=self.model.processor,
             prompt_generator=_stage2_prompt_gen,
             batch_size=self.config.data.batch_size,
+            num_workers=self.config.data.num_workers,
             shuffle=False,
             preloaded_data=self.dataset  # cùng subset/thứ tự như Stage 1
         )

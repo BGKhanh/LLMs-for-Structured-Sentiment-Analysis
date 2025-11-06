@@ -110,6 +110,10 @@ class ConfigValidator:
         if self.config.data.num_samples is not None:
             if self.config.data.num_samples < 1:
                 self.errors.append("num_samples must be >= 1 or null")
+        
+        # Check num_workers
+        if getattr(self.config.data, "num_workers", 0) < 0:
+            self.errors.append("num_workers must be >= 0")
     
     def _validate_prompt(self):
         """Validate prompt configuration."""

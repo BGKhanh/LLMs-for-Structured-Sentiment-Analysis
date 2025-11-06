@@ -122,6 +122,7 @@ class DataConfig:
     
     batch_size: int = 8
     num_samples: Optional[int] = None  # None means all samples
+    num_workers: Optional[int] = 2 
 
     def get_dataset_path(self) -> str:
         """Get the selected dataset path."""
