@@ -42,6 +42,7 @@ class ModelConfig:
     temperature: float = 0.1
     top_p: float = 0.95
     top_k: int = 50
+    enable_thinking: bool = False
     
     # === OPTIONAL BUT USEFUL ===
     cache_dir: Optional[str] = None

@@ -32,13 +32,13 @@ class BaseModel(ABC):
         """
         self.config = config
         self.model = None
-        self.processor = None
+        self.tokenizer = None
         self.is_loaded = False
     
     @abstractmethod
     def load_model(self) -> None:
         """
-        Load model and processor.
+        Load model and tokenizer.
         
         Must be implemented by each model class.
         """

@@ -25,7 +25,7 @@ from src.utils import (
     save_experiment_results,
     create_sentiment_dataloader
 )
-from src.model import GemmaModel
+from src.model import *
 from src.prompt_templates import *
 
 
@@ -119,40 +119,30 @@ class InferencePipeline:
         is_two_stage = (self.config.prompt.technique == "zero_shot_cot")
 
         if not is_two_stage:
-            self.dataloader = create_sentiment_dataloader(
-                data_path=dataset_path,
-                processor=self.model.processor,
-                prompt_generator=self.prompt_template.get_prompt,
-                batch_size=self.config.data.batch_size,
-                num_workers=self.config.data.num_workers,
-                shuffle=False
-            )
-
-            if self.config.data.num_samples is not None and self.config.data.num_samples > 0:
-                original_len = len(self.dataloader.dataset)
-                self.dataloader.dataset.data = self.dataloader.dataset.data[:self.config.data.num_samples]
-                print(f"  📊 Limited to {len(self.dataloader.dataset)}/{original_len} samples")
-            else:
-                print(f"  📊 Loaded {len(self.dataloader.dataset)} samples")
-
-            # Đồng bộ self.dataset để dùng chung
-            self.dataset = self.dataloader.dataset.data
-            self.stats['total_samples'] = len(self.dataset)
-
+            prompt_generator = SingleStagePromptGen(self.prompt_template)
         else:
-            # Two-stage: cần list cho Stage 1 tuần tự
-            with open(dataset_path, 'r', encoding='utf-8') as f:
-                self.dataset = json.load(f)
+            prompt_generator = CoTStage1PromptGen(self.prompt_template)
 
-            # Apply num_samples
-            if self.config.data.num_samples is not None and self.config.data.num_samples > 0:
-                original_len = len(self.dataset)
-                self.dataset = self.dataset[:self.config.data.num_samples]
-                print(f"  📊 Limited to {len(self.dataset)}/{original_len} samples")
-            else:
-                print(f"  📊 Loaded {len(self.dataset)} samples")
+        self.dataloader = create_sentiment_dataloader(
+            data_path=dataset_path,
+            tokenizer=self.model.tokenizer,
+            prompt_generator=prompt_generator,
+            batch_size=self.config.data.batch_size,
+            num_workers=self.config.data.num_workers,
+            chat_template_builder=self.model.chat_template_builder,
+            enable_thinking=self.config.model.enable_thinking
+        )
 
-            self.stats['total_samples'] = len(self.dataset)
+        if self.config.data.num_samples is not None and self.config.data.num_samples > 0:
+            original_len = len(self.dataloader.dataset)
+            self.dataloader.dataset.data = self.dataloader.dataset.data[:self.config.data.num_samples]
+            print(f"  📊 Limited to {len(self.dataloader.dataset)}/{original_len} samples")
+        else:
+            print(f"  📊 Loaded {len(self.dataloader.dataset)} samples")
+
+        # Đồng bộ self.dataset để dùng chung
+        self.dataset = self.dataloader.dataset.data
+        self.stats['total_samples'] = len(self.dataset)
     
     def _init_prompt_template(self):
         """Công đoạn 3: Initialize prompt template."""
@@ -324,21 +314,12 @@ class InferencePipeline:
         # ===== STAGE 1: Generate Reasoning (DataLoader) =====
         print("\n--- STAGE 1: Generate Reasoning ---")
 
-        stage1_dataloader = create_sentiment_dataloader(
-            data_path=None,
-            processor=self.model.processor,
-            prompt_generator=lambda t, s: self.prompt_template.get_prompt(t, s, stage="stage_1"),
-            batch_size=self.config.data.batch_size,
-            num_workers=self.config.data.num_workers,
-            shuffle=False,
-            preloaded_data=self.dataset  # dùng đúng subset/thứ tự đã load
-        )
-
-        total_samples = len(stage1_dataloader.dataset)
-        num_batches = len(stage1_dataloader)
+        dataloader = self.dataloader
+        total_samples = len(dataloader.dataset)
+        num_batches = len(dataloader)
         print(f"Processing {total_samples} samples in {num_batches} batches...")
 
-        for batch_idx, batch in enumerate(tqdm(stage1_dataloader, desc="Stage 1", unit="batch")):
+        for batch_idx, batch in enumerate(tqdm(dataloader, desc="Stage 1", unit="batch")):
             try:
                 # === COUNT INPUT TOKENS FROM BATCH ===
                 input_token_counts = batch['attention_mask'].sum(dim=1).tolist()
@@ -393,21 +374,15 @@ class InferencePipeline:
         # ===== STAGE 2: Extract Structured Output (DataLoader with preloaded_data) =====
         print("\n--- STAGE 2: Extract Structured Output ---")
 
-        def _stage2_prompt_gen(text: str, sent_id: str):
-            sid = str(sent_id)
-            r = self.reasoning_map.get(sid, {}).get('raw_response', '')
-            if not r:
-                raise ValueError(f"No reasoning from Stage 1 for {sid}")
-            return self.prompt_template.get_prompt(text, sid, stage="stage_2", reasoning=r)
-
         stage2_dataloader = create_sentiment_dataloader(
             data_path=None,
-            processor=self.model.processor,
-            prompt_generator=_stage2_prompt_gen,
+            tokenizer=self.model.tokenizer,
+            prompt_generator=CoTStage2PromptGen(self.prompt_template, self.reasoning_map),
             batch_size=self.config.data.batch_size,
             num_workers=self.config.data.num_workers,
-            shuffle=False,
-            preloaded_data=self.dataset  # cùng subset/thứ tự như Stage 1
+            preloaded_data=self.dataset,  # cùng subset/thứ tự như Stage 1
+            chat_template_builder=self.model.chat_template_builder,
+            enable_thinking=self.config.model.enable_thinking
         )
 
         total_samples = len(stage2_dataloader.dataset)
@@ -693,7 +668,8 @@ class InferencePipeline:
         
         if model_name == "gemma":
             return GemmaModel(config=self.config.model)
-        
+        elif model_name == "qwen":
+            return QwenModel(config=self.config.model)
         # Add other models here
         # elif model_name == "mistral":
         #     return MistralModel(config=self.config.model)

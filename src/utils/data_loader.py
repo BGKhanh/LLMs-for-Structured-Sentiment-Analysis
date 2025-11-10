@@ -107,17 +107,27 @@ class SentimentCollator:
     Compatible with transformers and accelerate.
     """
     
-    def __init__(self, processor, add_generation_prompt: bool = True):
+    def __init__(
+            self,
+            tokenizer,
+            chat_template_builder: Callable[[str, str], List[Dict[str, Any]]],
+            add_generation_prompt: bool = True,
+            enable_thinking: bool = False,
+        ):        
         """
         Initialize collator.
         
         Args:
-            processor: HuggingFace processor/tokenizer
-            add_generation_prompt: Whether to add generation prompt
+            tokenizer: HuggingFace tokenizer/tokenizer
+            chat_template_builder: Callable do model cung cấp để dựng message format
+            add_generation_prompt: Có thêm generation prompt hay không
+            enable_thinking: Bật chế độ thinking (tự động bị framework bỏ qua nếu model không hỗ trợ)
         """
-        self.processor = processor
+        self.tokenizer = tokenizer
         self.add_generation_prompt = add_generation_prompt
-    
+        self.chat_template_builder = chat_template_builder
+        self.enable_thinking = enable_thinking
+        
     def __call__(self, batch: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Collate batch of samples.
@@ -143,26 +153,33 @@ class SentimentCollator:
         user_prompts = [item["user_prompt"] for item in batch]
         
         # Build messages for chat template
-        batch_messages = []
-        for item in batch:
-            messages = [
-                {"role": "system", "content": [{"type": "text", "text": item["system_prompt"]}]},
-                {"role": "user", "content": [{"type": "text", "text": item["user_prompt"]}]}
-            ]
-            batch_messages.append(messages)
+        batch_messages = [
+            self.chat_template_builder(sys_prompt, usr_prompt)
+            for sys_prompt, usr_prompt in zip(system_prompts, user_prompts)
+        ]
         
         # Apply chat template with batching
-        inputs = self.processor.apply_chat_template(
+        inputs = self.tokenizer.apply_chat_template(
             batch_messages,
             add_generation_prompt=self.add_generation_prompt,
-            tokenize=True,
-            return_tensors="pt",
-            padding=True,
-            return_dict=True
+            tokenize=False,
+            enable_thinking=self.enable_thinking
         )
-        
+        if isinstance(inputs, list):
+            tokenized = self.tokenizer(
+                inputs,
+                return_tensors="pt",
+                padding=True
+            )
+        else:   
+            tokenized = self.tokenizer(
+                [inputs],
+                return_tensors="pt",
+                padding=True
+            )
+
         return {
-            **inputs,  # input_ids, attention_mask, etc.
+            **tokenized,  # input_ids, attention_mask, etc.
             "texts": texts,
             "sent_ids": sent_ids,
             "opinions": opinions,
@@ -175,19 +192,22 @@ class SentimentCollator:
 # Helper function for easy DataLoader creation
 def create_sentiment_dataloader(
     data_path: Optional[str],
-    processor,
+    tokenizer,
     prompt_generator: Callable[[str, str], Tuple[str, str]],
     batch_size: int = 8,
     num_workers: int = 0,
     shuffle: bool = False,
-    preloaded_data: Optional[List[Dict[str, Any]]] = None
+    preloaded_data: Optional[List[Dict[str, Any]]] = None,
+    add_generation_prompt: bool = True,
+    chat_template_builder: Optional[Callable[[str, str], List[Dict[str, Any]]]] = None,
+    enable_thinking: bool = False,
 ):
     """
     Create DataLoader for sentiment analysis.
     
     Args:
         data_path: Path to dataset JSON
-        processor: HuggingFace processor/tokenizer
+        tokenizer: HuggingFace tokenizer/tokenizer
         prompt_generator: Prompt generation callable
         batch_size: Batch size
         num_workers: Number of workers for DataLoader
@@ -203,7 +223,7 @@ def create_sentiment_dataloader(
         >>> few_shot.prepare()
         >>> dataloader = create_sentiment_dataloader(
         ...     "data/test.json",
-        ...     processor,
+        ...     tokenizer,
         ...     few_shot.get_prompt,
         ...     batch_size=8
         ... )
@@ -214,7 +234,7 @@ def create_sentiment_dataloader(
         >>> cot.prepare()
         >>> dataloader = create_sentiment_dataloader(
         ...     "data/test.json",
-        ...     processor,
+        ...     tokenizer,
         ...     lambda t, s: cot.get_prompt(t, s, stage="stage_1"),
         ...     batch_size=8
         ... )
@@ -223,7 +243,7 @@ def create_sentiment_dataloader(
         >>> reasoning_map = {...}  # From stage 1 inference
         >>> dataloader = create_sentiment_dataloader(
         ...     "data/test.json",
-        ...     processor,
+        ...     tokenizer,
         ...     lambda t, s: cot.get_prompt(t, s, stage="stage_2", reasoning=reasoning_map[s]),
         ...     batch_size=8
         ... )
@@ -236,7 +256,15 @@ def create_sentiment_dataloader(
         preloaded_data=preloaded_data
     )
     
-    collator = SentimentCollator(processor)
+    if chat_template_builder is None:
+        raise ValueError("chat_template_builder must be provided by the model.")
+    
+    collator = SentimentCollator(
+        tokenizer=tokenizer,
+        chat_template_builder=chat_template_builder,
+        add_generation_prompt=add_generation_prompt,
+        enable_thinking=enable_thinking
+    )
     
     dataloader = DataLoader(
         dataset,

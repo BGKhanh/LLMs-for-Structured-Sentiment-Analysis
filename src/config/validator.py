@@ -75,6 +75,16 @@ class ConfigValidator:
             if self.config.model.top_k < 1:
                 self.errors.append("top_k must be >= 1")
         
+        # Kiểm tra enable_thinking là bool
+        if hasattr(self.config.model, 'enable_thinking'):
+            if not isinstance(self.config.model.enable_thinking, bool):
+                self.errors.append("enable_thinking must be boolean")
+                
+        if self.config.model.name != "qwen" and self.config.model.enable_thinking:
+            self.warnings.append(
+                "enable_thinking=True with non-Qwen model (may be ignored, some Qwen models aren't support thinking)"
+            ) 
+                
         # Check dtype
         valid_dtypes = ["float32", "float16", "bfloat16", "auto"]
         if self.config.model.dtype not in valid_dtypes:
@@ -112,7 +122,9 @@ class ConfigValidator:
                 self.errors.append("num_samples must be >= 1 or null")
         
         # Check num_workers
-        if getattr(self.config.data, "num_workers", 0) < 0:
+        nw = self.config.data.num_workers
+        
+        if nw is not None and nw < 0:
             self.errors.append("num_workers must be >= 0")
     
     def _validate_prompt(self):

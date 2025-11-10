@@ -1,54 +1,174 @@
-# configs/base.yaml
+# ========================================================================
+# CONFIGURATION TEMPLATE FOR STRUCTURED SENTIMENT ANALYSIS
+# ========================================================================
 #
-# Base configuration with default values.
-# Experiment configs can override these values.
+# USAGE:
+#   1. Copy this file to configs/experiments/your_experiment_name.yaml
+#   2. Modify values according to your experiment
+#   3. Run: python inference.py --config configs/experiments/your_experiment_name.yaml
+#
+# DOCUMENTATION:
+#   - HuggingFace Transformers: https://huggingface.co/docs/transformers
+#   - Model loading params: https://huggingface.co/docs/transformers/main/en/main_classes/model#transformers.PreTrainedModel.from_pretrained
+#   - Generation params: https://huggingface.co/docs/transformers/main/en/main_classes/text_generation
+#
+# ========================================================================
 
-# Random seed for reproducibility
-seed: 42
 
-# Experiment metadata
+# ========================================================================
+# PROCESSING CONFIGURATION
+# ========================================================================
+
+# Random seed for reproducibility (same seed + same config = same results)
+random_seed: 42
+
+# GPU cleanup frequency (cleanup every N batches to manage memory)
+cleanup_frequency: 10
+
+
+# ========================================================================
+# EXPERIMENT METADATA
+# ========================================================================
+
 experiment:
+  # Experiment name (used as folder name in results/, avoid special chars)
   name: "base_experiment"
-  description: "Base configuration template"
+  
+  # Experiment description (brief description for tracking)
+  description: "Base configuration template - modify this for your experiment"
+  
+  # Experiment version (format: "major.minor", e.g., "1.0", "1.1")
   version: "1.0"
 
-# Model configuration
+
+# ========================================================================
+# MODEL CONFIGURATION
+# ========================================================================
+
 model:
-  name: "gemma"  # Options: gemma, mistral, qwen, llama
-  model_id: "google/gemma-3-4b-it"
-  dtype: "float32"  # Options: float32, float16, bfloat16
-  device_map: "auto"
-  max_tokens: 1024
-  do_sample: false
-  temperature: 0.1
-  trust_remote_code: true
+  # Model selection
+  name: "gemma"  # Options: "gemma", "qwen", "mistral", "llama"
+  model_id: "google/gemma-3-4b-it"  # HuggingFace model identifier
 
-# Data configuration
+  # Model loading parameters
+  # See: https://huggingface.co/docs/transformers/main/en/main_classes/model#transformers.PreTrainedModel.from_pretrained
+  dtype: "float32"  # Options: "float32", "float16", "bfloat16", "auto" (recommended: "auto")
+  device_map: "auto"  # Options: "auto", "cpu", "cuda", "cuda:0", or custom dict for multi-GPU
+  trust_remote_code: true  # Set to true for most HuggingFace models
+  
+  # Optional model loading parameters
+  cache_dir: null  # Custom cache directory (null = use HuggingFace default)
+  token: null  # HuggingFace token for gated models (get from https://huggingface.co/settings/tokens)
+  revision: "main"  # Model revision/branch/tag (use "main" for latest)
+
+  # Generation parameters
+  # See: https://huggingface.co/docs/transformers/main/en/main_classes/text_generation
+  max_new_tokens: 1024  # Maximum length of generated response (recommended: 512-4096)
+  do_sample: false  # false = greedy decoding (deterministic), true = sampling (non-deterministic)
+  
+  # Sampling parameters (only used if do_sample: true)
+  temperature: 0.1  # Controls randomness (0.0 = deterministic, 2.0 = very random)
+  top_p: 0.95  # Nucleus sampling threshold (0.0-1.0)
+  top_k: 50  # Number of top tokens to consider (1 to vocabulary_size)
+  
+  # Qwen-specific parameters
+  enable_thinking: false  # Enable thinking mode for Qwen models (ignored for other models)
+
+  # Advanced model parameters
+  # Pass additional parameters directly to from_pretrained()
+  # Examples: quantization_config, attn_implementation, max_memory, etc.
+  # See HuggingFace docs for full list of available parameters
+  additional_model_kwargs: {}
+
+
+# ========================================================================
+# DATA CONFIGURATION
+# ========================================================================
+
 data:
-  dataset_path: "data/dev.json"
-  batch_size: 8
-  num_samples: null  # null = all samples, or specify a number
-  shuffle: false
+  # Dataset selection
+  dataset: "dev"  # Options: "train", "dev", "test"
+  
+  # Dataset file paths (absolute or relative to project root)
+  train_dataset_path: "data/train.json"
+  dev_dataset_path: "data/dev.json"
+  test_dataset_path: "data/test.json"
 
-# Prompt configuration
+  # Few-shot examples pool (only used if prompt.technique is "few_shot" or "few_shot_cot")
+  examples_pool: "train"  # Options: "train", "dev", "test"
+
+  # Batch processing
+  batch_size: 2  # Number of samples per batch (higher = faster but more memory)
+  num_samples: null  # Number of samples to process (null = all samples, integer = first N samples)
+  num_workers: 2  # Number of data loading workers (null = default, 0 = single-threaded)
+
+
+# ========================================================================
+# PROMPT CONFIGURATION
+# ========================================================================
+
 prompt:
-  technique: "rereading"  # Options: rereading, few_shot, few_shot_cot, zero_shot_cot, plan_solve
-  language: "vi"  # Options: vi, en
+  # Prompt technique
+  # Options: "zero_shot", "few_shot", "few_shot_cot", "zero_shot_cot", "rereading", "plan_and_solve"
+  technique: "few_shot_cot"
   
-  # Few-shot parameters (used if technique is few_shot or few_shot_cot)
-  n_shot: 0
-  examples_pool_path: null
-  
-  # Plan-and-solve parameters (used if technique is plan_solve)
-  plus_mode: false  # true for PS+, false for PS
+  # Language
+  language: "vi"  # Options: "vi" (Vietnamese), "en" (English)
 
-# Output configuration
+  # Few-shot parameters (only used if technique is "few_shot" or "few_shot_cot")
+  n_shot: 0  # Number of examples to include (range: 0-10, recommended: 1-3)
+  examples_pool_path: null  # Custom examples pool path (null = use data.examples_pool)
+
+  # Plan-and-solve parameters (only used if technique is "plan_and_solve")
+  plus_mode: false  # false = Plan-and-Solve (PS), true = Plan-and-Solve+ (PS+)
+
+
+# ========================================================================
+# OUTPUT CONFIGURATION
+# ========================================================================
+
 output:
+  # Output directory (absolute or relative to project root)
+  # Results structure: {output_dir}/{model_name}/{experiment_name}/
   output_dir: "results/"
+  
+  # Output file name
   output_file: "results.json"
-  save_metadata: true
-  save_config_copy: true
-  overwrite: false
+  
+  # Save options
+  save_metadata: true  # Save metadata.json with statistics (timing, token counts, etc.)
+  save_config_copy: true  # Save copy of config.yaml in results folder
+  overwrite: false  # false = raise error if output exists, true = overwrite existing file
 
-# Processing configuration
-cleanup_frequency: 10  # GPU cleanup every N batches
+
+# ========================================================================
+# QUICK START EXAMPLES
+# ========================================================================
+#
+# === Zero-shot CoT with Gemma ===
+# model:
+#   name: "gemma"
+#   model_id: "google/gemma-3-4b-it"
+#   max_new_tokens: 2048
+# prompt:
+#   technique: "zero_shot_cot"
+#   language: "vi"
+#
+# === Few-shot (3-shot) with Qwen ===
+# model:
+#   name: "qwen"
+#   model_id: "Qwen/Qwen2.5-7B-Instruct"
+#   max_new_tokens: 1024
+# prompt:
+#   technique: "few_shot"
+#   language: "en"
+#   n_shot: 3
+#
+# === Testing with small batch ===
+# data:
+#   batch_size: 1
+#   num_samples: 10
+# model:
+#   max_new_tokens: 512
+#
+# ========================================================================
