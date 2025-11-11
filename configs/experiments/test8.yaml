@@ -13,7 +13,7 @@ experiment:
 model:
   # === MODEL LOADING ===
   name: "qwen"  # one of [gemma, mistral, qwen, llama]
-  model_id: "Qwen/Qwen3-4B"
+  model_id: "Qwen/Qwen3-4B-Instruct-2507"
   dtype: "float32"
   device_map: "auto"
   trust_remote_code: true
