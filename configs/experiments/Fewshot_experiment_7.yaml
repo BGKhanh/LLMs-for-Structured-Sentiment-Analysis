@@ -6,17 +6,18 @@ random_seed: 42
 cleanup_frequency: 10
 
 experiment:
-  name: "Fewshot_CoT_experiment_1"
-  description: "Few-shot CoT technique, experiment 1, n-shot = 1"
-  version: "2.0"
+  name: "Fewshot_experiment_7"
+  description: "Few-shot technique, experiment 7, n-shot = 2, Qwen3-4b-instruct-2507"
+  version: "1.0"
 
 model:
   # === MODEL LOADING ===
-  name: "gemma"  # one of [gemma, mistral, qwen, llama]
-  model_id: "google/gemma-3-4b-it"
+  name: "qwen"  # one of [gemma, mistral, qwen, llama]
+  model_id: "Qwen/Qwen3-4B-Instruct-2507"
   dtype: "float32"
   device_map: "auto"
   trust_remote_code: true
+  enable_thinking: true
 
   # === GENERATION PARAMETERS ===
   max_new_tokens: 2048
@@ -33,11 +34,12 @@ data:
   test_dataset_path: "/kaggle/input/vitoed/test.json"
 
   examples_pool: "train"
-  batch_size: 2
+  batch_size: 4
   num_samples: null   # null = use all samples
+  num_workers: 4
 
 prompt:
-  technique: "few_shot_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
+  technique: "few_shot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
   language: "vi"
   n_shot: 2
   examples_pool_path: null
