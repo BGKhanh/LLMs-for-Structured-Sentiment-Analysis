@@ -47,7 +47,7 @@ experiment:
 
 model:
   # Model selection
-  name: "gemma"  # Options: "gemma", "qwen", "mistral", "llama"
+  name: "gemma"  # Options: "gemma", "qwen", "mistral", "llama", "seallm"
   model_id: "google/gemma-3-4b-it"  # HuggingFace model identifier
 
   # Model loading parameters

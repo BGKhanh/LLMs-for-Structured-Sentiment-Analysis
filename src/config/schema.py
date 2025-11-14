@@ -28,7 +28,7 @@ class ModelConfig:
     rare parameters via additional_model_kwargs.
     """
     # === REQUIRED ===
-    name: Literal["gemma", "mistral", "qwen", "llama"] = "gemma"
+    name: Literal["gemma", "mistral", "qwen", "llama", "seallm"] = "gemma"
     model_id: str = "google/gemma-3-4b-it"
     
     # === COMMON MODEL LOADING PARAMS ===

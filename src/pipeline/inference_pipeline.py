@@ -670,6 +670,8 @@ class InferencePipeline:
             return GemmaModel(config=self.config.model)
         elif model_name == "qwen":
             return QwenModel(config=self.config.model)
+        elif model_name == "seallm":
+            return SeaLLModel(config=self.config.model)
         # Add other models here
         # elif model_name == "mistral":
         #     return MistralModel(config=self.config.model)
