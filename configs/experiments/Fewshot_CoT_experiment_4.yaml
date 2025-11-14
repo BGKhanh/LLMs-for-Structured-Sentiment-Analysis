@@ -6,8 +6,8 @@ random_seed: 42
 cleanup_frequency: 10
 
 experiment:
-  name: "Fewshot_CoT_experiment_3"
-  description: "Few-shot CoT technique, experiment 3, n-shot = 1, QwenModel"
+  name: "Fewshot_CoT_experiment_4"
+  description: "Few-shot CoT technique, experiment 4, n-shot = 2, QwenModel"
   version: "1.0"
 
 model:
