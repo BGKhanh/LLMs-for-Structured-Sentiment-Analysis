@@ -1,4 +1,9 @@
+torch
+numpy
+json
+tqdm
 transformers 
 accelerate 
 bitsandbytes 
 huggingface_hub
+underthesea

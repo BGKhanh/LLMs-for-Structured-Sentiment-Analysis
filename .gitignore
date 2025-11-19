@@ -216,3 +216,6 @@ semeval22_structured_sentiment
 
 # Results
 results/
+
+# GoT module
+graph-of-thoughts/

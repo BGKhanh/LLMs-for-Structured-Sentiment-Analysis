@@ -20,7 +20,7 @@ model:
   enable_thinking: true
 
   # === GENERATION PARAMETERS ===
-  max_new_tokens: 1024
+  max_new_tokens: 2048
   do_sample: false
   temperature: 0.1
   top_p: 0.95
@@ -36,7 +36,7 @@ data:
   examples_pool: "train"
   batch_size: 4
   num_samples: null   # null = use all samples
-  num_workers: 4
+  num_workers: 2
 
 prompt:
   technique: "plan_and_solve"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
