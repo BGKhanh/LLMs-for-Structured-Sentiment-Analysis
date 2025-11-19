@@ -32,7 +32,7 @@ class ModelConfig:
     model_id: str = "google/gemma-3-4b-it"
     
     # === COMMON MODEL LOADING PARAMS ===
-    dtype: Literal["float32", "float16", "bfloat16", "auto"] = "float32"
+    torch_dtype: Literal["float32", "float16", "bfloat16", "auto"] = "float32"
     device_map: str = "auto"
     trust_remote_code: bool = True
     
@@ -69,11 +69,11 @@ class ModelConfig:
             "trust_remote_code": self.trust_remote_code,
         }
         
-        # Handle dtype
-        if self.dtype == "auto":
-            kwargs["dtype"] = "auto"
+        # Handle torch_dtype
+        if self.torch_dtype == "auto":
+            kwargs["torch_dtype"] = "auto"
         else:
-            kwargs["dtype"] = getattr(torch, self.dtype)
+            kwargs["torch_dtype"] = getattr(torch, self.torch_dtype)
         
         # Add optional parameters if specified
         if self.cache_dir:

@@ -52,7 +52,7 @@ model:
 
   # Model loading parameters
   # See: https://huggingface.co/docs/transformers/main/en/main_classes/model#transformers.PreTrainedModel.from_pretrained
-  dtype: "float32"  # Options: "float32", "float16", "bfloat16", "auto" (recommended: "auto")
+  torch_dtype: "float32"  # Options: "float32", "float16", "bfloat16", "auto" (recommended: "auto")
   device_map: "auto"  # Options: "auto", "cpu", "cuda", "cuda:0", or custom dict for multi-GPU
   trust_remote_code: true  # Set to true for most HuggingFace models
   

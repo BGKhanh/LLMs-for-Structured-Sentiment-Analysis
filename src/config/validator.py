@@ -85,10 +85,10 @@ class ConfigValidator:
                 "enable_thinking=True with non-Qwen model (may be ignored, some Qwen models aren't support thinking)"
             ) 
                 
-        # Check dtype
+        # Check torch_dtype
         valid_dtypes = ["float32", "float16", "bfloat16", "auto"]
-        if self.config.model.dtype not in valid_dtypes:
-            self.errors.append(f"dtype must be one of {valid_dtypes}")
+        if self.config.model.torch_dtype not in valid_dtypes:
+            self.errors.append(f"torch_dtype must be one of {valid_dtypes}")
         
         # Note: We do NOT validate additional_model_kwargs
         # Advanced users are responsible for correctness

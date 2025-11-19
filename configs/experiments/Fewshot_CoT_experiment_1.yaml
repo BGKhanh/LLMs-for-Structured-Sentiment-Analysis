@@ -14,7 +14,7 @@ model:
   # === MODEL LOADING ===
   name: "gemma"  # one of [gemma, mistral, qwen, llama]
   model_id: "google/gemma-3-4b-it"
-  dtype: "float32"
+  torch_dtype: "float32"
   device_map: "auto"
   trust_remote_code: true
 
