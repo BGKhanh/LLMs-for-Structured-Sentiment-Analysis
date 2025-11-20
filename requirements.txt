@@ -4,5 +4,5 @@ tqdm
 transformers>=4.57.1
 accelerate 
 bitsandbytes 
-huggingface_hub>=1.0.0
+huggingface_hub==1.0.0
 underthesea
