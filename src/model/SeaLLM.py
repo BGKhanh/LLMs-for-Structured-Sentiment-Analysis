@@ -71,6 +71,8 @@ class SeaLLModel(BaseModel):
                 self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
                 print("  ⚙️  Configured pad_token_id = eos_token_id")
 
+            self.tokenizer.padding_side = "left"
+            
             # Load model
             self.model = self.model_class.from_pretrained(
                 model_id,
