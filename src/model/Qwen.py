@@ -4,6 +4,7 @@ import re
 import json
 import time
 import torch
+import traceback
 from typing import Tuple, Dict, Any, List, Union
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from .BaseModel import BaseModel
@@ -207,11 +208,24 @@ class QwenModel(BaseModel):
             # ===== MODE DETECTION =====
             if isinstance(inputs, dict):
                 # Mode 1: Tokenized inputs from DataLoader
-                tokenized_inputs = {
-                    k: v.to(self.model.device) if isinstance(v, torch.Tensor) else v
-                    for k, v in inputs.items()
-                    if k in ['input_ids', 'attention_mask']
-                }
+                tokenized_inputs = {}
+                
+                # Check device of input_ids
+                first_tensor = inputs.get('input_ids')
+                target_device = self.model.device
+                
+                # Logic: Only move if currently on CPU.
+                needs_move = first_tensor is not None and first_tensor.device.type == 'cpu'
+
+                for k, v in inputs.items():
+                    if k in ['input_ids', 'attention_mask'] and isinstance(v, torch.Tensor):
+                        if needs_move:
+                            tokenized_inputs[k] = v.to(target_device)
+                        else:
+                            tokenized_inputs[k] = v # Trust Accelerate
+                    else:
+                        tokenized_inputs[k] = v
+                
                 input_length = tokenized_inputs['input_ids'].shape[1]
                 
             else:
@@ -236,7 +250,7 @@ class QwenModel(BaseModel):
                 input_length = tokenized_inputs['input_ids'].shape[1]
             
             # ===== BATCH GENERATION =====
-            with torch.inference_mode(), torch.autocast(device_type="cuda"):
+            with torch.inference_mode():
                 generated_outputs = self.model.generate(
                     **tokenized_inputs,
                     **gen_kwargs
@@ -273,7 +287,9 @@ class QwenModel(BaseModel):
             
         except Exception as e:
             print(f"❌ Error in generate_batch: {str(e)}")
-            # Return empty responses based on input type
+            # In traceback để dễ debug lỗi model
+            traceback.print_exc()
+            
             if isinstance(inputs, dict):
                 batch_size = inputs['input_ids'].shape[0]
             else:

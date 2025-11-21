@@ -4,6 +4,7 @@ import re
 import json
 import time
 import torch
+import traceback
 from typing import Tuple, Dict, Any, List, Union
 from transformers import Gemma3ForConditionalGeneration, AutoTokenizer  
 from .BaseModel import BaseModel
@@ -129,7 +130,7 @@ class GemmaModel(BaseModel):
             
             # Generate
             start_time = time.time()
-            with torch.inference_mode(), torch.autocast(device_type="cuda"):
+            with torch.inference_mode():
                 generation = self.model.generate(
                     **inputs,
                     **gen_kwargs  
@@ -187,13 +188,25 @@ class GemmaModel(BaseModel):
             if isinstance(inputs, dict):
                 # Mode 1: Tokenized inputs from DataLoader
                 # Already tokenized, just move to device
-                tokenized_inputs = {
-                    k: v.to(self.model.device) if isinstance(v, torch.Tensor) else v
-                    for k, v in inputs.items()
-                    if k in ['input_ids', 'attention_mask']
-                }
-                input_length = tokenized_inputs['input_ids'].shape[1]
+                tokenized_inputs = {}
                 
+                # Check device of input_ids
+                first_tensor = inputs.get('input_ids')
+                target_device = self.model.device
+                
+                # Logic: Only move if currently on CPU. If on GPU (even different index), let Accelerate handle via hooks.
+                needs_move = first_tensor is not None and first_tensor.device.type == 'cpu'
+
+                for k, v in inputs.items():
+                    if k in ['input_ids', 'attention_mask'] and isinstance(v, torch.Tensor):
+                        if needs_move:
+                            tokenized_inputs[k] = v.to(target_device)
+                        else:
+                            tokenized_inputs[k] = v # Trust Accelerate
+                    else:
+                        tokenized_inputs[k] = v
+                
+                input_length = tokenized_inputs['input_ids'].shape[1]                
             else:
                 # Mode 2: Raw messages (manual batching)
                 # Need to apply chat template
@@ -208,14 +221,14 @@ class GemmaModel(BaseModel):
                     texts.append(text)
                     
                 tokenized_inputs = self.tokenizer(
-                    texts,  # List of message lists
+                    texts,
                     return_tensors="pt",
                     padding=True,
                 ).to(self.model.device)
                 input_length = tokenized_inputs['input_ids'].shape[1]
             
             # ===== BATCH GENERATION =====
-            with torch.inference_mode(), torch.autocast(device_type="cuda"):
+            with torch.inference_mode():
                 generated_outputs = self.model.generate(
                     **tokenized_inputs,
                     **gen_kwargs
@@ -252,6 +265,8 @@ class GemmaModel(BaseModel):
         except Exception as e:
             print(f"❌ Error in generate_batch: {str(e)}")
             # Return empty responses based on input type
+            traceback.print_exc()
+
             if isinstance(inputs, dict):
                 batch_size = inputs['input_ids'].shape[0]
             else:

@@ -1,142 +1,92 @@
 # inference.py
 
 """
-Inference CLI entry point.
+Inference CLI entry point (Minimalist & Accelerated).
 
 Usage:
-    python inference.py --config configs/experiments/exp_rereading.yaml
-    python inference.py -c configs/experiments/exp_few_shot_3.yaml
+    accelerate launch inference.py configs/experiments/exp_rereading.yaml
 """
 
-import argparse
 import sys
+import traceback
 from pathlib import Path
+from accelerate import Accelerator
 
 from src.config import load_config, validate_config
 from src.pipeline import InferencePipeline
 
 
-def parse_args():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Run inference with specified configuration",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Run with experiment config
-  python inference.py --config configs/experiments/exp_rereading.yaml
-  
-  # Short form
-  python inference.py -c configs/experiments/exp_few_shot_3.yaml
-  
-  # Validate config only
-  python inference.py -c configs/experiments/test.yaml --validate-only
-        """
-    )
-    
-    parser.add_argument(
-        "-c", "--config",
-        type=str,
-        required=True,
-        help="Path to experiment config YAML file"
-    )
-    
-    parser.add_argument(
-        "--validate-only",
-        action="store_true",
-        help="Only validate config without running inference"
-    )
-    
-    return parser.parse_args()
-
-
 def main():
     """Main inference entry point."""
-    # Parse arguments
-    args = parse_args()
     
-    # Print header
-    print("\n" + "=" * 80)
-    print("🚀 STRUCTURED SENTIMENT ANALYSIS - INFERENCE")
-    print("=" * 80)
-    print(f"\n📄 Config file: {args.config}\n")
+    # 1. Khởi tạo Accelerator (Luôn là dòng đầu tiên)
+    accelerator = Accelerator()
     
-    # Check if config file exists
-    config_path = Path(args.config)
+    # 2. Kiểm tra tham số đầu vào
+    if len(sys.argv) < 2:
+        accelerator.print("❌ Error: Missing config file path.")
+        accelerator.print("Usage: accelerate launch inference.py path/to/config.yaml")
+        sys.exit(1)
+    
+    config_path_str = sys.argv[1]
+    config_path = Path(config_path_str)
+
+    # 3. Setup Logging
+    accelerator.print("\n" + "=" * 60)
+    accelerator.print("🚀 INFERENCE START (Accelerated)")
+    accelerator.print("=" * 60)
+    accelerator.print(f"📄 Config: {config_path}")
+                      
+    # 4. Kiểm tra file tồn tại
     if not config_path.exists():
-        print(f"❌ Config file not found: {args.config}")
+        accelerator.print(f"❌ Config file not found: {config_path}")
         sys.exit(1)
     
     try:
-        # Load and validate config
-        print("🔍 Loading and validating configuration...")
+        # 5. Load Config
+        if accelerator.is_local_main_process:
+            accelerator.print("🔍 Loading configuration...")
+            
         config = load_config(str(config_path))
-        is_valid = validate_config(config)
         
-        if not is_valid:
-            print("\n❌ Configuration validation failed!")
-            sys.exit(1)
+        # (Tùy chọn) Validate config nếu cần thiết, nhưng module config đã lo rồi
+        # is_valid = validate_config(config)
         
-        print("\n✅ Configuration validated successfully!")
+        # Show config summary (Chỉ in trên Main Process)
+        if accelerator.is_local_main_process:
+            print("\n📋 Configuration Summary:")
+            print("-" * 80)
+            print(f"  Experiment : {config.experiment.name}")
+            print(f"  Model      : {config.model.name}")
+            print(f"  Technique  : {config.prompt.technique}")
+            print(f"  Dataset    : {config.data.dataset}")
+            print(f"  Batch size : {config.data.batch_size}")
+            print("-" * 80)
+            print()
         
-        # Show config summary
-        print("\n📋 Configuration Summary:")
-        print("-" * 80)
-        print(f"  Experiment : {config.experiment.name}")
-        print(f"  Description: {config.experiment.description}")
-        print(f"  Model      : {config.model.name}")
-        print(f"  Model ID   : {config.model.model_id}")
-        print(f"  Technique  : {config.prompt.technique}")
-        print(f"  Language   : {'English' if config.prompt.language == 'en' else 'Vietnamese'}")
-        print(f"  Dataset    : {config.data.dataset}")
+        # 6. Khởi tạo Pipeline
+        accelerator.print("🔧 Initializing inference pipeline...\n")
         
-        # ✅ FIX: Sử dụng num_samples thay vì n_sample
-        if config.data.num_samples is not None:
-            print(f"  N-samples  : {config.data.num_samples}")
-        else:
-            print(f"  N-samples  : ALL")
+        # ⚠️ QUAN TRỌNG: Phải truyền accelerator vào đây
+        pipeline = InferencePipeline(config=config, accelerator=accelerator)
         
-        print(f"  Batch size : {config.data.batch_size}")
-        
-        # Show few-shot info if applicable
-        if config.prompt.technique in ["few_shot", "few_shot_cot"]:
-            print(f"  N-shot     : {config.prompt.n_shot}")
-            if config.prompt.n_shot > 0:
-                print(f"  Examples   : {config.data.examples_pool}")
-        
-        # Show plan-solve mode if applicable
-        if config.prompt.technique == "plan_solve":
-            mode = "PS+" if config.prompt.plus_mode else "PS"
-            print(f"  Mode       : {mode}")
-        
-        print("-" * 80)
-        print()
-        
-        # If validate-only mode, exit here
-        if args.validate_only:
-            print("✅ Validation complete! (--validate-only mode)")
-            sys.exit(0)
-        
-        # Initialize and execute pipeline
-        print("🔧 Initializing inference pipeline...\n")
-        pipeline = InferencePipeline(config=config)
-        
-        # Execute complete pipeline
+        # 7. Chạy
         pipeline.execute()
         
-        print("\n" + "=" * 80)
-        print("✅ INFERENCE COMPLETED SUCCESSFULLY!")
-        print("=" * 80)
+        accelerator.print("\n" + "=" * 80)
+        accelerator.print("✅ INFERENCE COMPLETED SUCCESSFULLY!")
+        accelerator.print("=" * 80)
         
     except KeyboardInterrupt:
-        print("\n\n⚠️  Inference interrupted by user!")
+        accelerator.print("\n\n⚠️  Inference interrupted by user!")
         sys.exit(130)
         
     except Exception as e:
-        print(f"\n\n❌ INFERENCE FAILED!")
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
+        accelerator.print(f"\n\n❌ INFERENCE FAILED on process {accelerator.process_index}!")
+        accelerator.print(f"Error: {e}")
+        # Chỉ in traceback chi tiết ở process chính
+        if accelerator.is_local_main_process:
+            traceback.print_exc()
         sys.exit(1)
 
 

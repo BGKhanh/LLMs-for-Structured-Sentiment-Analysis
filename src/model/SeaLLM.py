@@ -3,6 +3,7 @@
 import re
 import json
 import time
+import traceback
 from typing import Tuple, Dict, Any, List, Union
 
 import torch
@@ -165,29 +166,43 @@ class SeaLLModel(BaseModel):
 
             # Mode detection
             if isinstance(inputs, dict):
-                tokenized_inputs = {
-                    k: v.to(self.model.device) if isinstance(v, torch.Tensor) else v
-                    for k, v in inputs.items()
-                    if k in ["input_ids", "attention_mask"]
-                }
+                # Mode 1: Tokenized inputs from DataLoader
+                tokenized_inputs = {}
+                
+                # Check device of input_ids
+                first_tensor = inputs.get('input_ids')
+                target_device = self.model.device
+                
+                # Logic: Only move if currently on CPU.
+                needs_move = first_tensor is not None and first_tensor.device.type == 'cpu'
+
+                for k, v in inputs.items():
+                    if k in ["input_ids", "attention_mask"] and isinstance(v, torch.Tensor):
+                        if needs_move:
+                            tokenized_inputs[k] = v.to(target_device)
+                        else:
+                            tokenized_inputs[k] = v # Trust Accelerate
+                    else:
+                        tokenized_inputs[k] = v
+                        
                 input_length = tokenized_inputs["input_ids"].shape[1]
             else:
                 texts = []
                 for msgs in inputs:
-                    t = self.tokenizer.apply_chat_template(
+                    text = self.tokenizer.apply_chat_template(
                         msgs,
                         tokenize=False,
                         add_generation_prompt=True,
                         enable_thinking=self.enable_thinking,
                     )
-                    texts.append(t)
+                    texts.append(text)
 
                 tokenized_inputs = self.tokenizer(
                     texts, return_tensors="pt", padding=True
                 ).to(self.model.device)
                 input_length = tokenized_inputs["input_ids"].shape[1]
 
-            with torch.inference_mode(), torch.autocast(device_type="cuda"):
+            with torch.inference_mode():
                 generated_outputs = self.model.generate(
                     **tokenized_inputs, **gen_kwargs
                 )
@@ -220,6 +235,7 @@ class SeaLLModel(BaseModel):
 
         except Exception as e:
             print(f"❌ Error in generate_batch: {str(e)}")
+            traceback.print_exc()
             if isinstance(inputs, dict):
                 batch_size = inputs["input_ids"].shape[0]
             else:

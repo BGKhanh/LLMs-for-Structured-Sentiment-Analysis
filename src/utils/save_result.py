@@ -5,10 +5,11 @@ Results saving utilities.
 
 Saves inference results with organized directory structure:
 results/{model_name}/{experiment_name}/
-    ├── result.json       # Processed results
-    ├── config.json       # Full config copy
-    ├── metadata.json     # Runtime info only (simplified)
-    └── debug_info.json   # Prompts + raw responses (always saved)
+    ├── result_rank0.json      # Processed results (Rank 0)
+    ├── result_rank1.json      # Processed results (Rank 1)
+    ├── config.json            # Full config copy (Shared)
+    ├── metadata_rank0.json    # Runtime info only
+    └── debug_info_rank0.json  # Prompts + raw responses
 """
 
 import json
@@ -16,6 +17,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import sys
+import re
 
 
 def save_experiment_results(
@@ -23,7 +25,8 @@ def save_experiment_results(
     config: 'Config',
     statistics: Optional[Dict[str, Any]] = None,
     raw_results: Optional[List[Dict[str, Any]]] = None,
-    results_dir: str = "results"
+    results_dir: str = "results",
+    rank: Optional[int] = None
 ) -> Dict[str, str]:
     """
     Save experiment results with organized structure.
@@ -43,7 +46,7 @@ def save_experiment_results(
         statistics: Optional statistics dict from pipeline
         raw_results: Optional raw results from pipeline (for debug_info)
         results_dir: Base results directory
-        
+        rank: Process rank (for multi-GPU). If None, assumes single process.
     Returns:
         Dict with paths to saved files:
         {
@@ -63,17 +66,20 @@ def save_experiment_results(
     
     experiment_dir = Path(results_dir) / model_name / experiment_name
     
-    # Create directory
-    print(f"\n📁 Creating experiment directory: {experiment_dir}")
+    if rank is None or rank == 0:
+        print(f"\n📁 Creating experiment directory: {experiment_dir}")
     experiment_dir.mkdir(parents=True, exist_ok=True)
-    print(f"✅ Directory ready: {experiment_dir}")
     
+    if rank is None or rank == 0:
+        print(f"✅ Directory ready: {experiment_dir}")
+        
+    suffix = f"_rank{rank}" if rank is not None else ""
     # Define file paths
-    result_file = experiment_dir / "result.json"
-    metadata_file = experiment_dir / "metadata.json"
-    config_file = experiment_dir / "config.json"
-    debug_file = experiment_dir / "debug_info.json"
+    result_file = experiment_dir / f"result{suffix}.json"
+    metadata_file = experiment_dir / f"metadata{suffix}.json"
+    debug_file = experiment_dir / f"debug_info{suffix}.json"
     
+    config_file = experiment_dir / "config.json" # Shared config file
     # Check overwrite
     if not config.output.overwrite:
         if result_file.exists():
@@ -83,29 +89,33 @@ def save_experiment_results(
             )
     
     # Save results
-    print(f"\n💾 Saving results...")
-    _save_json(result_file, results, "Results")
+    if rank is None or rank == 0: print(f"\n💾 Saving results (Rank {rank})...")
+    _save_json(result_file, results, f"Results (Rank {rank})")
     
     # Save metadata
     if config.output.save_metadata:
-        print(f"\n💾 Saving metadata...")
-        metadata = _build_metadata(config, results, statistics)
-        _save_json(metadata_file, metadata, "Metadata")
-    
-    # Save config copy
-    if config.output.save_config_copy:
-        print(f"\n💾 Saving config copy...")
-        config_dict = config.to_dict()
-        _save_json(config_file, config_dict, "Config")
+        if rank is None or rank == 0: print(f"\n💾 Saving metadata...")
+        metadata = _build_metadata(config, results, statistics, rank)
+        _save_json(metadata_file, metadata, f"Metadata (Rank {rank})")
     
     # Save debug info 
-    print(f"\n💾 Saving debug info...")
+    if rank is None or rank == 0: print(f"\n💾 Saving debug info (Rank {rank})...")
     debug_path = save_debug_info(
         raw_results=raw_results or [],
         experiment_dir=experiment_dir,
-        technique=config.prompt.technique
+        technique=config.prompt.technique,
+        suffix=suffix # Pass suffix to helper
     )
     
+    config_saved_path = None
+    if config.output.save_config_copy:
+        # Only Main Process (Rank 0 or Single GPU) saves config
+        if rank is None or rank == 0:
+            print(f"\n💾 Saving config copy...")
+            config_dict = config.to_dict()
+            _save_json(config_file, config_dict, "Config")
+            config_saved_path = str(config_file)
+            
     # Return saved paths
     saved_paths = {
         'result_file': str(result_file),
@@ -115,8 +125,9 @@ def save_experiment_results(
         'experiment_dir': str(experiment_dir)
     }
     
-    print(f"\n✅ All files saved to: {experiment_dir}")
-    
+    if rank is None or rank == 0:
+        print(f"\n✅ All files saved to: {experiment_dir}")    
+        
     return saved_paths
 
 
@@ -140,7 +151,8 @@ def _save_json(file_path: Path, data: Any, label: str) -> None:
 def _build_metadata(
     config: 'Config',
     results: List[Dict[str, Any]],
-    statistics: Optional[Dict[str, Any]]
+    statistics: Optional[Dict[str, Any]],
+    rank: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Build metadata dictionary (SIMPLIFIED - runtime info only).
@@ -167,7 +179,7 @@ def _build_metadata(
     metadata = {
         # Timestamp (unique to this run)
         "timestamp": datetime.now().isoformat(),
-        
+        "rank": rank if rank is not None else 0, # Log rank
         # Statistics (runtime metrics)
         "statistics": statistics,
         
@@ -179,7 +191,7 @@ def _build_metadata(
             "cuda_available": torch.cuda.is_available(),
             "cuda_version": torch.version.cuda if torch.cuda.is_available() else None,
             "gpu_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
-            "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() and torch.cuda.device_count() > 0 else None,
+            "device": torch.cuda.get_device_name(rank) if rank is not None and torch.cuda.is_available() and rank < torch.cuda.device_count() else "unknown"
         }
     }
     
@@ -205,7 +217,7 @@ def _calculate_statistics(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     # Count opinions
     total_opinions = sum(len(r.get('opinions', [])) for r in results)
     avg_opinions = total_opinions / total_samples if total_samples > 0 else 0
-    
+
     return {
         "total_samples": total_samples,
         "successful": successful,
@@ -218,7 +230,8 @@ def _calculate_statistics(results: List[Dict[str, Any]]) -> Dict[str, Any]:
 def save_debug_info(
     raw_results: List[Dict[str, Any]],
     experiment_dir: Path,
-    technique: str
+    technique: str,
+    suffix: str = ""
 ) -> str:
     """
     Save debug information (prompts + raw responses).
@@ -282,6 +295,9 @@ def save_debug_info(
             ]
         }
     """
+    
+    filename = f"debug_info{suffix}.json" # Use dynamic filename
+    debug_file = experiment_dir / filename
     if not raw_results:
         print("   ⚠️  No raw results to save in debug_info")
         # Create empty debug file
@@ -290,7 +306,6 @@ def save_debug_info(
             "is_multi_stage": False,
             "samples": []
         }
-        debug_file = experiment_dir / "debug_info.json"
         _save_json(debug_file, debug_data, "Debug info (empty)")
         return str(debug_file)
     
@@ -378,8 +393,7 @@ def save_debug_info(
             })
     
     # Save debug info
-    debug_file = experiment_dir / "debug_info.json"
-    _save_json(debug_file, debug_data, "Debug info")
+    _save_json(debug_file, debug_data, f"Debug info {suffix}")
     
     print(f"   📊 Saved {len(debug_data['samples'])} samples to debug_info.json")
     
@@ -417,16 +431,18 @@ def list_experiments(model_name: Optional[str] = None, results_dir: str = "resul
                 continue
             
             # Check if has result.json
-            result_file = exp_dir / "result.json"
-            if result_file.exists():
+            result_files = list(exp_dir.glob("result*.json"))
+            if result_files:
+                # Lấy file đầu tiên tìm thấy làm đại diện
+                main_result_file = result_files[0]
                 experiments.append({
                     'model_name': model_dir.name,
                     'experiment_name': exp_dir.name,
                     'path': str(exp_dir),
-                    'result_file': str(result_file),
-                    'has_metadata': (exp_dir / "metadata.json").exists(),
+                    'result_file': str(main_result_file),
+                    'has_metadata': list(exp_dir.glob("metadata*.json")) != [],
                     'has_config': (exp_dir / "config.json").exists(),
-                    'has_debug_info': (exp_dir / "debug_info.json").exists(),  
+                    'has_debug_info': list(exp_dir.glob("debug_info*.json")) != [],  
                 })
     
     return experiments
@@ -438,63 +454,42 @@ def load_experiment_results(
     results_dir: str = "results"
 ) -> Dict[str, Any]:
     """
-    Load saved experiment results.
-    
-    Args:
-        model_name: Model name (e.g., "gemma")
-        experiment_name: Experiment name (e.g., "dev_rereading")
-        results_dir: Base results directory
-        
-    Returns:
-        Dict with:
-        {
-            'results': [...],
-            'metadata': {...},
-            'config': {...},
-            'debug_info': {...}
-        }
-    
-    Raises:
-        FileNotFoundError: If experiment not found
+    Load saved experiment results (Fix: Supports multi-gpu filenames).
     """
     exp_dir = Path(results_dir) / model_name / experiment_name
-    
     if not exp_dir.exists():
         raise FileNotFoundError(f"Experiment not found: {exp_dir}")
     
-    # Load files
     data = {}
     
-    # Load results (required)
-    result_file = exp_dir / "result.json"
-    if not result_file.exists():
-        raise FileNotFoundError(f"Result file not found: {result_file}")
+    # === FIX 4: Load Priority: result.json -> result_rank0.json ===
+    if (exp_dir / "result.json").exists():
+        result_file = exp_dir / "result.json"
+    elif (exp_dir / "result_rank0.json").exists():
+        result_file = exp_dir / "result_rank0.json"
+        print(f"ℹ️ Loading distributed results from Rank 0: {result_file.name}")
+    else:
+        raise FileNotFoundError(f"No result file found in {exp_dir}")
     
     with open(result_file, 'r', encoding='utf-8') as f:
         data['results'] = json.load(f)
     
-    # Load metadata (optional)
-    metadata_file = exp_dir / "metadata.json"
-    if metadata_file.exists():
-        with open(metadata_file, 'r', encoding='utf-8') as f:
-            data['metadata'] = json.load(f)
+    # Load metadata (Tương tự)
+    if (exp_dir / "metadata.json").exists():
+        meta_path = exp_dir / "metadata.json"
+    elif (exp_dir / "metadata_rank0.json").exists():
+        meta_path = exp_dir / "metadata_rank0.json"
     else:
-        data['metadata'] = None
+        meta_path = None
+        
+    if meta_path:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            data['metadata'] = json.load(f)
     
-    # Load config (optional)
+    # Load config
     config_file = exp_dir / "config.json"
     if config_file.exists():
         with open(config_file, 'r', encoding='utf-8') as f:
             data['config'] = json.load(f)
-    else:
-        data['config'] = None
-    
-    # Load debug info (optional)
-    debug_file = exp_dir / "debug_info.json"
-    if debug_file.exists():
-        with open(debug_file, 'r', encoding='utf-8') as f:
-            data['debug_info'] = json.load(f)
-    else:
-        data['debug_info'] = None
-        
+            
     return data

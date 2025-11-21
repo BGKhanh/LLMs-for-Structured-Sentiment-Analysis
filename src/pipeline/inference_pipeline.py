@@ -16,7 +16,8 @@ import torch
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from tqdm import tqdm
+from tqdm.auto import tqdm
+from accelerate import Accelerator
 # === IMPORTS ===
 from src.config import Config
 from src.utils import (
@@ -43,14 +44,17 @@ class InferencePipeline:
     """
     
     # === INITIALIZATION ===
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, accelerator: Optional[Accelerator] = None):
         """
         Initialize pipeline with config.
         
         Args:
             config: Validated Config object
+            accelerator: Optional Accelerator instance (for distributed training)
         """
         self.config = config
+        
+        self.accelerator = accelerator if accelerator else Accelerator()
         
         # Components (initialized in setup)
         self.model = None
@@ -88,12 +92,12 @@ class InferencePipeline:
     def setup(self):
         """Setup all components."""
         if self.is_setup:
-            print("⚠️  Pipeline already setup!")
+            self.accelerator.print("⚠️  Pipeline already setup!")
             return
         
-        print("\n" + "=" * 80)
-        print("🔧 SETUP PHASE")
-        print("=" * 80)
+        self.accelerator.print("\n" + "=" * 80)
+        self.accelerator.print("🔧 SETUP PHASE")
+        self.accelerator.print("=" * 80)
         
         self._setup_environment()
         self._init_prompt_template()
@@ -101,20 +105,20 @@ class InferencePipeline:
         self._load_dataset()
         
         self.is_setup = True
-        print("\n✅ Pipeline setup complete!\n")
+        self.accelerator.print("\n✅ Pipeline setup complete!\n")
     
     def _setup_environment(self):
         """Công đoạn 2: Environment setup."""
-        print("\n[1/4] Setting up reproducible environment...")
+        self.accelerator.print("\n[1/4] Setting up reproducible environment...")
         setup_reproducible_environment(seed=self.config.random_seed)
-        print(f"  ✅ Random seed set to {self.config.random_seed}")
+        self.accelerator.print(f"  ✅ Random seed set to {self.config.random_seed}")
     
     def _load_dataset(self):
         """Công đoạn 5: Load data."""
-        print("\n[4/4] Loading dataset...")
+        self.accelerator.print("\n[4/4] Loading dataset...")
         
         dataset_path = self.config.data.get_dataset_path()
-        print(f"  📁 Dataset: {dataset_path}")
+        self.accelerator.print(f"  📁 Dataset: {dataset_path}")
         
         is_two_stage = (self.config.prompt.technique == "zero_shot_cot")
 
@@ -123,7 +127,7 @@ class InferencePipeline:
         else:
             prompt_generator = CoTStage1PromptGen(self.prompt_template)
 
-        self.dataloader = create_sentiment_dataloader(
+        raw_dataloader = create_sentiment_dataloader(
             data_path=dataset_path,
             tokenizer=self.model.tokenizer,
             prompt_generator=prompt_generator,
@@ -135,29 +139,32 @@ class InferencePipeline:
 
         if self.config.data.num_samples is not None and self.config.data.num_samples > 0:
             original_len = len(self.dataloader.dataset)
-            self.dataloader.dataset.data = self.dataloader.dataset.data[:self.config.data.num_samples]
-            print(f"  📊 Limited to {len(self.dataloader.dataset)}/{original_len} samples")
+            raw_dataloader.dataset.data = raw_dataloader.dataset.data[:self.config.data.num_samples]
+            self.accelerator.print(f"  📊 Limited to {len(raw_dataloader.dataset)}/{original_len} samples")
         else:
-            print(f"  📊 Loaded {len(self.dataloader.dataset)} samples")
+            self.accelerator.print(f"  📊 Loaded {len(raw_dataloader.dataset)} samples")
 
         # Đồng bộ self.dataset để dùng chung
-        self.dataset = self.dataloader.dataset.data
+        self.dataset = raw_dataloader.dataset.data
         self.stats['total_samples'] = len(self.dataset)
+
+        self.dataloader = self.accelerator.prepare(raw_dataloader)
+        self.accelerator.print(f"  ⚡ DataLoader prepared (Num processes: {self.accelerator.num_processes})")
     
     def _init_prompt_template(self):
         """Công đoạn 3: Initialize prompt template."""
-        print("\n[2/4] Initializing prompt template...")
+        self.accelerator.print("\n[2/4] Initializing prompt template...")
         
         technique = self.config.prompt.technique
-        print(f"  🎯 Technique: {technique}")
-        print(f"  🌐 Language: {'English' if self.config.prompt.language == 'en' else 'Vietnamese'}")
+        self.accelerator.print(f"  🎯 Technique: {technique}")
+        self.accelerator.print(f"  🌐 Language: {'English' if self.config.prompt.language == 'en' else 'Vietnamese'}")
         
         # Get examples pool path if needed
         examples_pool_path = None
         if technique in ["few_shot", "few_shot_cot"]:
             if self.config.data.examples_pool:
                 examples_pool_path = self.config.data.get_examples_pool_path()
-                print(f"  📚 Examples pool: {examples_pool_path}")
+                self.accelerator.print(f"  📚 Examples pool: {examples_pool_path}")
         
         # Create prompt template instance
         self.prompt_template = self._get_prompt_template_instance(
@@ -166,24 +173,29 @@ class InferencePipeline:
         
         # Prepare template (load examples, cache system prompt)
         self.prompt_template.prepare()
-        print(f"  ✅ {technique} prompt template ready")
+        self.accelerator.print(f"  ✅ {technique} prompt template ready")
     
     def _init_model(self):
         """Công đoạn 4: Initialize model."""
-        print("\n[3/4] Initializing model...")
+        self.accelerator.print("\n[3/4] Initializing model...")
         
         model_name = self.config.model.name
-        print(f"  🤖 Model: {model_name}")
-        print(f"  🆔 Model ID: {self.config.model.model_id}")
-        print(f"  📦 Batch size: {self.config.data.batch_size}")
+        self.accelerator.print(f"  🤖 Model: {model_name}")
+        self.accelerator.print(f"  🆔 Model ID: {self.config.model.model_id}")
+        self.accelerator.print(f"  📦 Batch size: {self.config.data.batch_size}")
        
         # Create model instance
         self.model = self._get_model_instance()
         
         # Load model
         self.model.load_model()
-        print(f"  ✅ {model_name} model ready")
-    
+        if hasattr(self.model, 'model'):
+            self.model.model = self.accelerator.prepare(self.model.model)
+            self.accelerator.print(f"  ⚡ Internal model prepared with Accelerate")
+        else:
+            self.accelerator.print("  ⚠️ Warning: Wrapper does not expose .model attribute!")
+
+        self.accelerator.print(f"  ✅ {model_name} model ready")    
     # ========================================================================
     # INFERENCE PHASE
     # ========================================================================
@@ -194,12 +206,12 @@ class InferencePipeline:
             raise RuntimeError("Pipeline not setup! Call setup() first.")
         
         if self.is_completed:
-            print("⚠️  Inference already completed!")
+            self.accelerator.print("⚠️  Inference already completed!")
             return
         
-        print("\n" + "=" * 80)
-        print("🚀 INFERENCE PHASE")
-        print("=" * 80)
+        self.accelerator.print("\n" + "=" * 80)
+        self.accelerator.print("🚀 INFERENCE PHASE")
+        self.accelerator.print("=" * 80)
         
         self.stats['start_time'] = datetime.now().isoformat()
         start_time = time.time()
@@ -210,10 +222,10 @@ class InferencePipeline:
         )
         
         if is_two_stage:
-            print("\n📋 Running Two-Stage Inference (Zero-shot CoT)")
+            self.accelerator.print("\n📋 Running Two-Stage Inference (Zero-shot CoT)")
             self._run_two_stage_inference()
         else:
-            print("\n📋 Running Single-Stage Inference")
+            self.accelerator.print("\n📋 Running Single-Stage Inference")
             self._run_single_stage_inference()
         
         # Postprocess results
@@ -223,7 +235,7 @@ class InferencePipeline:
         self.stats['total_time'] = time.time() - start_time
         self.is_completed = True
         
-        print("\n✅ Inference phase complete!\n")
+        self.accelerator.print("\n✅ Inference phase complete!\n")
    
     def _run_single_stage_inference(self):
         """
@@ -240,9 +252,11 @@ class InferencePipeline:
         total_samples = len(dataloader.dataset)
         num_batches = len(dataloader)
         
-        print(f"Processing {total_samples} samples in {num_batches} batches (batch_size={self.config.data.batch_size})...")
+        self.accelerator.print(f"Processing {total_samples} samples in {num_batches} batches (batch_size={self.config.data.batch_size}) across {self.accelerator.num_processes} devices...")
         
-        for batch_idx, batch in enumerate(tqdm(dataloader, desc="Inference", unit="batch")):
+        disable_tqdm = not self.accelerator.is_local_main_process
+        
+        for batch_idx, batch in enumerate(tqdm(dataloader, desc="Inference", unit="batch", disable=disable_tqdm)):
             try:
                 texts = batch["texts"]
                 sent_ids = batch["sent_ids"]
@@ -292,7 +306,7 @@ class InferencePipeline:
                     torch.cuda.empty_cache()
             
             except Exception as e:
-                print(f"\n⚠️  Error processing batch {batch_idx + 1}/{num_batches}: {e}")
+                self.accelerator.print(f"\n⚠️  Error processing batch {batch_idx + 1}/{num_batches}: {e}")
                 for i in range(len(batch["sent_ids"])):
                     self.raw_results.append({
                         'sent_id': int(batch["sent_ids"][i]),
@@ -312,14 +326,14 @@ class InferencePipeline:
         batch_size = self.config.data.batch_size
 
         # ===== STAGE 1: Generate Reasoning (DataLoader) =====
-        print("\n--- STAGE 1: Generate Reasoning ---")
-
+        self.accelerator.print("\n--- STAGE 1: Generate Reasoning ---")
+        disable_tqdm = not self.accelerator.is_local_main_process
         dataloader = self.dataloader
         total_samples = len(dataloader.dataset)
         num_batches = len(dataloader)
-        print(f"Processing {total_samples} samples in {num_batches} batches...")
+        self.accelerator.print(f"Processing {total_samples} samples in {num_batches} batches...")
 
-        for batch_idx, batch in enumerate(tqdm(dataloader, desc="Stage 1", unit="batch")):
+        for batch_idx, batch in enumerate(tqdm(dataloader, desc="Stage 1", unit="batch", disable=disable_tqdm)):
             try:
                 # === COUNT INPUT TOKENS FROM BATCH ===
                 input_token_counts = batch['attention_mask'].sum(dim=1).tolist()
@@ -357,7 +371,7 @@ class InferencePipeline:
                     torch.cuda.empty_cache()
 
             except Exception as e:
-                print(f"\n⚠️  Stage 1 error for batch {batch_idx + 1}/{num_batches}: {e}")
+                self.accelerator.print(f"\n⚠️  Stage 1 error for batch {batch_idx + 1}/{num_batches}: {e}")
                 for sent_id, text in zip(batch['sent_ids'], batch['texts']):
                     sid = str(sent_id)
                     self.reasoning_map[sid] = {
@@ -368,13 +382,14 @@ class InferencePipeline:
                         'generation_time': 0.0,
                         'error': str(e)
                     }
-
-        print(f"✅ Stage 1 complete: {len(self.reasoning_map)} reasonings generated")
+        # === SYNC BARRIER: Wait for all GPUs to finish Stage 1 before starting Stage 2 ===
+        self.accelerator.wait_for_everyone()
+        self.accelerator.print(f"✅ Stage 1 complete: {len(self.reasoning_map)} reasonings generated on process {self.accelerator.process_index}")
 
         # ===== STAGE 2: Extract Structured Output (DataLoader with preloaded_data) =====
-        print("\n--- STAGE 2: Extract Structured Output ---")
+        self.accelerator.print("\n--- STAGE 2: Extract Structured Output ---")
 
-        stage2_dataloader = create_sentiment_dataloader(
+        raw_stage2_dataloader = create_sentiment_dataloader(
             data_path=None,
             tokenizer=self.model.tokenizer,
             prompt_generator=CoTStage2PromptGen(self.prompt_template, self.reasoning_map),
@@ -387,9 +402,10 @@ class InferencePipeline:
 
         total_samples = len(stage2_dataloader.dataset)
         num_batches = len(stage2_dataloader)
-        print(f"Processing {total_samples} samples in {num_batches} batches...")
+        stage2_dataloader = self.accelerator.prepare(raw_stage2_dataloader)
+        self.accelerator.print(f"Processing {total_samples} samples in {num_batches} batches...")
 
-        for batch_idx, batch in enumerate(tqdm(stage2_dataloader, desc="Stage 2", unit="batch")):
+        for batch_idx, batch in enumerate(tqdm(stage2_dataloader, desc="Stage 2", unit="batch", disable=disable_tqdm)):
             try:
                 texts = batch["texts"]
                 sent_ids = batch["sent_ids"]
@@ -448,7 +464,7 @@ class InferencePipeline:
                     torch.cuda.empty_cache()
 
             except Exception as e:
-                print(f"\n⚠️  Stage 2 error for batch {batch_idx + 1}/{num_batches}: {e}")
+                self.accelerator.print(f"\n⚠️  Stage 2 error for batch {batch_idx + 1}/{num_batches}: {e}")
                 for i in range(len(batch["sent_ids"])):
                     self.raw_results.append({
                         'sent_id': int(batch["sent_ids"][i]),
@@ -458,13 +474,13 @@ class InferencePipeline:
                     })
                     self.stats['failed'] += 1
 
-        print(f"✅ Stage 2 complete!")
+        self.accelerator.print(f"✅ Stage 2 complete!")
     
     def _postprocess_results(self):
         """Postprocess all raw responses."""
-        print("\n📝 Postprocessing results...")
+        self.accelerator.print("\n📝 Postprocessing results...")
         
-        for result in tqdm(self.raw_results, desc="Postprocessing", unit="result"):
+        for result in tqdm(self.raw_results, desc="Postprocessing", unit="result", disable=not self.accelerator.is_local_main_process):
             if not result.get('success', False):
                 continue
             
@@ -501,11 +517,11 @@ class InferencePipeline:
                 })
                 
             except Exception as e:
-                print(f"\n⚠️  Postprocessing error for {result.get('sent_id')}: {e}")
+                self.accelerator.print(f"\n⚠️  Postprocessing error for {result.get('sent_id')}: {e}")
                 self.stats['failed'] += 1
                 self.stats['successful'] -= 1
         
-        print(f"✅ Postprocessed {len(self.final_results)} results")
+        self.accelerator.print(f"✅ Postprocessed {len(self.final_results)} results")
     
     # ========================================================================
     # SAVING PHASE
@@ -516,9 +532,9 @@ class InferencePipeline:
         if not self.is_completed:
             raise RuntimeError("Inference not completed! Call run() first.")
         
-        print("\n" + "=" * 80)
-        print("💾 SAVING PHASE")
-        print("=" * 80)
+        self.accelerator.print("\n" + "=" * 80)
+        self.accelerator.print("💾 SAVING PHASE")
+        self.accelerator.print("=" * 80)
         
         # Calculate statistics
         self._calculate_statistics()
@@ -526,25 +542,29 @@ class InferencePipeline:
         # Prepare results for saving
         results_to_save = []
         for result in self.final_results:
-            results_to_save.append({
-                'sent_id': result['sent_id'],
-                'text': result['text'],
-                **json.loads(result['result'])
-            })
-        
+            try:
+                results_to_save.append({
+                    'sent_id': result['sent_id'],
+                    'text': result['text'],
+                    **json.loads(result['result'])
+                })
+            except: continue
+            
         # Save using utility function
-        print("\n📁 Saving experiment results...")
+        self.accelerator.print(f"\n📁 Saving experiment results (Rank {self.accelerator.process_index})...")
         saved_paths = save_experiment_results(
             results=results_to_save,
             config=self.config,
             statistics=self.stats,
-            raw_results=self.raw_results 
+            raw_results=self.raw_results,
+            rank=self.accelerator.process_index 
         )
         
-        print("\n✅ Results saved:")
+        if self.accelerator.is_local_main_process:
+            self.accelerator.print("\n✅ Results saved:")
         for key, path in saved_paths.items():
             if path:
-                print(f"  📄 {key}: {path}")
+                self.accelerator.print(f"  📄 {key}: {path}")
     
     # ========================================================================
     # CLEANUP PHASE
@@ -552,51 +572,52 @@ class InferencePipeline:
     
     def cleanup(self):
         """Cleanup and summary."""
-        print("\n" + "=" * 80)
-        print("🧹 CLEANUP PHASE")
-        print("=" * 80)
+        self.accelerator.print("\n" + "=" * 80)
+        self.accelerator.print("🧹 CLEANUP PHASE")
+        self.accelerator.print("=" * 80)
         
         # Show summary
-        self._show_summary()
+        if self.accelerator.is_local_main_process:
+            self._show_summary()
         
         # Unload model
         if self.model:
-            print("\n🗑️  Unloading model...")
+            self.accelerator.print("\n🗑️  Unloading model...")
             self.model.cleanup()
-            print("  ✅ Model unloaded")
+            self.accelerator.print("  ✅ Model unloaded")
         
-        print("\n" + "=" * 80)
-        print("✨ PIPELINE COMPLETE!")
-        print("=" * 80)
+        self.accelerator.print("\n" + "=" * 80)
+        self.accelerator.print("✨ PIPELINE COMPLETE!")
+        self.accelerator.print("=" * 80)
     
     def _show_summary(self):
         """Display summary statistics."""
-        print("\n📊 EXPERIMENT SUMMARY")
-        print("-" * 80)
-        print(f"Experiment     : {self.config.experiment.name}")
-        print(f"Model          : {self.config.model.name}")
-        print(f"Prompt         : {self.config.prompt.technique}")
-        print(f"Language       : {'English' if self.config.prompt.language == 'en' else 'Vietnamese'}")
-        print(f"Batch Size     : {self.config.data.batch_size}")
-        print("-" * 80)
-        print(f"Total Samples  : {self.stats['total_samples']}")
-        print(f"Successful     : {self.stats['successful']}")
-        print(f"Failed         : {self.stats['failed']}")
-        print(f"Success Rate   : {self.stats.get('success_rate', 0):.2f}%")
-        print(f"Total Opinions : {self.stats['total_opinions']}")
-        print(f"Avg Opinions   : {self.stats.get('avg_opinions_per_sample', 0):.2f}")
-        print("-" * 80)
-        print(f"Total Time     : {self.stats['total_time']:.2f}s")
-        print(f"Generation Time: {self.stats['total_generation_time']:.2f}s")
-        print(f"Avg Time/Sample: {self.stats.get('avg_sample_time', 0):.2f}s")
-        print(f"Avg Batch Time : {self.stats.get('avg_batch_time', 0):.2f}s")
-        print("-" * 80)
-        print(f"Total Input Tokens      : {self.stats['total_input_tokens']:,}")
-        print(f"Total Output Tokens     : {self.stats['total_output_tokens']:,}")
-        print(f"Total Tokens            : {self.stats.get('total_tokens', 0):,}")
-        print(f"Avg Input Tokens/Sample : {self.stats.get('avg_input_tokens_per_sample', 0):.2f}")
-        print(f"Avg Output Tokens/Sample: {self.stats.get('avg_output_tokens_per_sample', 0):.2f}")
-        print("-" * 80)
+        self.accelerator.print("\n📊 EXPERIMENT SUMMARY")
+        self.accelerator.print("-" * 80)
+        self.accelerator.print(f"Experiment     : {self.config.experiment.name}")
+        self.accelerator.print(f"Model          : {self.config.model.name}")
+        self.accelerator.print(f"Prompt         : {self.config.prompt.technique}")
+        self.accelerator.print(f"Language       : {'English' if self.config.prompt.language == 'en' else 'Vietnamese'}")
+        self.accelerator.print(f"Batch Size     : {self.config.data.batch_size}")
+        self.accelerator.print("-" * 80)
+        self.accelerator.print(f"Total Samples  : {self.stats['total_samples']}")
+        self.accelerator.print(f"Successful     : {self.stats['successful']}")
+        self.accelerator.print(f"Failed         : {self.stats['failed']}")
+        self.accelerator.print(f"Success Rate   : {self.stats.get('success_rate', 0):.2f}%")
+        self.accelerator.print(f"Total Opinions : {self.stats['total_opinions']}")
+        self.accelerator.print(f"Avg Opinions   : {self.stats.get('avg_opinions_per_sample', 0):.2f}")
+        self.accelerator.print("-" * 80)
+        self.accelerator.print(f"Total Time     : {self.stats['total_time']:.2f}s")
+        self.accelerator.print(f"Generation Time: {self.stats['total_generation_time']:.2f}s")
+        self.accelerator.print(f"Avg Time/Sample: {self.stats.get('avg_sample_time', 0):.2f}s")
+        self.accelerator.print(f"Avg Batch Time : {self.stats.get('avg_batch_time', 0):.2f}s")
+        self.accelerator.print("-" * 80)
+        self.accelerator.print(f"Total Input Tokens      : {self.stats['total_input_tokens']:,}")
+        self.accelerator.print(f"Total Output Tokens     : {self.stats['total_output_tokens']:,}")
+        self.accelerator.print(f"Total Tokens            : {self.stats.get('total_tokens', 0):,}")
+        self.accelerator.print(f"Avg Input Tokens/Sample : {self.stats.get('avg_input_tokens_per_sample', 0):.2f}")
+        self.accelerator.print(f"Avg Output Tokens/Sample: {self.stats.get('avg_output_tokens_per_sample', 0):.2f}")
+        self.accelerator.print("-" * 80)
     
     # ========================================================================
     # MAIN ENTRY
@@ -610,15 +631,15 @@ class InferencePipeline:
             self.save()
             self.cleanup()
         except KeyboardInterrupt:
-            print("\n\n⚠️  Pipeline interrupted by user!")
+            self.accelerator.print("\n\n⚠️  Pipeline interrupted by user!")
             if self.model:
-                print("🗑️  Cleaning up model...")
+                self.accelerator.print("🗑️  Cleaning up model...")
                 self.model.cleanup()
             raise
         except Exception as e:
-            print(f"\n\n❌ Pipeline failed: {e}")
+            self.accelerator.print(f"\n\n❌ Pipeline failed: {e}")
             if self.model:
-                print("🗑️  Cleaning up model...")
+                self.accelerator.print("🗑️  Cleaning up model...")
                 self.model.cleanup()
             raise
     
