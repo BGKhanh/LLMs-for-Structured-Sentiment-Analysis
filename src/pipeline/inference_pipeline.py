@@ -184,6 +184,22 @@ class InferencePipeline:
         self.accelerator.print(f"  🆔 Model ID: {self.config.model.model_id}")
         self.accelerator.print(f"  📦 Batch size: {self.config.data.batch_size}")
        
+        if self.accelerator.num_processes > 1:
+            # Lấy rank hiện tại (0 hoặc 1)
+            current_device_index = self.accelerator.local_process_index
+            
+            # Tạo map ép buộc: Model chỉ được nằm trên GPU này
+            forced_device_map = {"": current_device_index}
+            
+            # Ghi đè vào object config trong bộ nhớ (không sửa file yaml)
+            # Hỗ trợ cả truy cập kiểu dict hoặc attribute (DotMap/Config object)
+            if isinstance(self.config.model, dict):
+                self.config.model['device_map'] = forced_device_map
+            else:
+                self.config.model.device_map = forced_device_map
+                
+            self.accelerator.print(f"  🔧 Runtime Override: device_map set to {forced_device_map} (Rank {current_device_index})")
+            
         # Create model instance
         self.model = self._get_model_instance()
         
