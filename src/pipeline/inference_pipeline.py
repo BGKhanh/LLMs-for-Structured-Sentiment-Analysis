@@ -205,13 +205,14 @@ class InferencePipeline:
         
         # Load model
         self.model.load_model()
-        if hasattr(self.model, 'model'):
-            self.model.model = self.accelerator.prepare(self.model.model)
-            self.accelerator.print(f"  ⚡ Internal model prepared with Accelerate")
-        else:
-            self.accelerator.print("  ⚠️ Warning: Wrapper does not expose .model attribute!")
+        # if hasattr(self.model, 'model'):
+        #     self.model.model = self.accelerator.prepare(self.model.model)
+        #     self.accelerator.print(f"  ⚡ Internal model prepared with Accelerate")
+        # else:
+        #     self.accelerator.print("  ⚠️ Warning: Wrapper does not expose .model attribute!")
 
-        self.accelerator.print(f"  ✅ {model_name} model ready")    
+        self.accelerator.print(f"  ⚡ Model loaded directly to device (Rank {self.accelerator.process_index})")
+        self.accelerator.print(f"  ✅ {model_name} model ready")  
     # ========================================================================
     # INFERENCE PHASE
     # ========================================================================
