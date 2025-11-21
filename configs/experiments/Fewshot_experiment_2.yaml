@@ -33,9 +33,9 @@ data:
   test_dataset_path: "/kaggle/input/vitoed/test.json"
 
   examples_pool: "train"
-  batch_size: 2
+  batch_size: 8
   num_samples: null   # null = use all samples
-  num_workers: 2
+  num_workers: 4
 
 prompt:
   technique: "few_shot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
