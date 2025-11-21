@@ -7,14 +7,14 @@ cleanup_frequency: 10
 
 experiment:
   name: "Fewshot_experiment_2"
-  description: "Few-shot technique, experiment 2, n-shot = 2"
-  version: "1.0"
+  description: "Few-shot technique, experiment 2, n-shot = 2, float32->float16(1.0->2.0)"
+  version: "2.0"
 
 model:
   # === MODEL LOADING ===
   name: "gemma"  # one of [gemma, mistral, qwen, llama]
   model_id: "google/gemma-3-4b-it"
-  torch_dtype: "float32"
+  torch_dtype: "float16"
   device_map: "auto"
   trust_remote_code: true
 
@@ -35,6 +35,7 @@ data:
   examples_pool: "train"
   batch_size: 4
   num_samples: null   # null = use all samples
+  num_workers: 2
 
 prompt:
   technique: "few_shot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
