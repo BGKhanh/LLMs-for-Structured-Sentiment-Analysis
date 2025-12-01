@@ -7,7 +7,7 @@ cleanup_frequency: 0
 
 experiment:
   name: "Fewshot_CoT_experiment_2"
-  description: "Few-shot CoT technique, experiment 2, n-shot = 2"
+  description: "Few-shot CoT technique, experiment 2, n-shot = 2, float16, batch size = 8"
   version: "1.0"
 
 model:

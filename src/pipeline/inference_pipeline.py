@@ -12,12 +12,13 @@ Coordinates all components to run end-to-end inference:
 """
 import json
 import time
+from datetime import timedelta
 import torch
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from tqdm.auto import tqdm
-from accelerate import Accelerator
+from accelerate import Accelerator, InitProcessGroupKwargs
 # === IMPORTS ===
 from src.config import Config
 from src.utils import (
@@ -54,7 +55,11 @@ class InferencePipeline:
         """
         self.config = config
         
-        self.accelerator = accelerator if accelerator else Accelerator()
+        if accelerator:
+            self.accelerator = accelerator
+        else:
+            accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(hours=24))
+            self.accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
         
         # Components (initialized in setup)
         self.model = None
@@ -134,11 +139,12 @@ class InferencePipeline:
             batch_size=self.config.data.batch_size,
             num_workers=self.config.data.num_workers,
             chat_template_builder=self.model.chat_template_builder,
-            enable_thinking=self.config.model.enable_thinking
+            enable_thinking=self.config.model.enable_thinking,
+            shuffle=False
         )
 
         if self.config.data.num_samples is not None and self.config.data.num_samples > 0:
-            original_len = len(self.dataloader.dataset)
+            original_len = len(raw_dataloader.dataset)
             raw_dataloader.dataset.data = raw_dataloader.dataset.data[:self.config.data.num_samples]
             self.accelerator.print(f"  📊 Limited to {len(raw_dataloader.dataset)}/{original_len} samples")
         else:
@@ -149,8 +155,8 @@ class InferencePipeline:
         self.stats['total_samples'] = len(self.dataset)
 
         self.dataloader = self.accelerator.prepare(raw_dataloader)
-        self.accelerator.print(f"  ⚡ DataLoader prepared (Num processes: {self.accelerator.num_processes})")
-    
+        self.accelerator.print(f" DataLoader prepared (Num processes: {self.accelerator.num_processes})")
+        self.accelerator.print(f" Samples per GPU: ~{len(self.dataset) // self.accelerator.num_processes}")
     def _init_prompt_template(self):
         """Công đoạn 3: Initialize prompt template."""
         self.accelerator.print("\n[2/4] Initializing prompt template...")

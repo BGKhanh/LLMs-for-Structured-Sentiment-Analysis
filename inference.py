@@ -10,7 +10,8 @@ Usage:
 import sys
 import traceback
 from pathlib import Path
-from accelerate import Accelerator
+from accelerate import Accelerator, InitProcessGroupKwargs
+from datetime import timedelta
 
 from src.config import load_config, validate_config
 from src.pipeline import InferencePipeline
@@ -19,8 +20,8 @@ from src.pipeline import InferencePipeline
 def main():
     """Main inference entry point."""
     
-    # 1. Khởi tạo Accelerator (Luôn là dòng đầu tiên)
-    accelerator = Accelerator()
+    accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(hours=24))
+    accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
     
     # 2. Kiểm tra tham số đầu vào
     if len(sys.argv) < 2:
@@ -36,6 +37,8 @@ def main():
     accelerator.print("🚀 INFERENCE START (Accelerated)")
     accelerator.print("=" * 60)
     accelerator.print(f"📄 Config: {config_path}")
+    accelerator.print(f"Devices: {accelerator.num_processes}")
+    accelerator.print(f"Rank: {accelerator.process_index}")
                       
     # 4. Kiểm tra file tồn tại
     if not config_path.exists():
