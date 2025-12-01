@@ -216,4 +216,4 @@ semeval22_structured_sentiment
 results/
 
 # GoT module
-graph-of-thoughts/
+lm-evaluation-harness/
