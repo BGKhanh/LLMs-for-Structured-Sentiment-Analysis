@@ -124,6 +124,8 @@ class SentimentCollator:
             enable_thinking: Bật chế độ thinking (tự động bị framework bỏ qua nếu model không hỗ trợ)
         """
         self.tokenizer = tokenizer
+        if self.tokenizer.padding_side and self.tokenizer.padding_side != "left":
+            self.tokenizer.padding_side = "left"
         self.add_generation_prompt = add_generation_prompt
         self.chat_template_builder = chat_template_builder
         self.enable_thinking = enable_thinking
@@ -256,6 +258,14 @@ def create_sentiment_dataloader(
         preloaded_data=preloaded_data
     )
     
+    if not shuffle:
+        try:
+            print("  ⚡ Sorting dataset by length for efficient batching...")
+            # Sort by text length (descending is often better for detecting OOM early)
+            dataset.data.sort(key=lambda x: len(x.get("text", "")), reverse=True)
+        except Exception as e:
+            print(f"  ⚠️ Could not sort dataset: {e}")
+
     if chat_template_builder is None:
         raise ValueError("chat_template_builder must be provided by the model.")
     

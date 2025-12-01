@@ -318,9 +318,7 @@ class InferencePipeline:
                         'success': True
                     })
                     self.stats['successful'] += 1
-                
-                if (batch_idx + 1) % self.config.cleanup_frequency == 0:
-                    torch.cuda.empty_cache()
+        
             
             except Exception as e:
                 self.accelerator.print(f"\n⚠️  Error processing batch {batch_idx + 1}/{num_batches}: {e}")
@@ -384,8 +382,6 @@ class InferencePipeline:
                         'output_tokens': out_tok    
                     }
 
-                if (batch_idx + 1) % self.config.cleanup_frequency == 0:
-                    torch.cuda.empty_cache()
 
             except Exception as e:
                 self.accelerator.print(f"\n⚠️  Stage 1 error for batch {batch_idx + 1}/{num_batches}: {e}")
@@ -477,8 +473,6 @@ class InferencePipeline:
                     })
                     self.stats['successful'] += 1
 
-                if (batch_idx + 1) % self.config.cleanup_frequency == 0:
-                    torch.cuda.empty_cache()
 
             except Exception as e:
                 self.accelerator.print(f"\n⚠️  Stage 2 error for batch {batch_idx + 1}/{num_batches}: {e}")
