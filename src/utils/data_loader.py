@@ -124,7 +124,7 @@ class SentimentCollator:
             enable_thinking: Bật chế độ thinking (tự động bị framework bỏ qua nếu model không hỗ trợ)
         """
         self.tokenizer = tokenizer
-        if self.tokenizer.padding_side and self.tokenizer.padding_side != "left":
+        if not hasattr(self.tokenizer, 'padding_side') or self.tokenizer.padding_side != "left":
             self.tokenizer.padding_side = "left"
         self.add_generation_prompt = add_generation_prompt
         self.chat_template_builder = chat_template_builder
