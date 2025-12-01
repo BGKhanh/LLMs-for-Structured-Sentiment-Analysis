@@ -14,7 +14,7 @@ model:
   # === MODEL LOADING ===
   name: "gemma"  # one of [gemma, mistral, qwen, llama]
   model_id: "google/gemma-3-4b-it"
-  torch_dtype: "float32"
+  torch_dtype: "float16"
   device_map: "auto"
   trust_remote_code: true
   enable_thinking: true
@@ -34,7 +34,7 @@ data:
   test_dataset_path: "/kaggle/input/vitoed/test.json"
 
   examples_pool: "train"
-  batch_size: 2
+  batch_size: 8
   num_samples: null   # null = use all samples
   num_workers: 0
 
