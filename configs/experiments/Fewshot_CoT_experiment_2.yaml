@@ -3,7 +3,7 @@
 # =============================================
 
 random_seed: 42
-cleanup_frequency: 10
+cleanup_frequency: 0
 
 experiment:
   name: "Fewshot_CoT_experiment_2"
@@ -36,7 +36,7 @@ data:
   examples_pool: "train"
   batch_size: 2
   num_samples: null   # null = use all samples
-  num_workers: 4
+  num_workers: 0
 
 prompt:
   technique: "few_shot_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
