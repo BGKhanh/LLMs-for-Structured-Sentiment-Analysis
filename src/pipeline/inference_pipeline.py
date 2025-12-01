@@ -12,7 +12,7 @@ Coordinates all components to run end-to-end inference:
 """
 import json
 import time
-from datetime import timedelta
+from datetime import timedelta, datetime
 import torch
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -54,11 +54,12 @@ class InferencePipeline:
         """
         self.config = config
         
-        if accelerator:
-            self.accelerator = accelerator
-        else:
-            accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(hours=24))
-            self.accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
+        if accelerator is None:
+            raise ValueError(
+                "Accelerator must be provided from main script. "
+                "Do not create Accelerator inside Pipeline to avoid distributed conflicts."
+            )
+        self.accelerator = accelerator
         
         # Components (initialized in setup)
         self.model = None
