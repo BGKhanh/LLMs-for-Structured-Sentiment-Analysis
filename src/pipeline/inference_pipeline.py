@@ -672,7 +672,14 @@ class InferencePipeline:
             return QwenModel(config=self.config.model)
         elif model_name == "seallm":
             return SeaLLModel(config=self.config.model)
-        # Add other models here
+        elif model_name == "vistral":
+            return VistralModel(config=self.config.model)
+        elif model_name == "llama4":
+            return Llama4Model(config=self.config.model)
+        elif model_name == "llama3":
+            return Llama3Model(config=self.config.model)
+        elif model_name == "vinallama":
+            return VinallamaModel(config=self.config.model)
         # elif model_name == "mistral":
         #     return MistralModel(config=self.config.model)
         
