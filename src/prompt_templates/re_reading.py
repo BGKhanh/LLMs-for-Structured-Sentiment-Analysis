@@ -19,18 +19,22 @@ class ReReadingPrompt(BasePromptTemplate):
     - Single stage
     """
     
-    def __init__(self, eng: bool = False):
+    def __init__(self, eng: bool = False, add_method: Literal["none", "CoT", "PaS"] = "none"):
         """
         Initialize Re-reading prompt generator.
         
         Args:
             eng: If True, use English prompts. If False, use Vietnamese prompts.
+            add_method: Enhancement method to combine with Re-reading.
+                        - "none": Vanilla Re-reading (RE2)
+                        - "CoT": Chain-of-Thought (RE2+CoT)
+                        - "PaS": Plan-and-Solve (RE2+PaS)
         
         Note:
             This is the simplest prompting technique - just repeats the question.
         """
         super().__init__(eng)
-    
+        self.add_method = add_method
     def _build_system_prompt(self) -> str:
         """
         Build system prompt (same as zero-shot).
@@ -63,6 +67,32 @@ class ReReadingPrompt(BasePromptTemplate):
             return self._get_user_prompt_en(text, sent_id)
         else:
             return self._get_user_prompt_vi(text, sent_id)
+    
+    
+    def _get_trigger_vi(self) -> str:
+        """Get the Vietnamese trigger phrase based on add_method."""
+        if self.add_method == "CoT":
+            return "A: Hãy cùng suy nghĩ từng bước."
+        elif self.add_method == "PaS":
+            # Điều chỉnh [Solving/Calculations] thành [Phân tích chi tiết] cho hợp ngữ cảnh
+            return ("A: Đầu tiên hãy hiểu vấn đề và vạch ra kế hoạch để giải quyết. "
+                    "Sau đó, hãy thực hiện kế hoạch, phân tích từng bước, "
+                    "và đưa ra câu trả lời cuối cùng. "
+                    "Vui lòng sinh ra quy trình cụ thể theo các bước: "
+                    "[Hiểu vấn đề], [Lập kế hoạch], [Phân tích chi tiết], [Câu trả lời].")
+        return ""
+
+    def _get_trigger_en(self) -> str:
+        """Get the English trigger phrase based on add_method."""
+        if self.add_method == "CoT":
+            return "A: Let's think step by step."
+        elif self.add_method == "PaS":
+            # Adapted from Table 11  but tuned for extraction
+            return ("A: Let's first understand the problem and devise a plan to solve the problem. "
+                    "Then, let's carry out the plan, solve the problem step by step, "
+                    "and give the ultimate answer. Please explicitly generate the mentioned process: "
+                    "[Problem Understanding], [Plan], [Detailed Analysis], [Answer].")
+        return ""
     
     # ==================== VIETNAMESE PROMPTS ====================
     
@@ -123,16 +153,27 @@ FORMAT JSON OUTPUT:
 """
     
     def _get_user_prompt_vi(self, text: str, sent_id: str) -> str:
-        """Vietnamese user prompt with re-reading (question repeated)."""
+        """Vietnamese user prompt with RE2 + logic."""
+        
+        # 1. Base Question (Pass 1)
         base_question = f"""Phân tích cảm xúc cho văn bản sau (sent_id: {sent_id}):
 "{text}"
 
 Trả về KẾT QUẢ CHÍNH XÁC theo cấu trúc JSON đã yêu cầu."""
         
-        # Re-reading: Repeat the question
-        return f"""{base_question}
-
-Đọc lại câu hỏi: {base_question}"""
+        # 2. Re-reading instruction (Pass 2) 
+        re_reading_part = f"Đọc lại câu hỏi: {base_question}"
+        
+        # 3. Add Method Trigger (CoT or PaS)
+        trigger = self._get_trigger_vi()
+        
+        # Combine parts
+        full_prompt = f"{base_question}\n\n{re_reading_part}"
+        
+        if trigger:
+            full_prompt += f"\n\n{trigger}"
+            
+        return full_prompt
     
     # ==================== ENGLISH PROMPTS ====================
     
@@ -193,16 +234,27 @@ JSON OUTPUT FORMAT:
 """
     
     def _get_user_prompt_en(self, text: str, sent_id: str) -> str:
-        """English user prompt with re-reading (question repeated)."""
+        """English user prompt with RE2 + logic."""
+        
+        # 1. Base Question (Pass 1)
         base_question = f"""Analyze the sentiment for the following text (sent_id: {sent_id}):
 "{text}"
 
 Return the EXACT RESULT according to the requested JSON structure."""
         
-        # Re-reading: Repeat the question
-        return f"""{base_question}
-
-Read the question again: {base_question}"""
+        # 2. Re-reading instruction (Pass 2) 
+        re_reading_part = f"Read the question again: {base_question}"
+        
+        # 3. Add Method Trigger (CoT or PaS)
+        trigger = self._get_trigger_en()
+        
+        # Combine parts
+        full_prompt = f"{base_question}\n\n{re_reading_part}"
+        
+        if trigger:
+            full_prompt += f"\n\n{trigger}"
+            
+        return full_prompt
 
 
 # # Example usage:

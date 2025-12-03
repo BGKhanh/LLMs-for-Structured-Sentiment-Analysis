@@ -164,8 +164,8 @@ class ConfigValidator:
             pass
         
         elif technique == "rereading":
-            # Re-reading has no special parameters
-            pass
+            if self.config.prompt.add_method not in ["none", "CoT", "PaS"]:
+                self.errors.append("add_method must be one of none, CoT, PaS")
         
         # Validate language
         valid_languages = ["vi", "en"]

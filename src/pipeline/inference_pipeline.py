@@ -651,7 +651,10 @@ class InferencePipeline:
             return ZeroShotCoTPrompt(eng=eng)
         
         elif technique == "rereading":
-            return ReReadingPrompt(eng=eng)
+            return ReReadingPrompt(
+                eng=eng,
+                add_method=self.config.prompt.add_method
+            )
         
         elif technique == "plan_and_solve":
             return PlanAndSolvePrompt(
