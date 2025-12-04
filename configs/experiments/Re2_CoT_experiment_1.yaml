@@ -1,0 +1,54 @@
+# =============================================
+# Configuration file for inference experiments
+# =============================================
+
+random_seed: 42
+cleanup_frequency: 0
+
+experiment:
+  name: "RE2_CoT_experiment_1"
+  description: "Re-reading + Chain-of-Though technique, experiment 1, GemmaModel"
+  version: "1.0"
+
+model:
+  # === MODEL LOADING ===
+  name: "gemma"  # one of [gemma, mistral, qwen, llama]
+  model_id: "google/gemma-3-4b-it"
+  torch_dtype: "float32"
+  device_map: "auto"
+  trust_remote_code: true
+  enable_thinking: true
+
+  # === GENERATION PARAMETERS ===
+  max_new_tokens: 2048
+  do_sample: false
+  temperature: 0.1
+  top_p: 0.95
+  top_k: 50
+
+
+data:
+  dataset: "dev"   # one of [train, dev, test]
+  train_dataset_path: "/kaggle/input/vitoed/train.json"
+  dev_dataset_path: "/kaggle/input/vitoed/dev.json"
+  test_dataset_path: "/kaggle/input/vitoed/test.json"
+
+  examples_pool: "train"
+  batch_size: 4
+  num_samples: null   # null = use all samples
+  num_workers: 2
+
+prompt:
+  technique: "rereading"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
+  language: "vi"
+  n_shot: 0                # just for few-shot and few-shot CoT technique
+  examples_pool_path: null
+  plus_mode: false         # just for plan-and-solve technique
+  add_method: "CoT"        # just for rereading technique
+
+output:
+  output_dir: "results/"
+  output_file: "results.json"
+  save_metadata: true
+  save_config_copy: true
+  overwrite: false
