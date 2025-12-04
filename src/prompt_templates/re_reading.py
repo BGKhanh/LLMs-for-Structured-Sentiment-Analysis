@@ -72,10 +72,10 @@ class ReReadingPrompt(BasePromptTemplate):
     def _get_trigger_vi(self) -> str:
         """Get the Vietnamese trigger phrase based on add_method."""
         if self.add_method == "CoT":
-            return "A: Hãy cùng suy nghĩ từng bước."
+            return "Hãy cùng suy nghĩ từng bước."
         elif self.add_method == "PaS":
             # Điều chỉnh [Solving/Calculations] thành [Phân tích chi tiết] cho hợp ngữ cảnh
-            return ("A: Đầu tiên hãy hiểu vấn đề và vạch ra kế hoạch để giải quyết. "
+            return ("Đầu tiên hãy hiểu vấn đề và vạch ra kế hoạch để giải quyết. "
                     "Sau đó, hãy thực hiện kế hoạch, phân tích từng bước, "
                     "và đưa ra câu trả lời cuối cùng. "
                     "Vui lòng sinh ra quy trình cụ thể theo các bước: "
@@ -85,10 +85,10 @@ class ReReadingPrompt(BasePromptTemplate):
     def _get_trigger_en(self) -> str:
         """Get the English trigger phrase based on add_method."""
         if self.add_method == "CoT":
-            return "A: Let's think step by step."
+            return "Let's think step by step."
         elif self.add_method == "PaS":
             # Adapted from Table 11  but tuned for extraction
-            return ("A: Let's first understand the problem and devise a plan to solve the problem. "
+            return ("Let's first understand the problem and devise a plan to solve the problem. "
                     "Then, let's carry out the plan, solve the problem step by step, "
                     "and give the ultimate answer. Please explicitly generate the mentioned process: "
                     "[Problem Understanding], [Plan], [Detailed Analysis], [Answer].")
@@ -158,11 +158,11 @@ FORMAT JSON OUTPUT:
         # 1. Base Question (Pass 1)
         base_question = f"""Phân tích cảm xúc cho văn bản sau (sent_id: {sent_id}):
 "{text}"
-
-Trả về KẾT QUẢ CHÍNH XÁC theo cấu trúc JSON đã yêu cầu."""
+"""
         
         # 2. Re-reading instruction (Pass 2) 
-        re_reading_part = f"Đọc lại câu hỏi: {base_question}"
+        re_reading_part = f"""Đọc lại câu hỏi: {base_question}
+Trả về KẾT QUẢ CHÍNH XÁC theo cấu trúc JSON đã yêu cầu."""
         
         # 3. Add Method Trigger (CoT or PaS)
         trigger = self._get_trigger_vi()
@@ -239,11 +239,11 @@ JSON OUTPUT FORMAT:
         # 1. Base Question (Pass 1)
         base_question = f"""Analyze the sentiment for the following text (sent_id: {sent_id}):
 "{text}"
-
-Return the EXACT RESULT according to the requested JSON structure."""
+"""
         
         # 2. Re-reading instruction (Pass 2) 
-        re_reading_part = f"Read the question again: {base_question}"
+        re_reading_part = f"""Read the question again: {base_question}
+Return the EXACT RESULT according to the requested JSON structure."""
         
         # 3. Add Method Trigger (CoT or PaS)
         trigger = self._get_trigger_en()
