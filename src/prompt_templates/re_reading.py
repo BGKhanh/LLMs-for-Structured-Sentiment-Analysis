@@ -1,6 +1,6 @@
 # src/prompt_templates/re_reading.py
 
-from typing import Tuple
+from typing import Tuple, Literal
 from .base import BasePromptTemplate
 
 
