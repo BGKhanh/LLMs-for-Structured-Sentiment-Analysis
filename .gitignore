@@ -222,4 +222,12 @@ semeval22_structured_sentiment/evaluation/metadata
 results/
 
 # GoT module
-lm-evaluation-harness/
+lm-evaluation-harness/.github/
+lm-evaluation-harness/docs/
+lm-evaluation-harness/examples/
+lm-evaluation-harness/scripts/
+lm-evaluation-harness/templates/
+lm-evaluation-harness/tests/
+lm-evaluation-harness/lm_eval/tasks/*
+!lm-evaluation-harness/lm_eval/tasks/README.md
+!lm-evaluation-harness/lm_eval/tasks/__init__.py
