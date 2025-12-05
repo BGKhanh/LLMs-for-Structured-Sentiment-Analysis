@@ -209,11 +209,11 @@ marimo/_lsp/
 __marimo__/
 
 
-# semeval
-semeval22_structured_sentiment
+# # semeval
+# semeval22_structured_sentiment
 
 # Results
 results/
 
-# GoT module
-lm-evaluation-harness/
+# # GoT module
+# lm-evaluation-harness/
