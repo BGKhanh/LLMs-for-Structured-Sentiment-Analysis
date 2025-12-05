@@ -210,7 +210,13 @@ __marimo__/
 
 
 # semeval
-semeval22_structured_sentiment
+semeval22_structured_sentiment/analysis/
+semeval22_structured_sentiment/baselines/
+semeval22_structured_sentiment/codalab/
+semeval22_structured_sentiment/data/
+semeval22_structured_sentiment/figures/
+semeval22_structured_sentiment/evaluation/example_submission.zip
+semeval22_structured_sentiment/evaluation/metadata
 
 # Results
 results/
