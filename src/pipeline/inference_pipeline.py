@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from tqdm.auto import tqdm
 from accelerate import Accelerator, InitProcessGroupKwargs
+from accelerate.utils import TorchDynamoPlugin
 # === IMPORTS ===
 from src.config import Config
 from src.utils import (
