@@ -3,7 +3,7 @@
 # =============================================
 
 random_seed: 42
-cleanup_frequency: 10
+cleanup_frequency: 0
 
 experiment:
   name: "Fewshot_experiment_4"
@@ -19,7 +19,7 @@ model:
   trust_remote_code: true
 
   # === GENERATION PARAMETERS ===
-  max_new_tokens: 4096
+  max_new_tokens: 2048
   do_sample: false
   temperature: 0.1
   top_p: 0.95
