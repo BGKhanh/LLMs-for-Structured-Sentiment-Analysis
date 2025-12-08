@@ -48,38 +48,32 @@ experiment:
 model:
   # Model selection
   name: "gemma"  # Options: "gemma", "qwen", "mistral", "llama", "seallm"
-  model_id: "google/gemma-3-4b-it"  # HuggingFace model identifier
-
   # Model loading parameters
   # See: https://huggingface.co/docs/transformers/main/en/main_classes/model#transformers.PreTrainedModel.from_pretrained
-  torch_dtype: "float32"  # Options: "float32", "float16", "bfloat16", "auto" (recommended: "auto")
-  device_map: "auto"  # Options: "auto", "cpu", "cuda", "cuda:0", or custom dict for multi-GPU
-  trust_remote_code: true  # Set to true for most HuggingFace models
-  
-  # Optional model loading parameters
-  cache_dir: null  # Custom cache directory (null = use HuggingFace default)
-  token: null  # HuggingFace token for gated models (get from https://huggingface.co/settings/tokens)
-  revision: "main"  # Model revision/branch/tag (use "main" for latest)
+  init_args:
+    model_id: "google/gemma-3-4b-it"  # HuggingFace model identifier
+    torch_dtype: "float32"  # float32, float16, bfloat16, auto
+    device_map: "auto"
+    trust_remote_code: true
+    # Flexible Args: Add any other from_pretrained args here
+    # attn_implementation: "flex_attention" 
+    # quantization_config: ...
+    # cache_dir: null  # Custom cache directory (null = use HuggingFace default)
+    # token: null  # HuggingFace token for gated models (get from https://huggingface.co/settings/tokens)
+    # revision: "main"  # Model revision/branch/tag (use "main" for latest)
 
   # Generation parameters
   # See: https://huggingface.co/docs/transformers/main/en/main_classes/text_generation
-  max_new_tokens: 1024  # Maximum length of generated response (recommended: 512-4096)
-  do_sample: false  # false = greedy decoding (deterministic), true = sampling (non-deterministic)
-  
-  # Sampling parameters (only used if do_sample: true)
-  temperature: 0.1  # Controls randomness (0.0 = deterministic, 2.0 = very random)
-  top_p: 0.95  # Nucleus sampling threshold (0.0-1.0)
-  top_k: 50  # Number of top tokens to consider (1 to vocabulary_size)
-  
-  # Qwen-specific parameters
-  enable_thinking: false  # Enable thinking mode for Qwen models (ignored for other models)
-
-  # Advanced model parameters
-  # Pass additional parameters directly to from_pretrained()
-  # Examples: quantization_config, attn_implementation, max_memory, etc.
-  # See HuggingFace docs for full list of available parameters
-  additional_model_kwargs: {}
-
+  generation_args:
+    max_new_tokens: 4096  # Maximum length of generated response (recommended: 512-4096)
+    do_sample: false      # false = greedy decoding (deterministic), true = sampling (non-deterministic)
+    temperature: 0.1      # Controls randomness (0.0 = deterministic, 2.0 = very random)
+    top_p: 0.95           # Nucleus sampling threshold (0.0-1.0)
+    top_k: 50             # Number of top tokens to consider (1 to vocabulary_size)
+    enable_thinking: false # Use by tokenizer.apply_chat_template()
+    # Flexible Args: Add any other generate args here
+    # min_p: 0.05
+    # repetition_penalty: 1.1
 
 # ========================================================================
 # DATA CONFIGURATION

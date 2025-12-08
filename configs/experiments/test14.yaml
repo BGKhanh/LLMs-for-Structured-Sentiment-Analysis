@@ -3,27 +3,27 @@
 # =============================================
 
 random_seed: 42
-cleanup_frequency: 10
+cleanup_frequency: 0
 
 experiment:
-  name: "test4"
-  description: "Testing 4"
+  name: "test14"
+  description: "Testing new config format model"
   version: "1.0"
 
 model:
   # === MODEL LOADING ===
-  name: "gemma"  # one of [gemma, mistral, qwen, llama]
-  model_id: "google/gemma-3-4b-it"
-  dtype: "float32"
-  device_map: "auto"
-  trust_remote_code: true
-
-  # === GENERATION PARAMETERS ===
-  max_new_tokens: 4096
-  do_sample: false
-  temperature: 0.1
-  top_p: 0.95
-  top_k: 50
+  name: "gemma"  
+  init_args:
+    model_id: "google/gemma-3-4b-it"
+    dtype: "float16"
+    device_map: "auto"
+    trust_remote_code: true
+  generation_args:
+    max_new_tokens: 2048
+    do_sample: false
+    temperature: 0.1
+    top_p: 0.95
+    top_k: 50
 
 
 data:
@@ -35,6 +35,7 @@ data:
   examples_pool: "train"
   batch_size: 4
   num_samples: 32   # null = use all samples
+  num_workers: 2
 
 prompt:
   technique: "few_shot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve

@@ -14,7 +14,7 @@ model:
   # === MODEL LOADING ===
   name: "vistral"  
   model_id: "Viet-Mistral/Vistral-7B-Chat"
-  torch_dtype: "float16"
+  dtype: "float16"
   device_map: "auto"
   trust_remote_code: true
   enable_thinking: true

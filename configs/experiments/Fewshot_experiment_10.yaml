@@ -14,7 +14,7 @@ model:
   # === MODEL LOADING ===
   name: "llama3"  # one of [gemma, mistral, qwen, llama]
   model_id: "meta-llama/Llama-3.2-3B-Instruct"
-  torch_dtype: "float32"
+  dtype: "float32"
   device_map: "auto"
   trust_remote_code: true
   enable_thinking: true

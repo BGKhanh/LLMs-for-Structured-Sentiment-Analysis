@@ -52,49 +52,68 @@ class ConfigValidator:
             )
     
     def _validate_model(self):
-        """Validate model configuration."""
+        """Validate model configuration (Init & Generation)."""
+        # === Validate Initialization Args ===
+        init_args = self.config.model.init_args
+        
+        # Check dtype
+        valid_dtypes = ["float32", "float16", "bfloat16", "auto"]
+        if init_args.dtype not in valid_dtypes:
+            self.errors.append(f"dtype must be one of {valid_dtypes}")
+        
+        # Check for dynamic arguments in init_args
+        from dataclasses import fields
+        default_init_fields = {f.name for f in fields(init_args.__class__)}
+        # Attributes in init_args that are NOT in the dataclass fields definition are dynamic
+        dynamic_init_args = [k for k in init_args.__dict__ if k not in default_init_fields and not k.startswith("__")]
+        
+        if dynamic_init_args:
+            self.warnings.append(
+                f"Custom init arguments detected: {dynamic_init_args}. "
+                "These will NOT be validated and might cause errors if not supported by transformers."
+            )
+            
+        # === Validate Generation Args ===
+        gen_args = self.config.model.generation_args
+        
         # Check max_new_tokens
-        if self.config.model.max_new_tokens < 1:
+        if gen_args.max_new_tokens < 1:
             self.errors.append("max_new_tokens must be >= 1")
         
-        if self.config.model.max_new_tokens > 8192:
+        if gen_args.max_new_tokens > 8192:
             self.warnings.append(
-                f"Very large max_new_tokens ({self.config.model.max_new_tokens}) may be slow"
+                f"Very large max_new_tokens ({gen_args.max_new_tokens}) may be slow and memory-intensive"
             )
         
         # Check temperature with do_sample
-        if self.config.model.do_sample:
-            if not (0.0 <= self.config.model.temperature <= 2.0):
+        if gen_args.do_sample:
+            if not (0.0 <= gen_args.temperature <= 2.0):
                 self.warnings.append(
-                    f"temperature={self.config.model.temperature} is unusual (typical: 0.1-1.5)"
+                    f"temperature={gen_args.temperature} is unusual (typical: 0.1-1.5)"
                 )
             
-            if not (0.0 <= self.config.model.top_p <= 1.0):
+            if not (0.0 <= gen_args.top_p <= 1.0):
                 self.errors.append("top_p must be between 0.0 and 1.0")
             
-            if self.config.model.top_k < 1:
+            if gen_args.top_k < 1:
                 self.errors.append("top_k must be >= 1")
         
-        # Kiểm tra enable_thinking là bool
-        if hasattr(self.config.model, 'enable_thinking'):
-            if not isinstance(self.config.model.enable_thinking, bool):
-                self.errors.append("enable_thinking must be boolean")
+        # Check enable_thinking (if present in dynamic args or explicit field)
+        # Note: In new schema, enable_thinking is explicit in generation_args
+        if gen_args.enable_thinking:
+            if self.config.model.name != "qwen":
+                self.warnings.append(
+                    "enable_thinking=True with non-Qwen model (may be ignored if model doesn't support)"
+                ) 
                 
-        if self.config.model.name != "qwen" and self.config.model.enable_thinking:
-            self.warnings.append(
-                "enable_thinking=True with non-Qwen model (may be ignored, some Qwen models aren't support thinking)"
-            ) 
-                
-        # Check torch_dtype
-        valid_dtypes = ["float32", "float16", "bfloat16", "auto"]
-        if self.config.model.torch_dtype not in valid_dtypes:
-            self.errors.append(f"torch_dtype must be one of {valid_dtypes}")
+        # Check for dynamic arguments in gen_args
+        default_gen_fields = {f.name for f in fields(gen_args.__class__)}
+        dynamic_gen_args = [k for k in gen_args.__dict__ if k not in default_gen_fields and not k.startswith("__")]
         
-        # Note: We do NOT validate additional_model_kwargs
-        # Advanced users are responsible for correctness
-        if self.config.model.additional_model_kwargs:
+        if dynamic_gen_args:
             self.warnings.append(
-                "Using additional_model_kwargs - ensure parameters are correct"
+                f"Custom generation arguments detected: {dynamic_gen_args}. "
+                "These will NOT be validated and might cause errors if not supported by transformers."
             )
     
     def _validate_data(self):

@@ -27,16 +27,17 @@ def load_yaml(path: str) -> Dict[str, Any]:
         FileNotFoundError: If file doesn't exist
         yaml.YAMLError: If YAML is invalid
     """
-    yaml_path = Path(path)
-    
-    if not yaml_path.exists():
+    path = Path(file_path)
+    if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
-    
-    try:
-        with open(yaml_path, 'r', encoding='utf-8') as f:
-            return yaml.safe_load(f) or {}
-    except yaml.YAMLError as e:
-        raise ValueError(f"Invalid YAML in {path}: {e}")
+        
+    with open(path, 'r', encoding='utf-8') as f:
+        try:
+            config_dict = yaml.safe_load(f) or {}
+        except yaml.YAMLError as e:
+            raise ValueError(f"Error parsing YAML file: {e}")
+            
+    return config_dict
 
 
 
@@ -52,65 +53,84 @@ def resolve_paths(config_dict: Dict[str, Any], project_root: Path) -> Dict[str, 
         Config dict with resolved paths
     """
     # Resolve dataset_path
-    if 'data' in config_dict and 'dataset_path' in config_dict['data']:
-        dataset_path = Path(config_dict['data']['dataset_path'])
-        if not dataset_path.is_absolute():
-            config_dict['data']['dataset_path'] = str(project_root / dataset_path)
+    if 'data' in config_dict:
+        data_conf = config_dict['data']
+        # List of path fields in DataConfig
+        path_fields = ['train_dataset_path', 'dev_dataset_path', 'test_dataset_path']
+        
+        for field in path_fields:
+            if field in data_conf and data_conf[field]:
+                path = Path(data_conf[field])
+                if not path.is_absolute():
+                    data_conf[field] = str(project_root / path)
     
-    # Resolve examples_pool_path
-    if 'prompt' in config_dict and config_dict['prompt'].get('examples_pool_path'):
-        pool_path = Path(config_dict['prompt']['examples_pool_path'])
-        if not pool_path.is_absolute():
-            config_dict['prompt']['examples_pool_path'] = str(project_root / pool_path)
+    # 2. Resolve Prompt paths
+    if 'prompt' in config_dict:
+        prompt_conf = config_dict['prompt']
+        if 'examples_pool_path' in prompt_conf and prompt_conf['examples_pool_path']:
+            path = Path(prompt_conf['examples_pool_path'])
+            if not path.is_absolute():
+                prompt_conf['examples_pool_path'] = str(project_root / path)
     
-    # Resolve output_dir
-    if 'output' in config_dict and 'output_dir' in config_dict['output']:
-        output_dir = Path(config_dict['output']['output_dir'])
-        if not output_dir.is_absolute():
-            config_dict['output']['output_dir'] = str(project_root / output_dir)
+    # 3. Resolve Output paths
+    if 'output' in config_dict:
+        output_conf = config_dict['output']
+        if 'output_dir' in output_conf and output_conf['output_dir']:
+            path = Path(output_conf['output_dir'])
+            if not path.is_absolute():
+                output_conf['output_dir'] = str(project_root / path)
     
     return config_dict
 
 
 def load_config(
-    config_path: str,
-    base_config_path: str = "configs/base.yaml",
-    project_root: Optional[str] = None
+    config_path: Union[str, Path],
+    project_root: Optional[Union[str, Path]] = None
 ) -> Config:
     """
-    Load configuration with base config merging.
+    Load Config object from YAML file.
     
     Args:
         config_path: Path to experiment config file
-        base_config_path: Path to base config (default: configs/base.yaml)
         project_root: Project root directory (default: auto-detected)
         
     Returns:
-        Loaded and merged Config object
-        
-    Example:
-        >>> config = load_config("configs/experiments/exp_001.yaml")
-        >>> print(config.model.model_id)
+        Validated Config object
     """
+    config_file = Path(config_path).resolve()
+    
     # Auto-detect project root if not provided
+    # Assumption: configs are usually in <root>/configs/...
     if project_root is None:
-        config_file = Path(config_path).resolve()
-        # Assume project root is 2 levels up from configs/experiments/
-        project_root = config_file.parent.parent.parent
+        # Try to find 'src' directory walking up
+        current = config_file.parent
+        for _ in range(3): # Look up 3 levels
+            if (current / "src").exists():
+                project_root = current
+                break
+            current = current.parent
+        
+        # Fallback if not found
+        if project_root is None:
+            project_root = Path(".")
     else:
         project_root = Path(project_root)
     
-    print(f"Loading config from: {config_path}")
+    print(f"📂 Loading config from: {config_file}")
+    print(f"📍 Project root detected: {project_root}")
     
-    # Load experiment config
-    exp_dict = load_yaml(config_path)
+    # 1. Load raw dict
+    config_dict = load_yaml(config_file)
     
-    # Resolve relative paths
-    exp_resolved_dict = resolve_paths(exp_dict, project_root)
+    # 2. Resolve paths
+    config_dict = resolve_paths(config_dict, project_root)
     
-    # Convert to Config object
-    config = Config.from_dict(exp_resolved_dict)
-    
+    # 3. Convert to Config object
+    # Config.from_dict handles nested ModelConfig creation (init_args/generation_args)
+    try:
+        config = Config.from_dict(config_dict)
+    except Exception as e:
+        raise ValueError(f"Error creating Config object: {e}")
+        
     print(f"✅ Config loaded: {config.experiment.name}")
-    
     return config

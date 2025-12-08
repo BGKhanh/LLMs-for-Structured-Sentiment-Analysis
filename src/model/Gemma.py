@@ -30,7 +30,7 @@ class GemmaModel(BaseModel):
         Example config:
             {
                 "model_id": "google/gemma-3-4b-it",
-                "torch_dtype": torch.float32,
+                "dtype": torch.float32,
                 "device_map": "auto",
                 "max_tokens": 2048,
                 "do_sample": False,
@@ -41,8 +41,6 @@ class GemmaModel(BaseModel):
         super().__init__(config)
         self.model_class = Gemma3ForConditionalGeneration
         self.tokenizer = None
-        
-        self.enable_thinking = self.config.get("enable_thinking", False) if isinstance(self.config, dict) else getattr(self.config, "enable_thinking", False)
         self.chat_template_builder = self._build_chat_messages
         
     def load_model(self) -> None:
@@ -52,26 +50,31 @@ class GemmaModel(BaseModel):
             return
         
         # Support both dict and ModelConfig object
-        if hasattr(self.config, 'model_id'):
-            # ModelConfig object
-            model_id = self.config.model_id
-            pretrained_kwargs = self.config.get_from_pretrained_kwargs()
+        if isinstance(self.config, dict):
+            # Legacy/Dict support
+            init_args = self.config.get("init_args", {})
+            if hasattr(init_args, "to_dict"):
+                kwargs = init_args.to_dict()
+            else:
+                kwargs = init_args
         else:
-            # Dict (backward compatible)
-            model_id = self.config["model_id"]
-            pretrained_kwargs = {
-                "device_map": self.config.get("device_map", "auto"),
-                "torch_dtype": getattr(torch, self.config.get("torch_dtype", "float32")),
-                "trust_remote_code": self.config.get("trust_remote_code", True)
-            }
+            # ModelConfig object support (Preferred)
+            kwargs = self.config.init_args.to_dict()
+            
+        model_id = kwargs.pop("model_id") # Extract ID
         
+        # Convert dtype string to actual torch type if needed
+        if kwargs.get("dtype") != "auto" and isinstance(kwargs.get("dtype"), str):
+            kwargs["dtype"] = getattr(torch, kwargs["dtype"])
+
         print(f"🔧 Loading Gemma model: {model_id}")
+        
         
         try:
             # Load model
             self.model = self.model_class.from_pretrained(
                 model_id,
-                **pretrained_kwargs
+                **kwargs
             ).eval()
             
             # Load tokenizer
@@ -171,15 +174,18 @@ class GemmaModel(BaseModel):
         
         try:
             # Get generation kwargs
-            if hasattr(self.config, 'get_generation_kwargs'):
-                gen_kwargs = self.config.get_generation_kwargs()
+            if isinstance(self.config, dict):
+                gen_args = self.config.get("generation_args", {})
+                if hasattr(gen_args, "to_dict"):
+                    gen_kwargs = gen_args.to_dict()
+                else:
+                    gen_kwargs = gen_args
             else:
-                gen_kwargs = {
-                    "max_new_tokens": self.config.get("max_tokens", 2048),
-                    "do_sample": self.config.get("do_sample", False),
-                }
-                if self.config.get("do_sample"):
-                    gen_kwargs["temperature"] = self.config.get("temperature", 0.1)
+                gen_kwargs = self.config.generation_args.to_dict()
+                
+            # This parameter is only use by tokenizer.apply_chat_template()   
+            enable_thinking = gen_kwargs.pop("enable_thinking", False)
+
             
             start_time = time.time()
             
@@ -203,7 +209,7 @@ class GemmaModel(BaseModel):
                         msgs,
                         tokenize=False,
                         add_generation_prompt=True,
-                        enable_thinking=self.enable_thinking
+                        enable_thinking=enable_thinking
                     )
                     texts.append(text)
                     
@@ -316,7 +322,7 @@ class GemmaModel(BaseModel):
 #     # Configuration
 #     config = {
 #         "model_id": "google/gemma-3-4b-it",
-#         "torch_dtype": torch.float32,
+#         "dtype": torch.float32,
 #         "device_map": "auto",
 #         "max_tokens": 2048,
 #         "do_sample": False,

@@ -28,15 +28,6 @@ class SeaLLModel(BaseModel):
         super().__init__(config)
         self.model_class = AutoModelForCausalLM
         self.tokenizer = None
-
-        # SeaLLM does not use thinking mode; read for compatibility (ignored)
-        self.enable_thinking = (
-            self.config.get("enable_thinking", False)
-            if isinstance(self.config, dict)
-            else getattr(self.config, "enable_thinking", False)
-        )
-
-        # Expose builder for collator
         self.chat_template_builder = self._build_chat_messages
 
     def load_model(self) -> None:
@@ -46,16 +37,22 @@ class SeaLLModel(BaseModel):
             return
 
         # Support both dict and ModelConfig object
-        if hasattr(self.config, "model_id"):
-            model_id = self.config.model_id
-            pretrained_kwargs = self.config.get_from_pretrained_kwargs()
+        if isinstance(self.config, dict):
+            # Legacy/Dict support
+            init_args = self.config.get("init_args", {})
+            if hasattr(init_args, "to_dict"):
+                kwargs = init_args.to_dict()
+            else:
+                kwargs = init_args
         else:
-            model_id = self.config["model_id"]
-            pretrained_kwargs = {
-                "device_map": self.config.get("device_map", "auto"),
-                "torch_dtype": self.config.get("torch_dtype", "auto"),
-                "trust_remote_code": self.config.get("trust_remote_code", True),
-            }
+            # ModelConfig object support (Preferred)
+            kwargs = self.config.init_args.to_dict()
+            
+        model_id = kwargs.pop("model_id") # Extract ID
+        
+        # Convert dtype string to actual torch type if needed
+        if kwargs.get("dtype") != "auto" and isinstance(kwargs.get("dtype"), str):
+            kwargs["dtype"] = getattr(torch, kwargs["dtype"])
 
         print(f"🔧 Loading SeaLLM model: {model_id}")
 
@@ -63,7 +60,7 @@ class SeaLLModel(BaseModel):
             # Load tokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(
                 model_id,
-                trust_remote_code=pretrained_kwargs.get("trust_remote_code", True),
+                trust_remote_code=kwargs.get("trust_remote_code", True),
             )
 
             # Safe default: if pad_token missing, set to eos
@@ -76,7 +73,7 @@ class SeaLLModel(BaseModel):
             # Load model
             self.model = self.model_class.from_pretrained(
                 model_id,
-                **pretrained_kwargs,
+                **kwargs,
             ).eval()
 
             self.is_loaded = True
@@ -149,17 +146,18 @@ class SeaLLModel(BaseModel):
             self.load_model()
 
         try:
-            # Generation kwargs
-            if hasattr(self.config, "get_generation_kwargs"):
-                gen_kwargs = self.config.get_generation_kwargs()
+            # Get generation kwargs
+            if isinstance(self.config, dict):
+                gen_args = self.config.get("generation_args", {})
+                if hasattr(gen_args, "to_dict"):
+                    gen_kwargs = gen_args.to_dict()
+                else:
+                    gen_kwargs = gen_args
             else:
-                gen_kwargs = {
-                    "max_new_tokens": self.config.get("max_tokens", 512),
-                    "do_sample": self.config.get("do_sample", False),
-                    "pad_token_id": self.tokenizer.pad_token_id,
-                }
-                if self.config.get("do_sample"):
-                    gen_kwargs["temperature"] = self.config.get("temperature", 0.1)
+                gen_kwargs = self.config.generation_args.to_dict()
+                
+            # This parameter is only use by tokenizer.apply_chat_template()   
+            enable_thinking = gen_kwargs.pop("enable_thinking", False)
 
             start_time = time.time()
 
@@ -178,7 +176,7 @@ class SeaLLModel(BaseModel):
                         msgs,
                         tokenize=False,
                         add_generation_prompt=True,
-                        enable_thinking=self.enable_thinking,
+                        enable_thinking=enable_thinking,
                     )
                     texts.append(t)
 

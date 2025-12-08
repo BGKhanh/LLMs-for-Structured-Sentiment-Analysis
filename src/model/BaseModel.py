@@ -17,14 +17,14 @@ class BaseModel(ABC):
     - GPU memory management
     """
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Any):
         """
         Initialize base model.
         
         Args:
             config: Model configuration dict containing:
                 - model_id: HuggingFace model ID
-                - torch_dtype: torch.float32, torch.float16, torch.bfloat16
+                - dtype: torch.float32, torch.float16, torch.bfloat16
                 - device_map: "auto", "cpu", or specific GPU mapping
                 - max_tokens: Max new tokens to generate
                 - do_sample: Whether to sample or use greedy
@@ -34,7 +34,18 @@ class BaseModel(ABC):
         self.model = None
         self.tokenizer = None
         self.is_loaded = False
-    
+        
+        if isinstance(self.config, dict):
+            # Dict mode (legacy)
+            gen_args = self.config.get("generation_args", {})
+            if isinstance(gen_args, dict):
+                self.enable_thinking = gen_args.get("enable_thinking", False)
+            else:
+                self.enable_thinking = getattr(gen_args, "enable_thinking", False)
+        else:
+            # Object mode (ModelConfig)
+            self.enable_thinking = getattr(self.config.generation_args, "enable_thinking", False)
+           
     @abstractmethod
     def load_model(self) -> None:
         """
@@ -68,7 +79,7 @@ class BaseModel(ABC):
     def generate_batch(
         self,
         batch_messages: List[List[Dict[str, Any]]]
-    ) -> Tuple[List[str], float]:
+    ) -> Tuple[List[str], float, List[int]]:
         """
         Generate responses for batch inputs.
         
@@ -117,11 +128,16 @@ class BaseModel(ABC):
     
     def get_model_info(self) -> Dict[str, Any]:
         """Get model information."""
+        # Update to reflect new config structure safely
+        if isinstance(self.config, dict):
+            model_id = self.config.get("init_args", {}).get("model_id", "unknown")
+            dtype = self.config.get("init_args", {}).get("dtype", "unknown")
+        else:
+            model_id = self.config.init_args.model_id
+            dtype = self.config.init_args.dtype
+            
         return {
-            "model_id": self.config.get("model_id"),
+            "model_id": model_id,
             "is_loaded": self.is_loaded,
-            "torch_dtype": str(self.config.get("torch_dtype")),
-            "device_map": self.config.get("device_map"),
-            "max_tokens": self.config.get("max_tokens"),
-            "do_sample": self.config.get("do_sample")
+            "dtype": str(dtype),
         }

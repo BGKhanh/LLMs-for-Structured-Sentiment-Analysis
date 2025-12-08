@@ -14,7 +14,7 @@ model:
   # === MODEL LOADING ===
   name: "seallm"  # one of [gemma, mistral, qwen, llama]
   model_id: "SeaLLMs/SeaLLMs-v3-1.5B-Chat"
-  torch_dtype: "float32"
+  dtype: "float32"
   device_map: "auto"
   trust_remote_code: true
   enable_thinking: true
