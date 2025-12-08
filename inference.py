@@ -85,7 +85,7 @@ def main():
         print(f"  Experiment : {config.experiment.name}")
         print(f"  Description: {config.experiment.description}")
         print(f"  Model      : {config.model.name}")
-        print(f"  Model ID   : {config.model.model_id}")
+        print(f"  Model ID   : {config.model.init_args.model_id}")
         print(f"  Technique  : {config.prompt.technique}")
         print(f"  Language   : {'English' if config.prompt.language == 'en' else 'Vietnamese'}")
         print(f"  Dataset    : {config.data.dataset}")
