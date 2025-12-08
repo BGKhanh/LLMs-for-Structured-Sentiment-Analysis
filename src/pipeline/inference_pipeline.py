@@ -130,7 +130,7 @@ class InferencePipeline:
             batch_size=self.config.data.batch_size,
             num_workers=self.config.data.num_workers,
             chat_template_builder=self.model.chat_template_builder,
-            enable_thinking=self.config.model.enable_thinking
+            enable_thinking=self.config.model.init_args.enable_thinking
         )
 
         if self.config.data.num_samples is not None and self.config.data.num_samples > 0:
@@ -174,7 +174,7 @@ class InferencePipeline:
         
         model_name = self.config.model.name
         print(f"  🤖 Model: {model_name}")
-        print(f"  🆔 Model ID: {self.config.model.model_id}")
+        print(f"  🆔 Model ID: {self.config.model.init_args.model_id}")
         print(f"  📦 Batch size: {self.config.data.batch_size}")
        
         # Create model instance
@@ -382,7 +382,7 @@ class InferencePipeline:
             num_workers=self.config.data.num_workers,
             preloaded_data=self.dataset,  # cùng subset/thứ tự như Stage 1
             chat_template_builder=self.model.chat_template_builder,
-            enable_thinking=self.config.model.enable_thinking
+            enable_thinking=self.config.model.init_args.enable_thinking
         )
 
         total_samples = len(stage2_dataloader.dataset)
