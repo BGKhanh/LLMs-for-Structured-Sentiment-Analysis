@@ -231,3 +231,4 @@ lm-evaluation-harness/tests/
 lm-evaluation-harness/lm_eval/tasks/*
 !lm-evaluation-harness/lm_eval/tasks/README.md
 !lm-evaluation-harness/lm_eval/tasks/__init__.py
+!lm-evaluation-harness/lm_eval/tasks/semeval_vietnamese/

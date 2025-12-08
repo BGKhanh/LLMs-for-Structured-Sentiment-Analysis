@@ -1,0 +1,52 @@
+task: semeval_vi_fewshot
+dataset_path: json
+dataset_kwargs:
+  data_files:
+    train: data/train.json
+    validation: data/dev.json
+    test: data/test.json
+
+output_type: generate_until
+training_split: train
+validation_split: validation
+test_split: test
+
+# Lấy few-shot example từ tập train (mặc định)
+fewshot_split: train
+
+# Prompting
+doc_to_text: "Text: {{text}}\nAnswer:"
+doc_to_target: !function utils.doc_to_target
+
+# Generation config
+generation_kwargs:
+  until:
+    - "</s>"
+    - "<|im_end|>"
+    - "<|endoftext|>"
+  do_sample: false
+  temperature: 0.1
+  top_p: 0.95
+  top_k: 50
+  max_gen_toks: 2048
+
+# Post-processing
+filter_list:
+  - name: "extract_json"
+    filter:
+      - function: "extract_json"
+
+# Metrics
+metric_list:
+  - metric: semeval_f1
+    aggregation: !function utils.semeval_f1_aggregation
+    higher_is_better: true
+  - metric: semeval_precision
+    aggregation: !function utils.semeval_precision_aggregation
+    higher_is_better: true
+  - metric: semeval_recall
+    aggregation: !function utils.semeval_recall_aggregation
+    higher_is_better: true
+
+metadata:
+  version: 1.0

@@ -1,0 +1,115 @@
+[
+    {
+        "text": "quay quay cái lồn , thấy bị bắt nạt thì ra nói một câu bảo vệ người ta , có khi tối về lại có người nằm ôm . cứ cầm điện thoại pin với chả không pin",
+        "reasoning": "\nBước 1: Xác định các Biểu thức Cảm xúc\nPhát hiện 5 polar expressions: \"quay quay cái lồn\", \"thấy bị bắt nạt\", \"nói một câu bảo vệ người ta\", \"tối về lại có người nằm ôm\", \"cứ cầm điện thoại pin với chả không pin\".\n\nBước 2: Phân tích Tuần tự từng Opinion\n--- Opinion 1: \"quay quay cái lồn\" ---\n\nSource: Không có vì không xuất hiện đại từ nhân xưng nào như \"tôi\", \"mình\".\nTarget: Không có vì không có đại từ xưng hô \"mày\", \"cậu\" hay danh từ cụ thể.\nPolar_expression: \"quay quay cái lồn\" vì đây là cụm từ thô tục chỉ trích hành động quay phim.\nPolarity: Negative vì sử dụng từ ngữ xúc phạm để chê bai.\nIntensity: Standard vì mức độ thô tục ở mức trung bình, không cực đoan.\n\n--- Opinion 2: \"thấy bị bắt nạt\" ---\n\nSource: Không có.\nTarget: Không có.\nPolar_expression: \"thấy bị bắt nạt\" vì mô tả tình huống tiêu cực.\nPolarity: Negative vì bắt nạt là hành vi có hại.\nIntensity: Standard vì diễn đạt ở mức độ thông thường.\n\n--- Opinion 3: \"nói một câu bảo vệ người ta\" ---\n\nSource: Không có.\nTarget: Không có, \"người ta\" ở đây là đại từ chung chung không xác định.\nPolar_expression: \"nói một câu bảo vệ người ta\" vì mô tả hành động tích cực.\nPolarity: Positive vì bảo vệ là hành vi tốt đẹp.\nIntensity: Standard vì là hành động thông thường, không quá mạnh mẽ.\n\n--- Opinion 4: \"tối về lại có người nằm ôm\" ---\n\nSource: Không có.\nTarget: Không có.\nPolar_expression: \"tối về lại có người nằm ôm\" vì ám chỉ kết quả tình cảm tích cực.\nPolarity: Positive vì thể hiện sự gần gũi, thân mật.\nIntensity: Standard vì diễn đạt ở mức độ bình thường.\n\n--- Opinion 5: \"cứ cầm điện thoại pin với chả không pin\" ---\n\nSource: Không có.\nTarget: Không có.\nPolar_expression: \"cứ cầm điện thoại pin với chả không pin\" vì mô tả thói quen quay phim liên tục.\nPolarity: Neutral vì chỉ nhận xét hành vi mà không có tính xúc phạm hay khen ngợi rõ ràng.\nIntensity: Standard vì diễn đạt bình thường.\n",
+        "output": {
+            "sent_id": 1833,
+            "text": "quay quay cái lồn , thấy bị bắt nạt thì ra nói một câu bảo vệ người ta , có khi tối về lại có người nằm ôm . cứ cầm điện thoại pin với chả không pin",
+            "opinions": [
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": [
+                        "quay quay cái lồn"
+                    ],
+                    "Polarity": "Negative",
+                    "Intensity": "Standard"
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": [
+                        "thấy bị bắt nạt"
+                    ],
+                    "Polarity": "Negative",
+                    "Intensity": "Standard"
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": [
+                        "nói một câu bảo vệ người ta"
+                    ],
+                    "Polarity": "Positive",
+                    "Intensity": "Standard"
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": [
+                        "tối về lại có người nằm ôm"
+                    ],
+                    "Polarity": "Positive",
+                    "Intensity": "Standard"
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": [
+                        "cứ cầm điện thoại pin với chả không pin"
+                    ],
+                    "Polarity": "Neutral",
+                    "Intensity": "Standard"
+                }
+            ]
+        }
+    },
+    {
+        "text": "yêu sắp 2 năm rồi mà không biết người yêu kể chuyện cho nghe là gì 😢 đòi mấy lần toàn kêu không bình thường xịu xịu",
+        "reasoning": "\nBước 1: Xác định các Biểu thức Cảm xúc\nPhát hiện 3 polar expressions: \"yêu sắp 2 năm rồi\", \"không biết người yêu kể chuyện cho nghe là gì\", \"đòi mấy lần toàn kêu không bình thường xịu xịu\".\n\nBước 2: Phân tích Tuần tự từng Opinion\n\n--- Opinion 1: \"yêu sắp 2 năm rồi\" ---\nSource: Không có vì không xuất hiện đại từ nhân xưng rõ ràng.\nTarget: Không có vì không có đối tượng cụ thể được nhắc đến.\nPolar_expression: \"yêu sắp 2 năm rồi\" vì thể hiện mối quan hệ tình cảm lâu dài.\nPolarity: Positive vì việc yêu nhau gần 2 năm thể hiện tình cảm ổn định, bền vững.\nIntensity: Standard vì diễn đạt ở mức độ bình thường, không quá phóng đại.\n\n--- Opinion 2: \"không biết người yêu kể chuyện cho nghe là gì\" ---\nSource: Không có.\nTarget: Không có, \"người yêu\" ở đây là danh từ chung chỉ đối tượng nhưng không phải target cụ thể trong ngữ cảnh phân tích.\nPolar_expression: \"không biết người yêu kể chuyện cho nghe là gì\" vì bày tỏ sự thiếu vắng giao tiếp, cảm giác buồn bã (kèm emoji 😢).\nPolarity: Negative vì thể hiện sự thất vọng, thiếu kết nối trong quan hệ.\nIntensity: Standard vì diễn đạt ở mức độ thông thường, không quá gay gắt.\n\n--- Opinion 3: \"đòi mấy lần toàn kêu không bình thường xịu xịu\" ---\nSource: Không có.\nTarget: Không có.\nPolar_expression: \"đòi mấy lần toàn kêu không bình thường xịu xịu\" vì mô tả phản ứng từ chối của người yêu.\nPolarity: Neutral vì chỉ khách quan mô tả phản ứng mà không mang tính xúc phạm hay khen ngợi rõ ràng, \"xịu xịu\" có thể hiểu là nhạt nhẽo nhưng không đủ mạnh để đánh giá tiêu cực.\nIntensity: Standard vì diễn đạt bình thường.\n",
+        "output": {
+            "sent_id": 1834,
+            "text": "yêu sắp 2 năm rồi mà không biết người yêu kể chuyện cho nghe là gì 😢 đòi mấy lần toàn kêu không bình thường xịu xịu",
+            "opinions": [
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": [
+                        "yêu sắp 2 năm rồi"
+                    ],
+                    "Polarity": "Positive",
+                    "Intensity": "Standard"
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": [
+                        "không biết người yêu kể chuyện cho nghe là gì"
+                    ],
+                    "Polarity": "Negative",
+                    "Intensity": "Standard"
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": [
+                        "đòi mấy lần toàn kêu không bình thường xịu xịu"
+                    ],
+                    "Polarity": "Neutral",
+                    "Intensity": "Standard"
+                }
+            ]
+        }
+    },
+    {
+        "text": "hi vọng câu chuyện admin vừa bịa ra giúp các bạn có thêm niềm tin trong cuộc sống 😂.",
+        "reasoning": "\nBước 1: Xác định các Biểu thức Cảm xúc\nPhát hiện 1 polar expression: \"giúp các bạn có thêm niềm tin trong cuộc sống\".\n\nBước 2: Phân tích Tuần tự từng Opinion\n\n--- Opinion 1: \"giúp các bạn có thêm niềm tin trong cuộc sống\" ---\nSource: Không có vì không xuất hiện đại từ nhân xưng rõ ràng chỉ người phát biểu.\nTarget: \"câu chuyện admin vừa bịa ra\" vì đây là đối tượng mà cảm xúc hướng tới, là sự vật được nhắc đến trong câu.\nPolar_expression: \"giúp các bạn có thêm niềm tin trong cuộc sống\" vì thể hiện tác động tích cực, mang lại hy vọng.\nPolarity: Positive vì \"có thêm niềm tin\" và \"giúp đỡ\" đều là những yếu tố tích cực, mặc dù có emoji 😂 mang tính châm biếm nhưng bản thân cụm từ vẫn mang nghĩa tích cực.\nIntensity: Standard vì diễn đạt ở mức độ bình thường, không quá phóng đại hay quá nhẹ nhàng.\n",
+        "output": {
+            "sent_id": 1835,
+            "text": "hi vọng câu chuyện admin vừa bịa ra giúp các bạn có thêm niềm tin trong cuộc sống 😂.",
+            "opinions": [
+                {
+                    "Source": [],
+                    "Target": [
+                        "câu chuyện admin vừa bịa ra"
+                    ],
+                    "Polar_expression": [
+                        "giúp các bạn có thêm niềm tin trong cuộc sống"
+                    ],
+                    "Polarity": "Positive",
+                    "Intensity": "Standard"
+                }
+            ]
+        }
+    }
+]
