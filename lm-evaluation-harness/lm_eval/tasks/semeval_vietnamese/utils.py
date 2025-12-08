@@ -623,6 +623,74 @@ def validate_example_pool():
     eval_logger.info(f"✅ Validated {len(examples)} CoT examples")
     return True
 
+# ==================== FEW-SHOT PROMPT LOGIC (Adapted from src/prompt_templates/few_shot.py) ====================
+
+def format_example_for_prompt(example: Dict[str, Any]) -> str:
+    """
+    Format a single example for inclusion in prompt (Simplified JSON).
+    Adapted from FewShotPrompt._format_example
+    """
+    def _simplify_opinions(opinions: List[Dict]) -> List[Dict]:
+        simplified = []
+        for op in opinions:
+            simplified_op = {
+                "Source": op.get('Source', [[], []])[0],
+                "Target": op.get('Target', [[], []])[0],
+                "Polar_expression": op.get('Polar_expression', [[], []])[0],
+                "Polarity": op.get('Polarity', ''),
+                "Intensity": op.get('Intensity', '')
+            }
+            simplified.append(simplified_op)
+        return simplified
+
+    formatted_output = {
+        "text": example.get('text', ''),
+        "opinions": _simplify_opinions(example.get('opinions', []))
+    }
+    
+    # Trả về format: Input: "..."\nOutput: {...}
+    return f'Input: "{example.get("text", "")}"\nOutput: {json.dumps(formatted_output, ensure_ascii=False, indent=2)}'
+
+def doc_to_text_fewshot(doc: Dict) -> str:
+    """
+    Generate user prompt. 
+    NOTE: This function is for ZERO-SHOT usage mainly. 
+    For FEW-SHOT, lm-eval handles concatenation automatically via `fewshot_split`.
+    
+    However, if we want to CONTROL the few-shot examples precisely using your class logic,
+    we can't easily override lm-eval's internal sampler without hacking.
+    
+    Strategy:
+    Use `lm-eval` built-in few-shot mechanism but format the examples using `doc_to_text` and `doc_to_target` properly.
+    """
+    # Format cho phần Input của mỗi example (và cả query chính)
+    return f'Input: "{doc["text"]}"\nOutput:'
+
+def doc_to_target_fewshot(doc: Dict) -> str:
+    """
+    Generate target string for few-shot examples.
+    This ensures the few-shot examples in the prompt have the correct JSON format.
+    """
+    # Tái sử dụng logic simplify để target string gọn gàng
+    def _simplify_opinions(opinions: List[Dict]) -> List[Dict]:
+        simplified = []
+        for op in opinions:
+            simplified_op = {
+                "Source": op.get('Source', [[], []])[0],
+                "Target": op.get('Target', [[], []])[0],
+                "Polar_expression": op.get('Polar_expression', [[], []])[0],
+                "Polarity": op.get('Polarity', ''),
+                "Intensity": op.get('Intensity', '')
+            }
+            simplified.append(simplified_op)
+        return simplified
+
+    formatted_output = {
+        "text": doc.get('text', ''),
+        "opinions": _simplify_opinions(doc.get('opinions', []))
+    }
+    return json.dumps(formatted_output, ensure_ascii=False, indent=2)
+
 
 # ==================== EXPORT ====================
 
@@ -651,6 +719,9 @@ __all__ = [
     "get_fewshot_samples",
     "format_opinion_for_display",
     "validate_example_pool",
+    
+    "doc_to_text_fewshot",
+    "doc_to_target_fewshot",
 ]
 
 

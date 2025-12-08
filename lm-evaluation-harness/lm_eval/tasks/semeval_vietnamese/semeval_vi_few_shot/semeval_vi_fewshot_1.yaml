@@ -1,4 +1,4 @@
-task: semeval_vi_fewshot
+task: semeval_vi_few_shot
 dataset_path: json
 dataset_kwargs:
   data_files:
