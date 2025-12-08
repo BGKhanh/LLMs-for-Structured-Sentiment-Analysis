@@ -27,7 +27,7 @@ def load_yaml(path: str) -> Dict[str, Any]:
         FileNotFoundError: If file doesn't exist
         yaml.YAMLError: If YAML is invalid
     """
-    path = Path(file_path)
+    path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
         
