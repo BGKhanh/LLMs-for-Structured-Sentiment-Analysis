@@ -6,25 +6,27 @@ random_seed: 42
 cleanup_frequency: 0
 
 experiment:
-  name: "Fewshot_experiment_9"
-  description: "Few-shot technique, experiment 9, n-shot = 0, meta-llama/Llama-3.2-3B-Instruct"
+  name: "Seallm_Fewshot_CoT_experiment_0"
+  description: "Few-shot CoT technique, n-shot = 2, SeaLLMs/SeaLLMs-v3-7B-Chat"
   version: "1.0"
 
 model:
   # === MODEL LOADING ===
-  name: "llama3"  # one of [gemma, mistral, qwen, llama]
-  model_id: "meta-llama/Llama-3.2-3B-Instruct"
-  dtype: "float32"
-  device_map: "auto"
-  trust_remote_code: true
-  enable_thinking: true
+  name: "seallm"  # one of [gemma, mistral, qwen, llama]
+  init_args:
+    model_id: "SeaLLMs/SeaLLMs-v3-7B-Chat"
+    dtype: "float16"
+    device_map: "auto"
+    trust_remote_code: true
 
   # === GENERATION PARAMETERS ===
-  max_new_tokens: 2048
-  do_sample: false
-  temperature: 0.1
-  top_p: 0.95
-  top_k: 50
+  generation_args:
+    max_new_tokens: 2048
+    do_sample: false
+    temperature: 0.1
+    top_p: 0.95
+    top_k: 50
+    enable_thinking: true
 
 
 data:
@@ -34,14 +36,14 @@ data:
   test_dataset_path: "/kaggle/input/vitoed/test.json"
 
   examples_pool: "train"
-  batch_size: 4
+  batch_size: 8
   num_samples: null   # null = use all samples
-  num_workers: 4
+  num_workers: 2
 
 prompt:
-  technique: "few_shot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
+  technique: "few_shot_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
   language: "vi"
-  n_shot: 0
+  n_shot: 2
   examples_pool_path: null
   plus_mode: false
 

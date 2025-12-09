@@ -6,7 +6,7 @@ random_seed: 42
 cleanup_frequency: 0
 
 experiment:
-  name: "Fewshot_experiment_10"
+  name: "Fewshot_experiment_2"
   description: "Few-shot technique, experiment 10, n-shot = 1, meta-llama/Llama-3.2-3B-Instruct"
   version: "1.0"
 
