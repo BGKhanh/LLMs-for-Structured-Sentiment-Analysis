@@ -6,7 +6,7 @@ random_seed: 42
 cleanup_frequency: 0
 
 experiment:
-  name: "Seallm_Fewshot_CoT_experiment_0"
+  name: "Seallm_Fewshot_CoT_experiment_1"
   description: "Few-shot CoT technique, n-shot = 1, SeaLLMs/SeaLLMs-v3-7B-Chat"
   version: "1.0"
 

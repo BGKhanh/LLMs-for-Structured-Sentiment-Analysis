@@ -52,7 +52,7 @@ model:
   # See: https://huggingface.co/docs/transformers/main/en/main_classes/model#transformers.PreTrainedModel.from_pretrained
   init_args:
     model_id: "google/gemma-3-4b-it"  # HuggingFace model identifier
-    torch_dtype: "float32"  # float32, float16, bfloat16, auto
+    dtype: "float32"  # float32, float16, bfloat16, auto
     device_map: "auto"
     trust_remote_code: true
     # Flexible Args: Add any other from_pretrained args here
