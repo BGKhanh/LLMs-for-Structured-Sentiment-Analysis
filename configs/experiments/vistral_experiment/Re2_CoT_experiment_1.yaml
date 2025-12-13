@@ -6,24 +6,27 @@ random_seed: 42
 cleanup_frequency: 0
 
 experiment:
-  name: "Fewshot_experiment_12"
-  description: "Few-shot technique, experiment 12, n-shot = 0, Viet-Mistral/Vistral-7B-Chat"
+  name: "Vistral_Re_reading_plus_CoT_experiment_1"
+  description: "Re-reading + Chain-of-Thought technique, add_method = CoT, Viet-Mistral/Vistral-7B-Chat"
   version: "1.0"
 
 model:
   # === MODEL LOADING ===
-  name: "vistral"  
-  model_id: "Viet-Mistral/Vistral-7B-Chat"
-  dtype: "float16"
-  device_map: "auto"
-  trust_remote_code: true
-  enable_thinking: true
+  name: "vistral"  # one of [gemma, mistral, qwen, llama]
+  init_args:
+    model_id: "Viet-Mistral/Vistral-7B-Chat"
+    dtype: "float16"
+    device_map: "auto"
+    trust_remote_code: true
+
   # === GENERATION PARAMETERS ===
-  max_new_tokens: 2048
-  do_sample: false
-  temperature: 0.1
-  top_p: 0.95
-  top_k: 50
+  generation_args:
+    max_new_tokens: 2048
+    do_sample: false
+    temperature: 0.1
+    top_p: 0.95
+    top_k: 50
+    enable_thinking: true
 
 
 data:
@@ -38,11 +41,12 @@ data:
   num_workers: 2
 
 prompt:
-  technique: "few_shot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
+  technique: "rereading"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
   language: "vi"
   n_shot: 0
   examples_pool_path: null
   plus_mode: false
+  add_method: "CoT"
 
 output:
   output_dir: "results/"
