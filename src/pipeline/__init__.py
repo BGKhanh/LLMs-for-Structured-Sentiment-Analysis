@@ -2,8 +2,9 @@
 
 """Pipeline modules for orchestrating inference and training."""
 
-from .inference_pipeline import InferencePipeline
+from .inference_pipeline import HFInferencePipeline, VLLMPipeline
 
 __all__ = [
-    'InferencePipeline'
+    'HFInferencePipeline', 
+    "VLLMPipeline"
 ]

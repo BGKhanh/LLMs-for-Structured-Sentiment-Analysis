@@ -22,15 +22,618 @@ from src.config import Config
 from src.utils import (
     setup_reproducible_environment, 
     postprocess_response, 
+    extract_json_from_response,
     save_experiment_results,
     create_sentiment_dataloader
 )
 from src.model import *
 from src.prompt_templates import *
 
-
+class VLLMPipeline:
+    """
+    vLLM-optimized inference pipeline.
+    
+    Architecture:
+    - Config-driven initialization
+    - Stateful execution (tracks progress)
+    - Error handling with recovery
+    - Special case handling (CoT 2-stage)
+    - Single-batch generation (vLLM handles batching internally)
+    """
+    
+    # === INITIALIZATION ===
+    def __init__(self, config: Config):
+        """
+        Initialize pipeline with config.
+        
+        Args:
+            config: Validated Config object
+        """
+        self.config = config
+        
+        # Components (initialized in setup)
+        self.model = None
+        self.prompt_template = None
+        
+        # Results storage
+        self.raw_results = []
+        self.final_results = []
+        
+        # Special handling for Zero-shot CoT
+        self.reasoning_map = {}  # For stage 2: sent_id -> reasoning
+        
+        # Statistics tracking
+        self.stats = {
+            'start_time': None,
+            'end_time': None,
+            'total_time': 0,
+            'total_generation_time': 0.0,
+            'successful': 0,
+            'failed': 0,
+            'total_samples': 0,
+            'total_opinions': 0,
+            'total_input_tokens': 0,
+            'total_output_tokens': 0
+        }
+        
+        # Flags
+        self.is_setup = False
+        self.is_completed = False
+        
+    # === SETUP PHASE ===
+    def setup(self):
+        """Setup all components."""
+        if self.is_setup:
+            print("⚠️  Pipeline already setup!")
+            return
+        
+        print("\n" + "=" * 80)
+        print("🔧 VLLM SETUP PHASE")
+        print("=" * 80)
+        
+        self._setup_environment()
+        self._init_prompt_template()
+        self._init_model()
+        self._load_dataset()
+        
+        self.is_setup = True
+        print("\n✅ Pipeline setup complete!\n")
+    
+    def _setup_environment(self):
+        """Công đoạn 2: Environment setup."""
+        print("\n[1/4] Setting up reproducible environment...")
+        setup_reproducible_environment(seed=self.config.random_seed)
+        print(f"  ✅ Random seed set to {self.config.random_seed}")
+    
+    def _load_dataset(self):
+        """Công đoạn 5: Load dataset (no DataLoader needed)."""
+        print("\n[4/4] Loading dataset...")
+        
+        dataset_path = self.config.data.get_dataset_path()
+        print(f"  📁 Dataset: {dataset_path}")
+        
+        # Load JSON directly (vLLM doesn't need DataLoader)
+        with open(dataset_path, 'r', encoding='utf-8') as f:
+            self.dataset = json.load(f)
+        
+        # Apply num_samples limit
+        if self.config.data.num_samples is not None and self.config.data.num_samples > 0:
+            original_len = len(self.dataset)
+            self.dataset = self.dataset[:self.config.data.num_samples]
+            print(f"  📊 Limited to {len(self.dataset)}/{original_len} samples")
+        else:
+            print(f"  📊 Loaded {len(self.dataset)} samples")
+        
+        self.stats['total_samples'] = len(self.dataset)
+    
+    def _init_prompt_template(self):
+        """Công đoạn 3: Initialize prompt template."""
+        print("\n[2/4] Initializing prompt template...")
+        
+        technique = self.config.prompt.technique
+        print(f"  🎯 Technique: {technique}")
+        print(f"  🌐 Language: {'English' if self.config.prompt.language == 'en' else 'Vietnamese'}")
+        
+        # Get examples pool path if needed
+        examples_pool_path = None
+        if technique in ["few_shot", "few_shot_cot"]:
+            if self.config.data.examples_pool:
+                examples_pool_path = self.config.data.get_examples_pool_path()
+                print(f"  📚 Examples pool: {examples_pool_path}")
+        
+        # Create prompt template instance
+        self.prompt_template = self._get_prompt_template_instance(
+            examples_pool_path=examples_pool_path
+        )
+        
+        # Prepare template (load examples, cache system prompt)
+        self.prompt_template.prepare()
+        print(f"  ✅ {technique} prompt template ready")
+    
+    def _init_model(self):
+        """Công đoạn 4: Initialize vLLM model."""
+        print("\n[3/4] Initializing vLLM model...")
+        
+        model_name = self.config.model.name
+        print(f"  🤖 Model: {model_name}")
+        print(f"  🆔 Model ID: {self.config.model.init_args.model_id}")
+        
+        # Create vLLM model instance
+        self.model = VLLMModel(config=self.config.model)
+        
+        # Load model
+        self.model.load_model()
+        print(f"  ✅ vLLM {model_name} model ready")
+    
+    # ========================================================================
+    # INFERENCE PHASE
+    # ========================================================================
+    
+    def run(self):
+        """Execute inference."""
+        if not self.is_setup:
+            raise RuntimeError("Pipeline not setup! Call setup() first.")
+        
+        if self.is_completed:
+            print("⚠️  Inference already completed!")
+            return
+        
+        print("\n" + "=" * 80)
+        print("🚀 VLLM INFERENCE PHASE")
+        print("=" * 80)
+        
+        self.stats['start_time'] = datetime.now().isoformat()
+        start_time = time.time()
+        
+        # Check if Zero-shot CoT (2-stage)
+        is_two_stage = (
+            self.config.prompt.technique == "zero_shot_cot"
+        )
+        
+        if is_two_stage:
+            print("\n📋 Running Two-Stage Inference (Zero-shot CoT)")
+            self._run_two_stage_inference()
+        else:
+            print("\n📋 Running Single-Stage Inference")
+            self._run_single_stage_inference()
+        
+        # Postprocess results
+        self._postprocess_results()
+        
+        self.stats['end_time'] = datetime.now().isoformat()
+        self.stats['total_time'] = time.time() - start_time
+        self.is_completed = True
+        
+        print("\n✅ Inference phase complete!\n")
+   
+    def _run_single_stage_inference(self):
+        """
+        Single-stage inference with vLLM.
+        
+        Builds formatted prompts manually, then generates all at once.
+        vLLM handles batching internally for optimal performance.
+        """
+        print(f"Processing {len(self.dataset)} samples...")
+        
+        # Build all prompts at once
+        formatted_prompts = []
+        metadata = []
+        
+        for sample in tqdm(self.dataset, desc="Building prompts", unit="sample"):
+            text = sample['text']
+            sent_id = sample['sent_id']
+            
+            sys_prompt, usr_prompt = self.prompt_template.get_prompt(text, sent_id)
+            
+            # Format prompt for vLLM (vLLM handles chat template internally)
+            # Simple format: combine system and user prompts
+            formatted_prompt = f"{sys_prompt}\n\n{usr_prompt}"
+            formatted_prompts.append(formatted_prompt)
+            
+            metadata.append({
+                'sent_id': sent_id,
+                'text': text,
+                'system_prompt': sys_prompt,
+                'user_prompt': usr_prompt
+            })
+        
+        print(f"✅ Built {len(formatted_prompts)} prompts")
+        
+        # Generate all at once with vLLM
+        print("🚀 Generating with vLLM...")
+        responses, gen_time, output_tokens, input_tokens = self.model.generate_batch(formatted_prompts)
+        
+        print(f"✅ Generated {len(responses)} responses")
+        
+        # Map results back to samples
+        time_per_sample = gen_time / len(metadata) if metadata else 0
+        
+        for meta, response, in_tok, out_tok in zip(
+            metadata, responses, input_tokens, output_tokens
+        ):
+            self.raw_results.append({
+                'sent_id': int(meta['sent_id']),
+                'text': meta['text'],
+                'system_prompt': meta['system_prompt'],
+                'user_prompt': meta['user_prompt'],
+                'raw_response': response,
+                'generation_time': time_per_sample,
+                'input_tokens': in_tok,
+                'output_tokens': out_tok,
+                'success': True
+            })
+            self.stats['successful'] += 1
+        
+        # Update stats
+        self.stats['total_generation_time'] += gen_time
+        self.stats['total_input_tokens'] += sum(input_tokens)
+        self.stats['total_output_tokens'] += sum(output_tokens)
+    
+    def _run_two_stage_inference(self):
+        """
+        Zero-shot CoT two-stage inference with vLLM.
+        
+        Stage 1: Generate reasoning for all samples at once
+        Stage 2: Extract structured output for all samples at once
+        """
+        batch_size = self.config.data.batch_size
+        
+        # ===== STAGE 1: Generate Reasoning =====
+        print("\n--- STAGE 1: Generate Reasoning ---")
+        print(f"Processing {len(self.dataset)} samples...")
+        
+        # Build Stage 1 prompts
+        stage1_prompts = []
+        metadata = []
+        
+        for sample in tqdm(self.dataset, desc="Building Stage 1 prompts", unit="sample"):
+            text = sample['text']
+            sent_id = sample['sent_id']
+            
+            sys_prompt, usr_prompt = self.prompt_template.get_prompt(text, sent_id, stage="stage_1")
+            
+            formatted_prompt = f"{sys_prompt}\n\n{usr_prompt}"
+            stage1_prompts.append(formatted_prompt)
+            
+            metadata.append({
+                'sent_id': sent_id,
+                'text': text,
+                'system_prompt': sys_prompt,
+                'user_prompt': usr_prompt
+            })
+        
+        print(f"✅ Built {len(stage1_prompts)} Stage 1 prompts")
+        
+        # Generate Stage 1
+        print("🚀 Generating Stage 1 with vLLM...")
+        stage1_responses, gen_time_1, stage1_output_tokens, stage1_input_tokens = self.model.generate_batch(stage1_prompts)
+        
+        # Store reasoning results
+        time_per_sample_1 = gen_time_1 / len(metadata) if metadata else 0
+        
+        for meta, reasoning, in_tok, out_tok in zip(
+            metadata, stage1_responses, stage1_input_tokens, stage1_output_tokens
+        ):
+            sid = str(meta['sent_id'])
+            self.reasoning_map[sid] = {
+                'text': meta['text'],
+                'system_prompt': meta['system_prompt'],
+                'user_prompt': meta['user_prompt'],
+                'raw_response': reasoning,
+                'generation_time': time_per_sample_1,
+                'input_tokens': in_tok,
+                'output_tokens': out_tok
+            }
+        
+        print(f"✅ Stage 1 complete: {len(self.reasoning_map)} reasonings generated")
+        
+        # ===== STAGE 2: Extract Structured Output =====
+        print("\n--- STAGE 2: Extract Structured Output ---")
+        print(f"Processing {len(self.dataset)} samples...")
+        
+        # Build Stage 2 prompts
+        stage2_prompts = []
+        stage2_metadata = []
+        
+        for sample in tqdm(self.dataset, desc="Building Stage 2 prompts", unit="sample"):
+            text = sample['text']
+            sent_id = sample['sent_id']
+            sid_str = str(sent_id)
+            
+            # Get reasoning from Stage 1
+            reasoning_data = self.reasoning_map.get(sid_str, {})
+            if not reasoning_data or not reasoning_data.get('raw_response'):
+                print(f"⚠️  No reasoning for {sid_str}, skipping...")
+                continue
+            
+            sys_prompt_2, usr_prompt_2 = self.prompt_template.get_prompt(
+                text, sent_id, 
+                stage="stage_2", 
+                reasoning=reasoning_data['raw_response']
+            )
+            
+            formatted_prompt_2 = f"{sys_prompt_2}\n\n{usr_prompt_2}"
+            stage2_prompts.append(formatted_prompt_2)
+            
+            stage2_metadata.append({
+                'sent_id': sent_id,
+                'text': text,
+                'system_prompt': sys_prompt_2,
+                'user_prompt': usr_prompt_2,
+                'stage_1_data': reasoning_data
+            })
+        
+        print(f"✅ Built {len(stage2_prompts)} Stage 2 prompts")
+        
+        # Generate Stage 2
+        print("🚀 Generating Stage 2 with vLLM...")
+        stage2_responses, gen_time_2, stage2_output_tokens, stage2_input_tokens = self.model.generate_batch(stage2_prompts)
+        
+        print(f"✅ Stage 2 complete!")
+        
+        # Map Stage 2 results
+        time_per_sample_2 = gen_time_2 / len(stage2_metadata) if stage2_metadata else 0
+        
+        for meta, response, in_tok, out_tok in zip(
+            stage2_metadata, stage2_responses, stage2_input_tokens, stage2_output_tokens
+        ):
+            self.raw_results.append({
+                'sent_id': int(meta['sent_id']),
+                'text': meta['text'],
+                'stage_1': meta['stage_1_data'],
+                'stage_2': {
+                    'system_prompt': meta['system_prompt'],
+                    'user_prompt': meta['user_prompt'],
+                    'raw_response': response,
+                    'generation_time': time_per_sample_2,
+                    'input_tokens': in_tok,
+                    'output_tokens': out_tok
+                },
+                'success': True
+            })
+            self.stats['successful'] += 1
+        
+        # Update stats (combine both stages)
+        total_gen_time = gen_time_1 + gen_time_2
+        total_input_tokens = sum(stage1_input_tokens) + sum(stage2_input_tokens)
+        total_output_tokens = sum(stage1_output_tokens) + sum(stage2_output_tokens)
+        
+        self.stats['total_generation_time'] += total_gen_time
+        self.stats['total_input_tokens'] += total_input_tokens
+        self.stats['total_output_tokens'] += total_output_tokens
+    
+    def _postprocess_results(self):
+        """Postprocess all raw responses."""
+        print("\n📝 Postprocessing results...")
+        
+        for result in tqdm(self.raw_results, desc="Postprocessing", unit="result"):
+            if not result.get('success', False):
+                continue
+            
+            try:
+                # Extract raw response (depends on stage)
+                if 'stage_2' in result:
+                    # Multi-stage: use stage 2 response
+                    raw_response = result['stage_2']['raw_response']
+                else:
+                    # Single-stage
+                    raw_response = result['raw_response']
+                
+                # Extract JSON from raw response using unified utility
+                json_response = extract_json_from_response(
+                    raw_response,
+                    model_type=self.config.model.name
+                )
+                
+                # Postprocess to SemEval format
+                processed = postprocess_response(
+                    response_text=json_response,
+                    original_text=result['text'],
+                    sent_id=result['sent_id']
+                )
+                
+                # Parse and count opinions
+                processed_json = json.loads(processed)
+                num_opinions = len(processed_json.get('opinions', []))
+                self.stats['total_opinions'] += num_opinions
+                
+                # Store final result
+                self.final_results.append({
+                    'sent_id': int(result['sent_id']),
+                    'text': result['text'],
+                    'result': processed,
+                    'num_opinions': num_opinions
+                })
+                
+            except Exception as e:
+                print(f"\n⚠️  Postprocessing error for {result.get('sent_id')}: {e}")
+                self.stats['failed'] += 1
+                self.stats['successful'] -= 1
+        
+        print(f"✅ Postprocessed {len(self.final_results)} results")
+    
+    # ========================================================================
+    # SAVING PHASE
+    # ========================================================================
+    
+    def save(self):
+        """Save results and metadata."""
+        if not self.is_completed:
+            raise RuntimeError("Inference not completed! Call run() first.")
+        
+        print("\n" + "=" * 80)
+        print("💾 SAVING PHASE")
+        print("=" * 80)
+        
+        # Calculate statistics
+        self._calculate_statistics()
+        
+        # Prepare results for saving
+        results_to_save = []
+        for result in self.final_results:
+            results_to_save.append({
+                'sent_id': result['sent_id'],
+                'text': result['text'],
+                **json.loads(result['result'])
+            })
+        
+        # Save using utility function
+        print("\n📁 Saving experiment results...")
+        saved_paths = save_experiment_results(
+            results=results_to_save,
+            config=self.config,
+            statistics=self.stats,
+            raw_results=self.raw_results 
+        )
+        
+        print("\n✅ Results saved:")
+        for key, path in saved_paths.items():
+            if path:
+                print(f"  📄 {key}: {path}")
+    
+    # ========================================================================
+    # CLEANUP PHASE
+    # ========================================================================
+    
+    def cleanup(self):
+        """Cleanup and summary."""
+        print("\n" + "=" * 80)
+        print("🧹 CLEANUP PHASE")
+        print("=" * 80)
+        
+        # Show summary
+        self._show_summary()
+        
+        # vLLM cleanup (if needed)
+        if self.model:
+            print("\n🗑️  Cleaning up vLLM model...")
+            self.model.cleanup()
+            print("  ✅ Model cleaned up")
+        
+        print("\n" + "=" * 80)
+        print("✨ VLLM PIPELINE COMPLETE!")
+        print("=" * 80)
+    
+    def _show_summary(self):
+        """Display summary statistics."""
+        print("\n📊 EXPERIMENT SUMMARY")
+        print("-" * 80)
+        print(f"Experiment     : {self.config.experiment.name}")
+        print(f"Model          : {self.config.model.name} (vLLM)")
+        print(f"Prompt         : {self.config.prompt.technique}")
+        print(f"Language       : {'English' if self.config.prompt.language == 'en' else 'Vietnamese'}")
+        print("-" * 80)
+        print(f"Total Samples  : {self.stats['total_samples']}")
+        print(f"Successful     : {self.stats['successful']}")
+        print(f"Failed         : {self.stats['failed']}")
+        print(f"Success Rate   : {self.stats.get('success_rate', 0):.2f}%")
+        print(f"Total Opinions : {self.stats['total_opinions']}")
+        print(f"Avg Opinions   : {self.stats.get('avg_opinions_per_sample', 0):.2f}")
+        print("-" * 80)
+        print(f"Total Time     : {self.stats['total_time']:.2f}s")
+        print(f"Generation Time: {self.stats['total_generation_time']:.2f}s")
+        print(f"Avg Time/Sample: {self.stats.get('avg_sample_time', 0):.2f}s")
+        print("-" * 80)
+        print(f"Total Input Tokens      : {self.stats['total_input_tokens']:,}")
+        print(f"Total Output Tokens     : {self.stats['total_output_tokens']:,}")
+        print(f"Total Tokens            : {self.stats.get('total_tokens', 0):,} tokens")
+        print(f"Avg Input Tokens/Sample : {self.stats.get('avg_input_tokens_per_sample', 0):.2f}")
+        print(f"Avg Output Tokens/Sample: {self.stats.get('avg_output_tokens_per_sample', 0):.2f}")
+        print("-" * 80)
+    
+    # ========================================================================
+    # MAIN ENTRY
+    # ========================================================================
+    
+    def execute(self):
+        """Execute complete pipeline."""
+        try:
+            self.setup()
+            self.run()
+            self.save()
+            self.cleanup()
+        except KeyboardInterrupt:
+            print("\n\n⚠️  Pipeline interrupted by user!")
+            if self.model:
+                print("🗑️  Cleaning up model...")
+                self.model.cleanup()
+            raise
+        except Exception as e:
+            print(f"\n\n❌ Pipeline failed: {e}")
+            if self.model:
+                print("🗑️  Cleaning up model...")
+                self.model.cleanup()
+            raise
+    
+    # ========================================================================
+    # HELPER METHODS
+    # ========================================================================
+    
+    def _get_prompt_template_instance(
+        self,
+        examples_pool_path: Optional[str] = None
+    ):
+        """Factory method for prompt templates."""
+        technique = self.config.prompt.technique
+        eng = True if self.config.prompt.language == 'en' else False
+        
+        if technique == "few_shot":
+            return FewShotPrompt(
+                eng=eng,
+                n_shot=self.config.prompt.n_shot,
+                examples_pool_path=examples_pool_path
+            )
+        
+        elif technique == "few_shot_cot":
+            return FewShotCoTPrompt(
+                eng=eng,
+                n_shot=self.config.prompt.n_shot
+            )
+        
+        elif technique == "zero_shot_cot":
+            return ZeroShotCoTPrompt(eng=eng)
+        
+        elif technique == "rereading":
+            return ReReadingPrompt(
+                eng=eng,
+                add_method=self.config.prompt.add_method
+            )
+        
+        elif technique == "plan_and_solve":
+            return PlanAndSolvePrompt(
+                eng=eng,
+                plus=self.config.prompt.plus_mode
+            )
+        
+        else:
+            raise ValueError(f"Unknown prompt technique: {technique}")
+    
+    def _calculate_statistics(self):
+        """Calculate pipeline statistics."""
+        total = self.stats['total_samples']
+        successful = self.stats['successful']
+        
+        self.stats['success_rate'] = (successful / total * 100) if total > 0 else 0
+        self.stats['avg_opinions_per_sample'] = (
+            self.stats['total_opinions'] / successful if successful > 0 else 0
+        )
+        self.stats['avg_time_per_sample'] = (
+            self.stats['total_time'] / total if total > 0 else 0
+        )
+        
+        self.stats['avg_input_tokens_per_sample'] = (
+            self.stats['total_input_tokens'] / successful if successful > 0 else 0
+        )
+        self.stats['avg_output_tokens_per_sample'] = (
+            self.stats['total_output_tokens'] / successful if successful > 0 else 0
+        )
+        self.stats['total_tokens'] = (
+            self.stats['total_input_tokens'] + self.stats['total_output_tokens']
+        )
+        
+        
 # === MAIN CLASS ===
-class InferencePipeline:
+class HFInferencePipeline:
     """
     Main inference pipeline orchestrator.
     
