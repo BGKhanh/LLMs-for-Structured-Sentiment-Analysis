@@ -6,7 +6,7 @@ random_seed: 42
 
 
 experiment:
-  name: "Gemma_Fewshot_CoT_experiment_3"
+  name: "Gemma_Fewshot_CoT_experiment_4"
   description: "Few-shot CoT technique, n-shot = 1, google/gemma-3-4b-it, new parameters"
   version: "1.0"
 
@@ -15,7 +15,7 @@ model:
   name: "gemma"  # one of [gemma, mistral, qwen, llama]
   init_args:
     model_id: "google/gemma-3-4b-it"
-    dtype: "float16"
+    dtype: "float32"
     device_map: "auto"
     trust_remote_code: true
 
@@ -37,7 +37,7 @@ data:
   test_dataset_path: "/kaggle/input/vitoed/test.json"
 
   examples_pool: "train"
-  batch_size: 8
+  batch_size: 4
   num_samples: null   # null = use all samples
   num_workers: 2
 
