@@ -68,7 +68,8 @@ class GemmaModel(BaseModel):
             kwargs["dtype"] = getattr(torch, kwargs["dtype"])
 
         print(f"🔧 Loading Gemma model: {model_id}")
-        
+        print(f"🔧 init_args: {kwargs}")
+        print(f"🔧 gen_args: {self.config.get("generation_args", {})}")
         
         try:
             # Load model
