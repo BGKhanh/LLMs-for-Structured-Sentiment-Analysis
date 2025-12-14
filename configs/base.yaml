@@ -22,8 +22,6 @@
 # Random seed for reproducibility (same seed + same config = same results)
 random_seed: 42
 
-# GPU cleanup frequency (cleanup every N batches to manage memory)
-cleanup_frequency: 10
 
 
 # ========================================================================

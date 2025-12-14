@@ -3,7 +3,7 @@
 # =============================================
 
 random_seed: 42
-cleanup_frequency: 10
+
 
 experiment:
   name: "PS_experiment_2"

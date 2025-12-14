@@ -3,7 +3,7 @@
 # =============================================
 
 random_seed: 42
-cleanup_frequency: 1
+
 
 experiment:
   name: "Gemma_Fewshot_CoT_experiment_3"

@@ -223,7 +223,6 @@ class Config:
     data: DataConfig = field(default_factory=DataConfig)
     prompt: PromptConfig = field(default_factory=PromptConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
-    cleanup_frequency: int = 0  # GPU cleanup every N batches
     
     @classmethod
     def from_dict(cls, config_dict: dict) -> 'Config':
@@ -242,8 +241,7 @@ class Config:
             model=ModelConfig(**config_dict.get('model', {})),
             data=DataConfig(**config_dict.get('data', {})),
             prompt=PromptConfig(**config_dict.get('prompt', {})),
-            output=OutputConfig(**config_dict.get('output', {})),
-            cleanup_frequency=config_dict.get('cleanup_frequency', 0)
+            output=OutputConfig(**config_dict.get('output', {}))
         )
     
     def to_dict(self) -> dict:

@@ -3,7 +3,7 @@
 # =============================================
 
 random_seed: 42
-cleanup_frequency: 0
+
 
 experiment:
   name: "Vistral_Plan_and_Solve_experiment_2"

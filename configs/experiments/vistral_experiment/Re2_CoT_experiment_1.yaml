@@ -3,7 +3,7 @@
 # =============================================
 
 random_seed: 42
-cleanup_frequency: 0
+
 
 experiment:
   name: "Vistral_Re_reading_plus_CoT_experiment_1"
