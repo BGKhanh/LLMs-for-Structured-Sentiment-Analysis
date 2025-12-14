@@ -66,7 +66,7 @@ class GemmaModel(BaseModel):
         # Convert dtype string to actual torch type if needed
         if kwargs.get("dtype") != "auto" and isinstance(kwargs.get("dtype"), str):
             kwargs["dtype"] = getattr(torch, kwargs["dtype"])
-        generation_args = self.config.get("generation_args", {})
+        generation_args = self.config.generation_args.to_dict()
         print(f"🔧 Loading Gemma model: {model_id}")
         print(f"🔧 init_args: {kwargs}")
         print(f"🔧 gen_args: {generation_args}")
