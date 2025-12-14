@@ -186,7 +186,6 @@ class GemmaModel(BaseModel):
             # This parameter is only use by tokenizer.apply_chat_template()   
             enable_thinking = gen_kwargs.pop("enable_thinking", False)
             
-            print(f"🔧 gen_kwargs: {gen_kwargs}")
             start_time = time.time()
             
             # ===== MODE DETECTION =====
