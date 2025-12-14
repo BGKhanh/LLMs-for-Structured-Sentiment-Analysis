@@ -18,7 +18,6 @@ model:
     dtype: "float16"
     device_map: "auto"
     trust_remote_code: true
-    attn_implementation: "flash_attention_2"
 
   # === GENERATION PARAMETERS ===
   generation_args:

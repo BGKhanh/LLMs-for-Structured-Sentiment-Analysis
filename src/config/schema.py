@@ -6,43 +6,81 @@ Configuration schema definitions using dataclasses.
 Defines the complete structure of config.yaml with type hints and defaults.
 """
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, MISSING
 from typing import Optional, Literal, Dict, Any, List
 
 class FlexibleConfig:
     """
     Base class for configs that allow extra fields (dynamic kwargs).
-    Unknown arguments passed to __init__ are stored in self.extra_args.
+
+    Behaviour:
+    - When instantiated, apply dataclass defaults (if any).
+    - Override defaults with kwargs passed in.
+    - Unknown kwargs are stored both as attributes and in self._extra_args.
+    - to_dict() returns a merged dictionary of dataclass fields + extra fields.
     """
+
     def __init__(self, **kwargs):
-        # Store definition-based fields
-        names = set([f.name for f in self.__dataclass_fields__.values()])
-        
+        # container for unknown (dynamic) fields
+        self._extra_args: Dict[str, Any] = {}
+
+        # 1) Apply dataclass defaults (if this instance is from a @dataclass subclass)
+        if hasattr(self, "__dataclass_fields__"):
+            for f in self.__dataclass_fields__.values():
+                # If a default is provided, set it
+                if f.default is not MISSING:
+                    setattr(self, f.name, f.default)
+                # If a default_factory is provided, call it and set result
+                else:
+                    default_factory = getattr(f, "default_factory", MISSING)
+                    if default_factory is not MISSING:
+                        setattr(self, f.name, default_factory())
+
+        # Prepare set of defined dataclass field names (for distinguishing extras)
+        defined_names = set(self.__dataclass_fields__.keys()) if hasattr(self, "__dataclass_fields__") else set()
+
+        # 2) Override / add from kwargs (YAML)
         for k, v in kwargs.items():
-            if k in names:
-                setattr(self, k, v)
-            else:
-                # Store unknown fields dynamically
-                # We simply set them as attributes so they act like normal fields
-                setattr(self, k, v)
-    
+            setattr(self, k, v)
+            if k not in defined_names:
+                # keep track of dynamic/extra args separately as well
+                self._extra_args[k] = v
+
     def to_dict(self) -> Dict[str, Any]:
-        """Convert all attributes (static + dynamic) to dictionary."""
-        # Get static fields
-        data = asdict(self) # type: ignore
-        
-        # Merge with dynamic attributes that are not in dataclass fields
-        # Note: asdict already handles dataclass fields. 
-        # We need to add attributes that were added dynamically in __init__
-        # but NOT duplicate what asdict already does.
-        
-        # Simpler approach for this specific use case:
-        # Just return the instance's __dict__, but filtered for internal Python stuff
-        result = {}
+        """
+        Convert all attributes (static dataclass fields + dynamic attrs) to dictionary.
+        Priority: use asdict() for dataclass fields when possible, then add extras.
+        """
+        result: Dict[str, Any] = {}
+
+        # Try to get canonical dataclass representation first
+        try:
+            result = asdict(self)  # type: ignore
+        except Exception:
+            # Fallback: collect declared dataclass fields manually (if any)
+            if hasattr(self, "__dataclass_fields__"):
+                for name in self.__dataclass_fields__.keys():
+                    # Use getattr to allow defaults/applied values
+                    result[name] = getattr(self, name)
+
+        # Merge dynamic attributes that are not part of asdict result
         for k, v in self.__dict__.items():
-            if not k.startswith('__'):
+            # Skip private/internal attributes
+            if k.startswith("_"):
+                continue
+            if k not in result:
                 result[k] = v
+
+        # Ensure extras tracked in _extra_args are present (in case someone set private attr)
+        for k, v in getattr(self, "_extra_args", {}).items():
+            result.setdefault(k, v)
+
         return result
+
+    @property
+    def extra_args(self) -> Dict[str, Any]:
+        """Read-only view of extra (unknown) args provided at init time."""
+        return dict(getattr(self, "_extra_args", {}))
     
 @dataclass
 class ExperimentConfig:
@@ -52,7 +90,7 @@ class ExperimentConfig:
     version: str = "1.0"
 
 
-@dataclass
+@dataclass(init=False)
 class ModelInitConfig(FlexibleConfig):
     """
     Parameters for Model Initialization (load_model / from_pretrained).
@@ -71,7 +109,7 @@ class ModelInitConfig(FlexibleConfig):
     
     # Extra params are handled by FlexibleConfig.__init__.
 
-@dataclass
+@dataclass(init=False)
 class ModelGenerationConfig(FlexibleConfig):
     """
     Parameters for Model Generation (model.generate).
