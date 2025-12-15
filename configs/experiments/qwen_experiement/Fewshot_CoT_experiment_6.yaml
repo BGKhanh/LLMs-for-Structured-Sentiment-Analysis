@@ -21,7 +21,7 @@ model:
 
   # === GENERATION PARAMETERS ===
   generation_args:
-    max_new_tokens: 2048
+    max_new_tokens: 4096
     do_sample: true
     temperature: 0.7
     top_p: 0.8
