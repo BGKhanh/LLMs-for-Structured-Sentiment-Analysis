@@ -15,10 +15,9 @@ model:
   name: "gemma"  # one of [gemma, mistral, qwen, llama]
   init_args:
     model_id: "google/gemma-3-4b-it"
-    dtype: "bfloat16"
+    dtype: "float32"
     device_map: "auto"
     trust_remote_code: true
-    attn_implementation: "flash_attention_2"
 
   # === GENERATION PARAMETERS ===
   generation_args:
@@ -38,9 +37,9 @@ data:
   test_dataset_path: "data/test.json"
 
   examples_pool: "train"
-  batch_size: 8
+  batch_size: 16
   num_samples: null   # null = use all samples
-  num_workers: 2
+  num_workers: 4
 
 prompt:
   technique: "few_shot_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
