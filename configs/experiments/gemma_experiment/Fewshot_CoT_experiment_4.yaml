@@ -15,7 +15,7 @@ model:
   name: "gemma"  # one of [gemma, mistral, qwen, llama]
   init_args:
     model_id: "google/gemma-3-4b-it"
-    dtype: "float32"
+    dtype: "bfloat16"
     device_map: "auto"
     trust_remote_code: true
     attn_implementation: "flash_attention_2"
