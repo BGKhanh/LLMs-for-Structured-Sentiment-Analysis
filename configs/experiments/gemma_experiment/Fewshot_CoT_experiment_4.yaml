@@ -18,6 +18,7 @@ model:
     dtype: "float32"
     device_map: "auto"
     trust_remote_code: true
+    attn_implementation: "flash_attention_2"
 
   # === GENERATION PARAMETERS ===
   generation_args:
@@ -37,7 +38,7 @@ data:
   test_dataset_path: "/kaggle/input/vitoed/test.json"
 
   examples_pool: "train"
-  batch_size: 2
+  batch_size: 8
   num_samples: null   # null = use all samples
   num_workers: 2
 
