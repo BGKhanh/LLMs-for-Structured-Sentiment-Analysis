@@ -249,7 +249,11 @@ Bước 3: Thực thi Suy luận (Execution)
         return """Hãy thực hiện một phân tích chi tiết theo quy trình Plan-and-Solve (PaS) sau:
 
 1. [TRÍCH XUẤT ỨNG VIÊN]: Đọc kỹ văn bản. Xác định và liệt kê danh sách các cụm từ (spans) tiềm năng chứa cảm xúc (Polar Expressions) hoặc mô tả hành vi/trạng thái.
-2. [LẬP KẾ HOẠCH]: Dựa trên danh sách trên, xác định số lượng Opinion cần phân tích và thứ tự thực hiện.
+2. [LẬP KẾ HOẠCH]: 
+   - Xác định tổng số Opinion cần phân tích.
+   - Nêu chiến lược xử lý: thứ tự phân tích (tuần tự theo văn bản/theo độ ưu tiên), cách tiếp cận các thành phần (Source, Target, Polar_expression, Polarity, Intensity).
+   - Nhận diện các đặc điểm chung/thách thức có thể gặp phải trong văn bản này (ví dụ: nhiều Source/Target ẩn, có tiếng lóng, có ẩn ý, cần phân biệt Neutral vs Negative).
+   - Xác nhận sẽ phân tích đầy đủ 5 thành phần cho mỗi Opinion.
 3. [THỰC THI SUY LUẬN]:
    - Với mỗi Opinion trong kế hoạch, hãy phân tích chi tiết các thành phần: Source, Target, Polar_expression, Polarity, Intensity.
    - BẮT BUỘC: Với mỗi giá trị gán nhãn, phải kèm theo lý giải ngắn gọn (Reasoning) dựa trên ngữ cảnh, tiếng lóng hoặc ẩn ý.
