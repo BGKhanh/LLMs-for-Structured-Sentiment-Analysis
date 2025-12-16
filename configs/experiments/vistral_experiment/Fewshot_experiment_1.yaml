@@ -37,9 +37,9 @@ data:
   test_dataset_path: "data/test.json"
 
   examples_pool: "train"
-  batch_size: 8
+  batch_size: 4
   num_samples: null   # null = use all samples
-  num_workers: 4
+  num_workers: 2
 
 prompt:
   technique: "few_shot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
