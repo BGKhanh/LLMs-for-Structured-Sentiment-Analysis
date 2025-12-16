@@ -31,9 +31,9 @@ model:
 
 data:
   dataset: "dev"   # one of [train, dev, test]
-  train_dataset_path: "/kaggle/input/vitoed/train.json"
-  dev_dataset_path: "/kaggle/input/vitoed/dev.json"
-  test_dataset_path: "/kaggle/input/vitoed/test.json"
+  train_dataset_path: "data/train.json"
+  dev_dataset_path: "data/dev.json"
+  test_dataset_path: "data/test.json"
 
   examples_pool: "train"
   batch_size: 4
