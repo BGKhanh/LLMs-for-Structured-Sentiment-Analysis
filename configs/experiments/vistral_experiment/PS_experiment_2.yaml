@@ -15,7 +15,7 @@ model:
   name: "vistral"  # one of [gemma, mistral, qwen, llama]
   init_args:
     model_id: "Viet-Mistral/Vistral-7B-Chat"
-    dtype: "float16"
+    dtype: "bfloat16"
     device_map: "auto"
     trust_remote_code: true
 
@@ -38,7 +38,7 @@ data:
   examples_pool: "train"
   batch_size: 4
   num_samples: null   # null = use all samples
-  num_workers: 2
+  num_workers: 4
 
 prompt:
   technique: "plan_and_solve"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
