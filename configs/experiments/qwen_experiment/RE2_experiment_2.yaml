@@ -6,8 +6,8 @@ random_seed: 42
 
 
 experiment:
-  name: "Qwen_PaS_experiment_3"
-  description: "Plan and solve technique, plus_mode=false, Qwen/Qwen3-4B-Instruct-2507, new parameters"
+  name: "Qwen_Re2_experiment_2"
+  description: "Re-reading technique, Qwen/Qwen3-4B-Instruct-2507, new parameters"
   version: "1.0"
 
 model:
@@ -37,12 +37,12 @@ data:
   test_dataset_path: "data/test.json"
 
   examples_pool: "train"
-  batch_size: 2
+  batch_size: 4
   num_samples: null   # null = use all samples
   num_workers: 2
 
 prompt:
-  technique: "plan_and_solve"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
+  technique: "rereading"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
   language: "vi"
   n_shot: 0
   examples_pool_path: null
