@@ -97,6 +97,25 @@ class VinallamaModel(BaseModel):
             {"role": "user", "content": user_prompt},
         ]
         
+    def _get_autocast_dtype(self) -> Union[torch.dtype, None]:
+        """Helper to get torch dtype from config for autocast."""
+        dtype_str = None
+        
+        # Extract dtype string from config
+        if isinstance(self.config, dict):
+            init_args = self.config.get("init_args", {})
+            if isinstance(init_args, dict):
+                dtype_str = init_args.get("dtype")
+            else:
+                dtype_str = getattr(init_args, "dtype", None)
+        else:
+            dtype_str = getattr(self.config.init_args, "dtype", None)
+            
+        # Convert string to torch.dtype
+        if isinstance(dtype_str, str) and dtype_str != "auto" and hasattr(torch, dtype_str):
+            return getattr(torch, dtype_str)
+        return None   
+         
     def generate_single(self, system_prompt: str, user_prompt: str) -> Tuple[str, float]:
         """Generate response for single input."""
         if not self.is_loaded:

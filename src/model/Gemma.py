@@ -96,6 +96,25 @@ class GemmaModel(BaseModel):
             {"role": "user", "content": [{"type": "text", "text": user_prompt}]},
         ]
 
+    def _get_autocast_dtype(self) -> Union[torch.dtype, None]:
+        """Helper to get torch dtype from config for autocast."""
+        dtype_str = None
+        
+        # Extract dtype string from config
+        if isinstance(self.config, dict):
+            init_args = self.config.get("init_args", {})
+            if isinstance(init_args, dict):
+                dtype_str = init_args.get("dtype")
+            else:
+                dtype_str = getattr(init_args, "dtype", None)
+        else:
+            dtype_str = getattr(self.config.init_args, "dtype", None)
+            
+        # Convert string to torch.dtype
+        if isinstance(dtype_str, str) and dtype_str != "auto" and hasattr(torch, dtype_str):
+            return getattr(torch, dtype_str)
+        return None
+    
     def generate_single(self, system_prompt: str, user_prompt: str) -> Tuple[str, float]:
         """Generate response for single input."""
         if not self.is_loaded:
@@ -129,10 +148,12 @@ class GemmaModel(BaseModel):
                 }
                 if self.config.get("do_sample"):
                     gen_kwargs["temperature"] = self.config.get("temperature", 0.1)
+
+            autocast_dtype = self._get_autocast_dtype()
             
             # Generate
             start_time = time.time()
-            with torch.inference_mode(), torch.autocast(device_type="cuda"):
+            with torch.inference_mode(), torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", dtype=autocast_dtype):
                 generation = self.model.generate(
                     **inputs,
                     **gen_kwargs  
@@ -218,9 +239,11 @@ class GemmaModel(BaseModel):
                     padding=True,
                 ).to(self.model.device)
                 input_length = tokenized_inputs['input_ids'].shape[1]
+
+            autocast_dtype = self._get_autocast_dtype()
             
             # ===== BATCH GENERATION =====
-            with torch.inference_mode(), torch.autocast(device_type="cuda"):
+            with torch.inference_mode(), torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", dtype=autocast_dtype):
                 generated_outputs = self.model.generate(
                     **tokenized_inputs,
                     **gen_kwargs
