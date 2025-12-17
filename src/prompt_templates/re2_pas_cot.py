@@ -23,7 +23,8 @@ class Re2PaSCoTPrompt(BasePromptTemplate):
     EXAMPLES_POOL_VI = [
         {
             "text": "quay quay cái lồn , thấy bị bắt nạt thì ra nói một câu bảo vệ người ta , có khi tối về lại có người nằm ôm . cứ cầm điện thoại pin với chả không pin",
-            "reasoning": """Bước 1: Trích xuất Ứng viên (Extraction)
+            "reasoning": """
+Bước 1: Trích xuất Ứng viên (Extraction)
 Tôi tìm thấy 5 cụm từ mang sắc thái cảm xúc hoặc mô tả hành vi: 
 1. "quay quay cái lồn"
 2. "thấy bị bắt nạt"
@@ -32,7 +33,14 @@ Tôi tìm thấy 5 cụm từ mang sắc thái cảm xúc hoặc mô tả hành 
 5. "cứ cầm điện thoại pin với chả không pin"
 
 Bước 2: Lập Kế hoạch (Planning)
-Tôi sẽ phân tích tuần tự 5 cụm từ trên tương ứng với 5 Opinion riêng biệt để xác định các thành phần cấu trúc của chúng.
+- Rà soát ứng viên: Cả 5 cụm từ đều mang sắc thái cảm xúc hoặc mô tả hành vi rõ ràng, không có cụm từ nào cần loại bỏ.
+- Chiến lược xử lý:
+  + Thứ tự: Phân tích tuần tự theo văn bản.
+  + Source/Target ẩn: Vì câu thiếu chủ ngữ, tôi sẽ suy luận Source là người nói (tác giả) và Target dựa trên hành động.
+- Nhận diện thách thức:
+  + Văn bản chứa từ ngữ thô tục ("cái lồn") và tiếng lóng, cần xác định xem đây là xúc phạm hay chỉ là than phiền.
+  + Cấu trúc khẩu ngữ "A với chả B" ("pin với chả không pin") là một thách thức về thái độ, thường mang nghĩa dè bỉu.
+- Xác nhận: Tôi sẽ phân tích đầy đủ 5 thành phần (Source, Target, Polar_expression, Polarity, Intensity) cho mỗi Opinion.
 
 Bước 3: Thực thi Suy luận (Execution)
 --- Opinion 1 ---
@@ -120,7 +128,16 @@ Tôi tìm thấy 3 cụm từ mang sắc thái cảm xúc hoặc mô tả trạn
 3. "đòi mấy lần toàn kêu không bình thường xịu xịu"
 
 Bước 2: Lập Kế hoạch (Planning)
-Tôi sẽ phân tích tuần tự 3 cụm từ trên tương ứng với 3 Opinion riêng biệt để xác định các thành phần cấu trúc của chúng.
+- Rà soát ứng viên: Tất cả ứng viên đều hợp lệ.
+- Chiến lược xử lý:
+  + Thứ tự: Phân tích tuần tự.
+  + Cách tiếp cận: Tập trung giải mã các tín hiệu phi ngôn ngữ (emoji) và sắc thái từ vựng để xác định Polarity.
+  + Source/Target ẩn: Vì câu thiếu chủ ngữ, tôi sẽ suy luận Source là người nói (tác giả) và Target dựa trên hành động.
+- Nhận diện thách thức:
+  + Thách thức về ngữ nghĩa thời gian: Cụm "sắp 2 năm" cần được xác định là thành tựu (tích cực) hay sự kéo dài lê thê (tiêu cực) dựa trên ngữ cảnh "yêu".
+  + Thách thức về đa phương thức: Cần kết hợp emoji "😢" với nội dung văn bản để chốt Polarity Negative.
+  + Thách thức về từ láy: Từ "xịu xịu" có sắc thái nhẹ, cần cân nhắc kỹ giữa Neutral và Negative.
+- Xác nhận: Tôi sẽ phân tích đầy đủ 5 thành phần cho 3 Opinion trên.
 
 Bước 3: Thực thi Suy luận (Execution)
 --- Opinion 1 ---
@@ -173,12 +190,20 @@ Bước 3: Thực thi Suy luận (Execution)
         },
         {
             "text": "hi vọng câu chuyện admin vừa bịa ra giúp các bạn có thêm niềm tin trong cuộc sống 😂.",
-            "reasoning": """Bước 1: Trích xuất Ứng viên (Extraction)
+            "reasoning": """
+Bước 1: Trích xuất Ứng viên (Extraction)
 Tôi tìm thấy 1 cụm từ mang sắc thái cảm xúc:
 1. "giúp các bạn có thêm niềm tin trong cuộc sống"
 
 Bước 2: Lập Kế hoạch (Planning)
-Tôi sẽ phân tích cụm từ trên tương ứng với 1 Opinion để xác định các thành phần cấu trúc của nó.
+- Rà soát ứng viên: Cụm từ duy nhất này hợp lệ và mang nghĩa tích cực rõ ràng.
+- Chiến lược xử lý:
+  + Truy vết Target: Cần xác định đối tượng gây ra tác động "giúp đỡ" (Cause of Emotion) dù chủ ngữ bị ẩn.
+- Nhận diện thách thức:
+  + Thách thức về Châm biếm/Hài hước (Sarcasm/Irony): Có sự xung đột giữa nội dung ngữ nghĩa tích cực ("thêm niềm tin") và các tín hiệu giả định/đùa cợt ("bịa ra", emoji "😂").
+  + Chiến lược giải quyết: Áp dụng quy tắc "Tách biệt Ngữ nghĩa" (Semantic Disentanglement). Ta sẽ ưu tiên gán nhãn dựa trên Giá trị Cảm xúc Hiển ngôn (Explicit Sentiment) của bản thân cụm từ polar expression, thay vì Ý định Giao tiếp (Pragmatic Intent) của toàn bộ câu.
+  + Source/Target ẩn: Vì câu thiếu chủ ngữ, tôi sẽ suy luận Source là người nói (tác giả) và Target dựa trên hành động (ví dụ: hành động quay phim).
+- Xác nhận: Tôi sẽ phân tích đầy đủ 5 thành phần cho Opinion này.
 
 Bước 3: Thực thi Suy luận (Execution)
 --- Opinion 1 ---
@@ -250,9 +275,9 @@ Bước 3: Thực thi Suy luận (Execution)
 
 1. [TRÍCH XUẤT ỨNG VIÊN]: Đọc kỹ văn bản. Xác định và liệt kê danh sách các cụm từ (spans) tiềm năng chứa cảm xúc (Polar Expressions) hoặc mô tả hành vi/trạng thái.
 2. [LẬP KẾ HOẠCH]: 
-   - Xác định tổng số Opinion cần phân tích.
-   - Nêu chiến lược xử lý: thứ tự phân tích (tuần tự theo văn bản/theo độ ưu tiên), cách tiếp cận các thành phần (Source, Target, Polar_expression, Polarity, Intensity).
-   - Nhận diện các đặc điểm chung/thách thức có thể gặp phải trong văn bản này (ví dụ: nhiều Source/Target ẩn, có tiếng lóng, có ẩn ý, cần phân biệt Neutral vs Negative).
+   - Rà soát lại danh sách ứng viên ở Bước 1. Loại bỏ các cụm từ không rõ ràng hoặc trùng lặp (nếu có).
+   - Nêu chiến lược xử lý: thứ tự phân tích, cách tiếp cận các thành phần. Xác định Source/Target nếu chúng bị ẩn.
+   - Nhận diện các đặc điểm chung/thách thức có thể gặp phải trong văn bản này.
    - Xác nhận sẽ phân tích đầy đủ 5 thành phần cho mỗi Opinion.
 3. [THỰC THI SUY LUẬN]:
    - Với mỗi Opinion trong kế hoạch, hãy phân tích chi tiết các thành phần: Source, Target, Polar_expression, Polarity, Intensity.
@@ -297,7 +322,7 @@ Nhiệm vụ của bạn là phân tích bình luận mạng xã hội và tríc
 1. SOURCE (Nguồn gốc bình luận):
    - Người phát biểu ý kiến, có thể là người bình luận hoặc được trích dẫn
    - Thường là các đại từ nhân xưng: "Tôi", "Tao", "Mình", "Bọn tao", "Mẹ tui"
-   - Có thể có hoặc không có trong câu
+   - Có thể có hoặc không có trong câu (ẩn)
 
 2. TARGET (Đối tượng hướng tới):
    - Cá nhân, tập thể, sự vật, hiện tượng mà bình luận hướng đến
