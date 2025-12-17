@@ -151,11 +151,11 @@ class ConfigValidator:
         technique = self.config.prompt.technique
         
         # Validate technique-specific parameters
-        if technique in ["few_shot", "few_shot_cot"]:
+        if technique in ["few_shot", "few_shot_cot", "re2_pas_cot"]:
             # Check n_shot
             if self.config.prompt.n_shot < 0:
                 self.errors.append("n_shot must be >= 0")
-            
+             
             if self.config.prompt.n_shot > 10:
                 self.warnings.append(
                     f"Very large n_shot ({self.config.prompt.n_shot}) may make prompts extremely long"

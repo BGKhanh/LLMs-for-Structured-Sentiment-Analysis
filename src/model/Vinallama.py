@@ -147,9 +147,11 @@ class VinallamaModel(BaseModel):
                 if self.config.get("do_sample"):
                     gen_kwargs["temperature"] = self.config.get("temperature", 0.6)
             
+            autocast_dtype = self._get_autocast_dtype()
+
             # Generate
             start_time = time.time()
-            with torch.inference_mode(), torch.autocast(device_type="cuda"):
+            with torch.inference_mode(), torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", dtype=autocast_dtype):
                 generated_ids = self.model.generate(
                     **model_inputs,
                     **gen_kwargs
@@ -232,9 +234,11 @@ class VinallamaModel(BaseModel):
                     padding=True
                 ).to(self.model.device)
                 input_length = tokenized_inputs['input_ids'].shape[1]
-            
+                
+            autocast_dtype = self._get_autocast_dtype()
+
             # ===== BATCH GENERATION =====
-            with torch.inference_mode(), torch.autocast(device_type="cuda"):
+            with torch.inference_mode(), torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", dtype=autocast_dtype):
                 generated_outputs = self.model.generate(
                     **tokenized_inputs,
                     **gen_kwargs

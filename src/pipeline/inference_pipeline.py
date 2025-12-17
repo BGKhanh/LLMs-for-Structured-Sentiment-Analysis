@@ -656,6 +656,12 @@ class InferencePipeline:
                 plus=self.config.prompt.plus_mode
             )
         
+        elif technique == "re2_pas_cot":
+            return Re2PaSCoTPrompt(
+                eng=eng,
+                n_shot=self.config.prompt.n_shot
+            )
+            
         else:
             raise ValueError(f"Unknown prompt technique: {technique}")
     
