@@ -81,6 +81,7 @@ class VistralModel(BaseModel):
                 **kwargs
             ).eval()
             
+            self.model.generation_config.pad_token_id = self.tokenizer.pad_token_id
             self.is_loaded = True
             print("✅ Vistral model and tokenizer loaded successfully!")
             
