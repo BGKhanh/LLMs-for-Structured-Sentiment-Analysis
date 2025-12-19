@@ -6,19 +6,18 @@ random_seed: 42
 
 
 experiment:
-  name: "Vistral_Fewshot_experiment_2"
-  description: "Few-shot technique, n-shot = 1, Viet-Mistral/Vistral-7B-Chat"
+  name: "BloomVN_Fewshot_experiment_2"
+  description: "Few-shot technique, n-shot = 1, BlossomsAI/BloomVN-8B-chat"
   version: "1.0"
 
 model:
   # === MODEL LOADING ===
-  name: "vistral"  # one of [gemma, mistral, qwen, llama]
+  name: "seallm"  # one of [gemma, mistral, qwen, llama]
   init_args:
-    model_id: "Viet-Mistral/Vistral-7B-Chat"
-    dtype: "bfloat16"
+    model_id: "BlossomsAI/BloomVN-8B-chat"
+    dtype: "float16"
     device_map: "auto"
     trust_remote_code: true
-    attn_implementation: "flash_attention_2"
 
   # === GENERATION PARAMETERS ===
   generation_args:
@@ -32,14 +31,14 @@ model:
 
 data:
   dataset: "dev"   # one of [train, dev, test]
-  train_dataset_path: "data/train.json"
-  dev_dataset_path: "data/dev.json"
-  test_dataset_path: "data/test.json"
+  train_dataset_path: "/kaggle/input/vitoed/train.json"
+  dev_dataset_path: "/kaggle/input/vitoed/dev.json"
+  test_dataset_path: "/kaggle/input/vitoed/test.json"
 
   examples_pool: "train"
-  batch_size: 16
+  batch_size: 8
   num_samples: null   # null = use all samples
-  num_workers: 4
+  num_workers: 2
 
 prompt:
   technique: "few_shot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
