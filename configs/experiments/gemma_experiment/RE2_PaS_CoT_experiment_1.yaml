@@ -13,19 +13,19 @@ experiment:
 model:
   # === MODEL LOADING ===
   name: "gemma"  # one of [gemma, mistral, qwen, llama]
-  model_id: "google/gemma-3-4b-it"
-  dtype: "float16"
-  device_map: "auto"
-  trust_remote_code: true
-  enable_thinking: true
+  init_args:
+    model_id: "google/gemma-3-4b-it"
+    dtype: "float16"
+    device_map: "auto"
+    trust_remote_code: true
 
   # === GENERATION PARAMETERS ===
-  max_new_tokens: 2048
-  do_sample: false
-  temperature: 0.1
-  top_p: 0.95
-  top_k: 50
-
+  generation_args:
+    max_new_tokens: 2048
+    do_sample: false
+    temperature: 0.1
+    top_p: 0.95
+    top_k: 50
 
 data:
   dataset: "dev"   # one of [train, dev, test]
