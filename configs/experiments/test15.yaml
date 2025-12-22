@@ -15,13 +15,13 @@ model:
   name: "gemma"  # one of [gemma, mistral, qwen, llama]
   init_args:
     model_id: "google/gemma-3-4b-it"
-    dtype: "float16"
+    dtype: "float32"
     device_map: "auto"
     trust_remote_code: true
 
   # === GENERATION PARAMETERS ===
   generation_args:
-    max_new_tokens: 4096
+    max_new_tokens: 2048
     do_sample: false
     temperature: 0.1
     top_p: 0.95
