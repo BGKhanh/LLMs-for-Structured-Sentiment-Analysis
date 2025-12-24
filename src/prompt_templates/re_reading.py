@@ -1,8 +1,11 @@
 # src/prompt_templates/re_reading.py
 
-from typing import Tuple, Literal
+import json
+import random
+from typing import Tuple, Literal, Optional, List, Dict, Any
+from torch.utils.data import Dataset
 from .base import BasePromptTemplate
-
+from .few_shot_CoT import FewShotCoTPrompt
 
 class ReReadingPrompt(BasePromptTemplate):
     """
@@ -19,7 +22,14 @@ class ReReadingPrompt(BasePromptTemplate):
     - Single stage
     """
     
-    def __init__(self, eng: bool = False, add_method: Literal["none", "CoT", "PaS"] = "none"):
+    def __init__(
+        self, 
+        eng: bool = False, 
+        add_method: Literal["none", "0_CoT", "FewShot", "FewShot_CoT", "PaS"] = "none",
+        n_shot: int = 0,
+        examples_pool: Optional[Dataset] = None,
+        examples_pool_path: Optional[str] = None
+    ):
         """
         Initialize Re-reading prompt generator.
         
@@ -27,14 +37,84 @@ class ReReadingPrompt(BasePromptTemplate):
             eng: If True, use English prompts. If False, use Vietnamese prompts.
             add_method: Enhancement method to combine with Re-reading.
                         - "none": Vanilla Re-reading (RE2)
-                        - "CoT": Chain-of-Thought (RE2+CoT)
+                        - "0_CoT": Chain-of-Thought (RE2+0_CoT)
+                        - "FewShot": Few-shot (RE2+FewShot)
+                        - "FewShot_CoT": Few-shot + Chain-of-Thought (RE2+FewShot_CoT)
                         - "PaS": Plan-and-Solve (RE2+PaS)
-        
+            n_shot: Number of examples for FewShot methods.
+            examples_pool: Dataset object containing example pool.
+            examples_pool_path: Path to JSON file containing example pool.
         Note:
             This is the simplest prompting technique - just repeats the question.
         """
         super().__init__(eng)
         self.add_method = add_method
+        
+        # Few-shot params
+        self.n_shot = n_shot
+        self.examples_pool_path = examples_pool_path
+        self._examples_pool_raw = examples_pool
+        
+        self._examples_pool = None
+        self._selected_examples = None
+    
+    def prepare(self) -> None:
+        """Load examples pool and select fixed examples if needed."""
+        if self._is_prepared:
+            return
+        
+        # Load examples if FewShot method is used
+        if self.n_shot > 0:
+            if self.add_method == "FewShot":
+                self._load_examples_pool()
+                self._select_fixed_examples()
+            elif self.add_method == "FewShot_CoT":
+                # Use hardcoded pool from FewShotCoTPrompt
+                pool = FewShotCoTPrompt.EXAMPLES_POOL_EN if self.eng else FewShotCoTPrompt.EXAMPLES_POOL_VI
+                if len(pool) < self.n_shot:
+                    print(f"⚠️ Warning: Requested {self.n_shot} shots but CoT pool only has {len(pool)}. Using all.")
+                    self._selected_examples = pool
+                else:
+                    # Lấy n_shot đầu tiên (Fixed)
+                    self._selected_examples = pool[:self.n_shot]
+                print(f"✅ Selected {len(self._selected_examples)} hardcoded examples for Re-reading FewShot_CoT")
+            
+        super().prepare()
+     
+    def _select_fixed_examples(self) -> None:
+        """Select fixed examples for all samples (Standard FewShot)."""
+        if not self._examples_pool:
+            raise ValueError("Examples pool is empty.")
+            
+        if len(self._examples_pool) < self.n_shot:
+            raise ValueError(
+                f"Not enough examples. Requested {self.n_shot}, "
+                f"but only {len(self._examples_pool)} available."
+            )
+        
+        # Random sample cố định cho toàn bộ quá trình inference
+        self._selected_examples = random.sample(self._examples_pool, self.n_shot)
+        print(f"✅ Selected {self.n_shot} fixed examples for Re-reading FewShot")
+
+    def _load_examples_pool(self) -> None:
+        """Load examples from provided source."""
+        # Priority 1: Raw list
+        if self._examples_pool_raw is not None:
+            self._examples_pool = self._examples_pool_raw
+            return
+        
+        # Priority 2: File path
+        if self.examples_pool_path is not None:
+            try:
+                with open(self.examples_pool_path, 'r', encoding='utf-8') as f:
+                    self._examples_pool = json.load(f)
+                return
+            except Exception as e:
+                raise ValueError(f"Error loading examples pool: {e}")
+        
+        # No source provided
+        raise ValueError("n_shot > 0 but no examples pool provided (examples_pool or examples_pool_path).")
+            
     def _build_system_prompt(self) -> str:
         """
         Build system prompt (same as zero-shot).
@@ -71,10 +151,9 @@ class ReReadingPrompt(BasePromptTemplate):
     
     def _get_trigger_vi(self) -> str:
         """Get the Vietnamese trigger phrase based on add_method."""
-        if self.add_method == "CoT":
+        if self.add_method == "0_CoT":
             return "Hãy cùng suy nghĩ từng bước."
         elif self.add_method == "PaS":
-            # Điều chỉnh [Solving/Calculations] thành [Phân tích chi tiết] cho hợp ngữ cảnh
             return ("Đầu tiên hãy hiểu vấn đề và vạch ra kế hoạch để giải quyết. "
                     "Sau đó, hãy thực hiện kế hoạch, phân tích từng bước, "
                     "và đưa ra câu trả lời cuối cùng. "
@@ -82,12 +161,98 @@ class ReReadingPrompt(BasePromptTemplate):
                     "[Hiểu vấn đề], [Lập kế hoạch], [Phân tích chi tiết], [Câu trả lời].")
         return ""
 
+    def _format_example_re2_vi(self, example: Dict[str, Any], include_reasoning: bool = False) -> str:
+        """Format a single example with Re-reading logic (Vietnamese)."""
+        text = example.get('text', '')
+        
+        # Base Question
+        q1 = f'Phân tích cảm xúc cho văn bản sau: "{text}"'
+        
+        # Re-reading
+        q2 = f'Đọc lại câu hỏi: {q1}'
+        
+        formatted_str = f"{q1}\n\n{q2}\n\n"
+        
+        # Reasoning (if FewShot_CoT)
+        if include_reasoning and 'reasoning' in example:
+             formatted_str += f"Reasoning:\n{example['reasoning']}\n\n"
+        
+        # Output
+        if include_reasoning:
+            output_data = example.get('output', {})
+        else:
+            output_data = {
+                "text": text,
+                "opinions": self._simplify_opinions(example.get('opinions', []))
+            
+
+        formatted_str += f"Output:\n{json.dumps(output_data, ensure_ascii=False, indent=2)}"
+        
+        return formatted_str
+
+    def _format_example_re2_en(self, example: Dict[str, Any], include_reasoning: bool = False) -> str:
+        """Format a single example simulating Re-reading logic (English)."""
+        text = example.get('text', '')
+        
+        q1 = f'Analyze the sentiment for the following text: "{text}"'
+        q2 = f'Read the question again: {q1}'
+        
+        formatted_str = f"{q1}\n\n{q2}\n\n"
+        
+        if include_reasoning and 'reasoning' in example:
+             formatted_str += f"Reasoning:\n{example['reasoning']}\n\n"
+        
+        if include_reasoning:
+            output_data = example.get('output', {})
+        else:
+             output_data = {
+                "text": text,
+                "opinions": self._simplify_opinions(example.get('opinions', []))
+            }
+
+        formatted_str += f"Output:\n{json.dumps(output_data, ensure_ascii=False, indent=2)}"
+        
+        return formatted_str
+        
+    def _simplify_opinions(self, opinions: List[Dict]) -> List[Dict]:
+        """Simplify opinion format."""
+        simplified = []
+        for op in opinions:
+            simplified_op = {
+                "Source": op.get('Source', [[], []])[0],
+                "Target": op.get('Target', [[], []])[0],
+                "Polar_expression": op.get('Polar_expression', [[], []])[0],
+                "Polarity": op.get('Polarity', ''),
+                "Intensity": op.get('Intensity', '')
+            }
+            simplified.append(simplified_op)
+        return simplified
+
+    def _build_examples_section_vi(self, examples: List[Dict[str, Any]]) -> str:
+        section = "DƯỚI ĐÂY LÀ MỘT SỐ VÍ DỤ MINH HỌA:\n\n"
+        include_reasoning = (self.add_method == "FewShot_CoT")
+        
+        for i, example in enumerate(examples, 1):
+            section += f"=== VÍ DỤ {i} ===\n"
+            section += self._format_example_re2_vi(example, include_reasoning)
+            section += "\n\n"
+        return section.strip()
+
+    def _build_examples_section_en(self, examples: List[Dict[str, Any]]) -> str:
+        section = "HERE ARE SOME DEMONSTRATION EXAMPLES:\n\n"
+        include_reasoning = (self.add_method == "FewShot_CoT")
+        
+        for i, example in enumerate(examples, 1):
+            section += f"=== EXAMPLE {i} ===\n"
+            section += self._format_example_re2_en(example, include_reasoning)
+            section += "\n\n"
+        return section.strip()
+    
     def _get_trigger_en(self) -> str:
         """Get the English trigger phrase based on add_method."""
-        if self.add_method == "CoT":
+        if self.add_method == "0_CoT":
             return "Let's think step by step."
         elif self.add_method == "PaS":
-            # Adapted from Table 11  but tuned for extraction
             return ("Let's first understand the problem and devise a plan to solve the problem. "
                     "Then, let's carry out the plan, solve the problem step by step, "
                     "and give the ultimate answer. Please explicitly generate the mentioned process: "
@@ -153,27 +318,34 @@ FORMAT JSON OUTPUT:
 """
     
     def _get_user_prompt_vi(self, text: str, sent_id: str) -> str:
-        """Vietnamese user prompt with RE2 + logic."""
+        """Vietnamese user prompt with Re-reading."""
         
-        # 1. Base Question (Pass 1)
+        prompt_parts = []
+        
+        # 0. Examples (if any)
+        if self.n_shot > 0 and self._selected_examples:
+            examples_text = self._build_examples_section_vi(self._selected_examples)
+            prompt_parts.append(examples_text)
+            prompt_parts.append("\nBây giờ, hãy phân tích trường hợp sau:\n")
+
+        # 1. Base Question
         base_question = f"""Phân tích cảm xúc cho văn bản sau (sent_id: {sent_id}):
 "{text}"
 """
-        
-        # 2. Re-reading instruction (Pass 2) 
+        # 2. Re-reading instruction
         re_reading_part = f"""Đọc lại câu hỏi: {base_question}
 Trả về KẾT QUẢ CHÍNH XÁC theo cấu trúc JSON đã yêu cầu."""
         
-        # 3. Add Method Trigger (CoT or PaS)
+        # 3. Add Method Trigger
         trigger = self._get_trigger_vi()
         
-        # Combine parts
-        full_prompt = f"{base_question}\n\n{re_reading_part}"
-        
+        core_prompt = f"{base_question}\n\n{re_reading_part}"
         if trigger:
-            full_prompt += f"\n\n{trigger}"
+            core_prompt += f"\n\n{trigger}"
             
-        return full_prompt
+        prompt_parts.append(core_prompt)
+        
+        return "".join(prompt_parts)
     
     # ==================== ENGLISH PROMPTS ====================
     
@@ -234,27 +406,34 @@ JSON OUTPUT FORMAT:
 """
     
     def _get_user_prompt_en(self, text: str, sent_id: str) -> str:
-        """English user prompt with RE2 + logic."""
+        """English user prompt with Re-reading."""
         
-        # 1. Base Question (Pass 1)
+        prompt_parts = []
+        
+        # 0. Examples (if any)
+        if self.n_shot > 0 and self._selected_examples:
+            examples_text = self._build_examples_section_en(self._selected_examples)
+            prompt_parts.append(examples_text)
+            prompt_parts.append("\nNow, analyze the following case:\n")
+
+        # 1. Base Question
         base_question = f"""Analyze the sentiment for the following text (sent_id: {sent_id}):
 "{text}"
 """
-        
-        # 2. Re-reading instruction (Pass 2) 
+        # 2. Re-reading instruction
         re_reading_part = f"""Read the question again: {base_question}
 Return the EXACT RESULT according to the requested JSON structure."""
         
-        # 3. Add Method Trigger (CoT or PaS)
+        # 3. Add Method Trigger
         trigger = self._get_trigger_en()
         
-        # Combine parts
-        full_prompt = f"{base_question}\n\n{re_reading_part}"
-        
+        core_prompt = f"{base_question}\n\n{re_reading_part}"
         if trigger:
-            full_prompt += f"\n\n{trigger}"
+            core_prompt += f"\n\n{trigger}"
             
-        return full_prompt
+        prompt_parts.append(core_prompt)
+        
+        return "".join(prompt_parts)
 
 
 # # Example usage:
