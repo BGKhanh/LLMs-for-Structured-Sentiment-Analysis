@@ -184,7 +184,7 @@ class ReReadingPrompt(BasePromptTemplate):
             output_data = {
                 "text": text,
                 "opinions": self._simplify_opinions(example.get('opinions', []))
-            
+            }
 
         formatted_str += f"Output:\n{json.dumps(output_data, ensure_ascii=False, indent=2)}"
         
