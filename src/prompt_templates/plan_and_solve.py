@@ -1,7 +1,10 @@
 # src/prompt_templates/plan_and_solve.py
 
-from typing import Tuple
+import json
+import random
+from typing import Tuple, List, Dict, Any
 from .base import BasePromptTemplate
+from .re2_pas_cot import Re2PaSCoTPrompt
 
 
 class PlanAndSolvePrompt(BasePromptTemplate):
@@ -20,20 +23,45 @@ class PlanAndSolvePrompt(BasePromptTemplate):
     - PS+: Adds more detailed instructions (extract relevant info, calculate carefully, etc.)
     """
     
-    def __init__(self, eng: bool = False, plus: bool = False):
+    def __init__(self, eng: bool = False, plus: bool = False, n_shot: int = 0):
+
         """
         Initialize Plan-and-Solve prompt generator.
         
         Args:
             eng: If True, use English prompts. If False, use Vietnamese prompts.
             plus: If True, use PS+ (enhanced). If False, use PS (basic).
+            n_shot: Number of examples (only used if plus=True).
         
         Note:
             PS+ adds more detailed reasoning instructions compared to PS.
         """
         super().__init__(eng)
+        super().__init__(eng)
         self.plus = plus
-    
+        self.n_shot = n_shot
+        self._selected_examples = None
+
+    def prepare(self) -> None:
+        """Select examples if in PS+CoT mode."""
+        if self._is_prepared:
+            return
+            
+        # Only load examples if plus=True and n_shot > 0 (PaS+CoT mode)
+        if self.plus and self.n_shot > 0:
+            # Use pool from Re2PaSCoTPrompt as requested
+            pool = Re2PaSCoTPrompt.EXAMPLES_POOL_EN if self.eng else Re2PaSCoTPrompt.EXAMPLES_POOL_VI
+            
+            if len(pool) < self.n_shot:
+                print(f"⚠️ Warning: Requested {self.n_shot} shots but pool only has {len(pool)}. Using all.")
+                self._selected_examples = pool
+            else:
+                self._selected_examples = pool[:self.n_shot]
+                
+            print(f"✅ Selected {len(self._selected_examples)} PaS-style examples for Plan-and-Solve")
+            
+        super().prepare()
+                    
     def _build_system_prompt(self) -> str:
         """
         Build system prompt (same as zero-shot, shared for PS and PS+).
@@ -72,7 +100,20 @@ class PlanAndSolvePrompt(BasePromptTemplate):
                 return self._get_user_prompt_ps_plus_vi(text, sent_id)
             else:
                 return self._get_user_prompt_ps_vi(text, sent_id)
-    
+
+    def _format_pas_example(self, example: Dict[str, Any]) -> str:
+        """Format a single example with PaS reasoning."""
+        return f'Input: "{example.get("text", "")}"\nReasoning:\n{example.get("reasoning", "")}\nOutput:\n{json.dumps(example.get("output", {}), ensure_ascii=False, indent=2)}'
+
+    def _build_examples_section(self, examples: List[Dict[str, Any]], title: str) -> str:
+        """Build examples section."""
+        section = f"{title}\n\n"
+        for i, example in enumerate(examples, 1):
+            section += f"=== EXAMPLE {i} ===\n"
+            section += self._format_pas_example(example)
+            section += "\n\n"
+        return section.strip()
+        
     # ==================== SYSTEM PROMPTS (SHARED) ====================
     
     def _get_system_prompt_vi(self) -> str:
@@ -201,18 +242,40 @@ Cuối cùng, tổng hợp tất cả các phân tích vào một khối JSON du
 """
     
     def _get_user_prompt_ps_plus_vi(self, text: str, sent_id: str) -> str:
-        """Vietnamese user prompt for PS+ (enhanced)."""
-        return f"""Phân tích cảm xúc cho văn bản sau (sent_id: {sent_id}):
-"{text}"
+        """Vietnamese user prompt for PS+ (enhanced) & PaS+CoT."""
+        
+        # 1. Instruction
+        instruction = """Hãy thực hiện một phân tích chi tiết theo quy trình Plan-and-Solve (PaS) sau:
 
-Hãy thực hiện một phân tích chi tiết theo các bước sau:
-1.  **Phân tích Sơ bộ & Trích xuất Dấu hiệu:** Đọc kỹ văn bản. Trích xuất tất cả các cụm từ khóa, đại từ nhân xưng, tiếng lóng, và các dấu hiệu ngôn ngữ có thể liên quan đến cảm xúc.
-2.  **Lập Kế hoạch Phân tích:** Dựa trên các dấu hiệu đã trích xuất, vạch ra một kế hoạch để phân tích tuần tự từng Opinion.
-3.  **Thực thi Kế hoạch:**
-    -   Với mỗi Opinion, hãy xác định giá trị cho từng thành phần (Source, Target, Polar_expression, Polarity, Intensity).
-    -   Hãy giải thích ngắn gọn lý do của bạn, đặc biệt chú ý đến ngữ cảnh, ẩn ý và các quy tắc đã được định nghĩa.
-4.  **Tổng hợp Kết quả:** Xây dựng khối JSON cuối cùng dựa trên toàn bộ phân tích ở trên.
+1. [TRÍCH XUẤT ỨNG VIÊN]: Đọc kỹ văn bản. Xác định và liệt kê danh sách các cụm từ (spans) tiềm năng chứa cảm xúc (Polar Expressions) hoặc mô tả hành vi/trạng thái.
+2. [LẬP KẾ HOẠCH]: 
+   - Rà soát lại danh sách ứng viên ở Bước 1. Loại bỏ các cụm từ không rõ ràng hoặc trùng lặp (nếu có).
+   - Nêu chiến lược xử lý: thứ tự phân tích, cách tiếp cận các thành phần. Xác định Source/Target nếu chúng bị ẩn.
+   - Nhận diện các đặc điểm chung/thách thức có thể gặp phải trong văn bản này.
+   - Xác nhận sẽ phân tích đầy đủ 5 thành phần cho mỗi Opinion.
+3. [THỰC THI SUY LUẬN]:
+   - Với mỗi Opinion trong kế hoạch, hãy phân tích chi tiết các thành phần: Source, Target, Polar_expression, Polarity, Intensity.
+   - BẮT BUỘC: Với mỗi giá trị gán nhãn, phải kèm theo lý giải ngắn gọn (Reasoning) dựa trên ngữ cảnh, tiếng lóng hoặc ẩn ý.
+4. [TỔNG HỢP]: Trình bày kết quả cuối cùng dưới dạng JSON.
 """
+        parts = [instruction]
+
+        # 2. Examples (only for PaS+CoT)
+        if self.n_shot > 0 and self._selected_examples:
+            examples_text = self._build_examples_section(
+                self._selected_examples, 
+                "DƯỚI ĐÂY LÀ MỘT SỐ VÍ DỤ MINH HỌA (HÃY LÀM THEO QUY TRÌNH TƯƠNG TỰ):"
+            )
+            parts.append(examples_text)
+            parts.append("\nBây giờ, hãy phân tích trường hợp sau:\n")
+
+        # 3. Input Question
+        question = f"""Phân tích cảm xúc cho văn bản sau (sent_id: {sent_id}):
+"{text}"
+"""
+        parts.append(question)
+        
+        return "\n".join(parts)
     
     # ==================== ENGLISH USER PROMPTS ====================
     
@@ -228,11 +291,10 @@ Finally, summarize all analyses into a single JSON block.
 """
 
     def _get_user_prompt_ps_plus_en(self, text: str, sent_id: str) -> str:
-        """English user prompt for PS+ (enhanced)."""
-        return f"""Analyze the sentiment for the following text (sent_id: {sent_id}):
-"{text}"
-
-Perform a detailed analysis following these steps:
+        """English user prompt for PS+ (enhanced) & PaS+CoT."""
+        
+        # 1. Instruction
+        instruction = """Perform a detailed analysis following these steps:
 1. **Preliminary Analysis & Signal Extraction:** Read the text carefully. Extract all keywords, personal pronouns, slang (teencode), and linguistic signals that might relate to sentiment.
 2. **Analysis Planning:** Based on the extracted signals, outline a plan to sequentially analyze each Opinion.
 3. **Plan Execution:**
@@ -240,6 +302,24 @@ Perform a detailed analysis following these steps:
     - Briefly explain your reasoning, paying special attention to context, implicit meaning, and the defined rules.
 4. **Result Synthesis:** Construct the final JSON block based on the entire analysis above.
 """
+        parts = [instruction]
+
+        # 2. Examples (only for PaS+CoT)
+        if self.n_shot > 0 and self._selected_examples:
+            examples_text = self._build_examples_section(
+                self._selected_examples, 
+                "HERE ARE SOME DEMONSTRATION EXAMPLES (PLEASE FOLLOW SIMILAR PROCESS):"
+            )
+            parts.append(examples_text)
+            parts.append("\nNow, analyze the following case:\n")
+
+        # 3. Input Question
+        question = f"""Analyze the sentiment for the following text (sent_id: {sent_id}):
+"{text}"
+"""
+        parts.append(question)
+        
+        return "\n".join(parts)
 
 
 # # Example usage:
