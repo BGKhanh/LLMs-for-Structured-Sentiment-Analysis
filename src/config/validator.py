@@ -174,23 +174,53 @@ class ConfigValidator:
                 except Exception as e:
                     self.errors.append(f"Error getting examples pool path: {e}")
         
-        elif technique == "plan_solve":
-            # Plan-and-Solve has plus_mode parameter
-            pass  # plus_mode is bool, no validation needed
+        elif technique in ["plan_solve", "plan_and_solve"]:
+            # If PS+ (plus_mode=True) and n_shot > 0 -> Hybrid PS+CoT mode
+            if self.config.prompt.plus_mode and self.config.prompt.n_shot > 0:
+                # We need to validate examples_pool as well (uses hardcoded pool, but validation is minimal)
+                # No external file required for hardcoded pools, so skip file check
+                if self.config.prompt.n_shot > 10:
+                    self.warnings.append(f"Large n_shot ({self.config.prompt.n_shot}) for PS+CoT")
         
         elif technique == "zero_shot_cot":
             # Zero-shot CoT has no special parameters to validate
             pass
         
         elif technique == "rereading":
-            if self.config.prompt.add_method not in ["none", "CoT", "PaS"]:
-                self.errors.append("add_method must be one of none, CoT, PaS")
+            add_method = self.config.prompt.add_method
+            valid_methods = ["none", "0_CoT", "FewShot", "FewShot_CoT", "PaS"]
+            
+            if add_method not in valid_methods:
+                self.errors.append(f"add_method must be one of {valid_methods}")
+            
+            # If using FewShot variants, validate n_shot
+            if add_method in ["FewShot", "FewShot_CoT"]:
+                if self.config.prompt.n_shot <= 0:
+                    self.errors.append(f"n_shot must be > 0 for add_method={add_method}")
+                
+                # Check pool for FewShot (file-based)
+                if add_method == "FewShot":
+                    self._check_examples_pool_existence()
         
         # Validate language
         valid_languages = ["vi", "en"]
         if self.config.prompt.language not in valid_languages:
             self.errors.append(f"language must be one of {valid_languages}")
+
+    def _check_examples_pool_existence(self):
+        """Helper to check if examples pool file exists."""
+        try:
+            # Get examples pool path from DataConfig
+            pool_path = Path(self.config.data.get_examples_pool_path())
+            if not pool_path.exists():
+                self.errors.append(
+                    f"Examples pool file not found: {pool_path}\n"
+                    f"  Set data.examples_pool to 'train', 'dev', or 'test'"
+                )
+        except Exception as e:
+            self.errors.append(f"Error getting examples pool path: {e}")
     
+        
     def _validate_output(self):
         """Validate output configuration."""
         output_dir = Path(self.config.output.output_dir)

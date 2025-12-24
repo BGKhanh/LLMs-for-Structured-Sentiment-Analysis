@@ -6,15 +6,15 @@ random_seed: 42
 
 
 experiment:
-  name: "Vistral_Re_reading_plus_CoT_experiment_1"
-  description: "Re-reading + Chain-of-Thought technique, add_method = 0_CoT, Viet-Mistral/Vistral-7B-Chat"
+  name: "Re2_FewShot_experiment_1"
+  description: "Re-reading + Few-shot technique, experiment 1, n-shot = 1, GemmaModel"
   version: "1.0"
 
 model:
   # === MODEL LOADING ===
-  name: "vistral"  # one of [gemma, mistral, qwen, llama]
+  name: "gemma"
   init_args:
-    model_id: "Viet-Mistral/Vistral-7B-Chat"
+    model_id: "google/gemma-3-4b-it"
     dtype: "bfloat16"
     device_map: "auto"
     trust_remote_code: true
@@ -22,13 +22,11 @@ model:
 
   # === GENERATION PARAMETERS ===
   generation_args:
-    max_new_tokens: 2048
+    max_new_tokens: 1024
     do_sample: false
     temperature: 0.1
     top_p: 0.95
     top_k: 50
-    enable_thinking: true
-
 
 data:
   dataset: "dev"   # one of [train, dev, test]
@@ -36,18 +34,18 @@ data:
   dev_dataset_path: "data/dev.json"
   test_dataset_path: "data/test.json"
 
-  examples_pool: "train"
-  batch_size: 4
-  num_samples: null   # null = use all samples
-  num_workers: 4
+  examples_pool: "train" # Pool to pick the 1 shot from
+  batch_size: 16
+  num_samples: null # Run all samples
+  num_workers: 8
 
 prompt:
-  technique: "rereading"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
+  technique: "rereading"
   language: "vi"
-  n_shot: 0
+  n_shot: 1   
   examples_pool_path: null
-  plus_mode: false
-  add_method: "0_CoT"
+  plus_mode: false       
+  add_method: "FewShot" # Re-reading + Few-shot (from file)
 
 output:
   output_dir: "results/"

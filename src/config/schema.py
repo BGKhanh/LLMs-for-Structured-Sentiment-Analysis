@@ -202,7 +202,7 @@ class PromptConfig:
     
     # Plan-and-solve specific parameters
     plus_mode: bool = False  # True for PS+, False for PS
-    add_method: Literal["none", "CoT", "PaS"] = "none" # none for vanilla RE2, CoT for RE2+CoT, PaS for RE2+PaS
+    add_method: Literal["none", "0_CoT", "FewShot", "FewShot_CoT", "PaS"] = "none" # none for vanilla RE2, CoT for RE2+CoT, PaS for RE2+PaS
 
 @dataclass
 class OutputConfig:

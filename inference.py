@@ -4,8 +4,8 @@
 Inference CLI entry point.
 
 Usage:
-    python inference.py --config configs/experiments/exp_rereading.yaml
-    python inference.py -c configs/experiments/exp_few_shot_3.yaml
+    python inference.py --config configs/experiments/exp_rereading.yaml -framework hf
+    python inference.py -c configs/experiments/exp_few_shot_3.yaml -f vllm
 """
 
 import argparse
@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from src.config import load_config, validate_config
-from src.pipeline import InferencePipeline
+from src.pipeline import HFInferencePipeline, VLLMInferencePipeline
 
 
 def parse_args():
@@ -23,14 +23,14 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run with experiment config
-  python inference.py --config configs/experiments/exp_rereading.yaml
+  # Run with HuggingFace Transformers
+  python inference.py --config configs/experiments/exp_rereading.yaml --framework hf  
   
   # Short form
   python inference.py -c configs/experiments/exp_few_shot_3.yaml
   
-  # Validate config only
-  python inference.py -c configs/experiments/test.yaml --validate-only
+  # Default framework (hf)
+  python inference.py -c configs/experiments/exp_rereading.yaml
         """
     )
     
@@ -42,9 +42,11 @@ Examples:
     )
     
     parser.add_argument(
-        "--validate-only",
-        action="store_true",
-        help="Only validate config without running inference"
+        "-f", "--framework",
+        type=str,
+        choices=["hf", "vllm"],
+        default="hf",
+        help="Inference framework: 'hf' for HuggingFace Transformers, 'vllm' for vLLM (default: hf)"
     )
     
     return parser.parse_args()
@@ -59,7 +61,9 @@ def main():
     print("\n" + "=" * 80)
     print("🚀 STRUCTURED SENTIMENT ANALYSIS - INFERENCE")
     print("=" * 80)
-    print(f"\n📄 Config file: {args.config}\n")
+    print(f"\n📄 Config file: {args.config}")
+    print(f"🛠️  Framework: {args.framework.upper()}")
+    print()
     
     # Check if config file exists
     config_path = Path(args.config)
@@ -112,14 +116,12 @@ def main():
         print("-" * 80)
         print()
         
-        # If validate-only mode, exit here
-        if args.validate_only:
-            print("✅ Validation complete! (--validate-only mode)")
-            sys.exit(0)
-        
-        # Initialize and execute pipeline
-        print("🔧 Initializing inference pipeline...\n")
-        pipeline = InferencePipeline(config=config)
+        if args.framework == "hf":
+            pipeline = HFInferencePipeline(config=config)
+        elif args.framework == "vllm":
+            pipeline = VLLMInferencePipeline(config=config)
+        else:
+            raise ValueError(f"Unknown framework: {args.framework}")
         
         # Execute complete pipeline
         pipeline.execute()
