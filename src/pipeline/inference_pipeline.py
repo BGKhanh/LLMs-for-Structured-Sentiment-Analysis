@@ -775,7 +775,7 @@ class HFInferencePipeline:
         
         # Get examples pool path if needed
         examples_pool_path = None
-        if technique in ["few_shot", "few_shot_cot"]:
+        if self.config.prompt.n_shot > 0:
             if self.config.data.examples_pool:
                 examples_pool_path = self.config.data.get_examples_pool_path()
                 print(f"  📚 Examples pool: {examples_pool_path}")
