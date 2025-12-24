@@ -6,8 +6,8 @@ random_seed: 42
 
 
 experiment:
-  name: "RE2_PaS_CoT_experiment_2"
-  description: "Re-reading + Plan and Solve + Chain-of-Though technique, experiment 2, n-shot = 2, GemmaModel"
+  name: "RE2_PaS_CoT_experiment_3"
+  description: "Re-reading + Plan and Solve + Chain-of-Though technique, experiment 3, n-shot = 3, GemmaModel"
   version: "1.0"
 
 model:
@@ -42,7 +42,7 @@ data:
 prompt:
   technique: "re2_pas_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
   language: "vi"
-  n_shot: 2                # just for few-shot and few-shot CoT technique
+  n_shot: 3                # just for few-shot and few-shot CoT technique
   examples_pool_path: null
   plus_mode: false         # just for plan-and-solve technique
   add_method: "none"        # just for rereading technique
