@@ -189,4 +189,4 @@ def extract_json_from_response(
                         break
     
     # Strategy 3: Fallback - clean markdown
-    return response.replace('', '').replace('```', '').strip()---
+    return response.replace('', '').replace('```', '').strip()
