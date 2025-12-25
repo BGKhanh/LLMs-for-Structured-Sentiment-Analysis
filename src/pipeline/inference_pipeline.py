@@ -233,8 +233,18 @@ class VLLMInferencePipeline:
             
             # Format prompt for vLLM (vLLM handles chat template internally)
             # Simple format: combine system and user prompts
-            formatted_prompt = f"{sys_prompt}\n\n{usr_prompt}"
+            messages = [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": usr_prompt}
+            ]
+            
+            formatted_prompt = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
             formatted_prompts.append(formatted_prompt)
+            
             
             metadata.append({
                 'sent_id': sent_id,
@@ -282,6 +292,10 @@ class VLLMInferencePipeline:
         Stage 1: Generate reasoning for all samples at once
         Stage 2: Extract structured output for all samples at once
         """
+        tokenizer = self.model.get_tokenizer()
+        if not tokenizer:
+            raise RuntimeError("Could not retrieve tokenizer from vLLM model!")
+
         batch_size = self.config.data.batch_size
         
         # ===== STAGE 1: Generate Reasoning =====
@@ -298,7 +312,13 @@ class VLLMInferencePipeline:
             
             sys_prompt, usr_prompt = self.prompt_template.get_prompt(text, sent_id, stage="stage_1")
             
-            formatted_prompt = f"{sys_prompt}\n\n{usr_prompt}"
+            messages = [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": usr_prompt}
+            ]
+            formatted_prompt = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
             stage1_prompts.append(formatted_prompt)
             
             metadata.append({
@@ -358,7 +378,13 @@ class VLLMInferencePipeline:
                 reasoning=reasoning_data['raw_response']
             )
             
-            formatted_prompt_2 = f"{sys_prompt_2}\n\n{usr_prompt_2}"
+            messages_2 = [
+                {"role": "system", "content": sys_prompt_2},
+                {"role": "user", "content": usr_prompt_2}
+            ]
+            formatted_prompt_2 = tokenizer.apply_chat_template(
+                messages_2, tokenize=False, add_generation_prompt=True
+            )
             stage2_prompts.append(formatted_prompt_2)
             
             stage2_metadata.append({

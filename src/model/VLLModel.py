@@ -49,7 +49,7 @@ class VLLMModel:
         
         # Generate
         start = time.time()
-        outputs = self.llm.generate(prompts, sampling_params)
+        outputs = self.llm.generate(prompts, sampling_params, use_tqdm=True)
         gen_time = time.time() - start
         
         # Extract results
