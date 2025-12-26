@@ -6,37 +6,39 @@ random_seed: 42
 
 
 experiment:
-  name: "Fewshot_CoT_experiment_3"
-  description: "Few-shot CoT technique, experiment 3, n-shot = 1, QwenModel"
+  name: "Fewshot_CoT_experiment_1"
+  description: "Few-shot CoT technique, experiment 1, n-shot = 1, QwenModel"
   version: "1.0"
 
 model:
   # === MODEL LOADING ===
   name: "qwen"  # one of [gemma, mistral, qwen, llama]
-  model_id: "Qwen/Qwen3-4B-Instruct-2507"
-  dtype: "float32"
-  device_map: "auto"
-  trust_remote_code: true
-  enable_thinking: true
+  init_args:
+    model_id: "Qwen/Qwen3-4B-Instruct-2507"
+    dtype: "bfloat16"
+    device_map: "auto"
+    trust_remote_code: true
+    attn_implementation: "flash_attention_2"
 
   # === GENERATION PARAMETERS ===
-  max_new_tokens: 1024
-  do_sample: false
-  temperature: 0.1
-  top_p: 0.95
-  top_k: 50
+  generation_args:  
+    max_new_tokens: 2048
+    do_sample: false
+    temperature: 0.1
+    top_p: 0.95
+    top_k: 50
 
 
 data:
   dataset: "dev"   # one of [train, dev, test]
-  train_dataset_path: "/kaggle/input/vitoed/train.json"
-  dev_dataset_path: "/kaggle/input/vitoed/dev.json"
-  test_dataset_path: "/kaggle/input/vitoed/test.json"
+  train_dataset_path: "data/train.json"
+  dev_dataset_path: "data/dev.json"
+  test_dataset_path: "data/test.json"
 
   examples_pool: "train"
-  batch_size: 2
+  batch_size: 16
   num_samples: null   # null = use all samples
-  num_workers: 4
+  num_workers: 8
 
 prompt:
   technique: "few_shot_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
