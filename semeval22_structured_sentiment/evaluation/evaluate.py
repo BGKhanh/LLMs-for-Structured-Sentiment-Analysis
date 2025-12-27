@@ -87,126 +87,262 @@ def convert_opinion_to_tuple(sentence):
     return opinion_tuples
 
 
-def sent_tuples_in_list(sent_tuple1, list_of_sent_tuples, keep_polarity=True):
+# def sent_tuples_in_list(sent_tuple1, list_of_sent_tuples, keep_polarity=True):
+#     holder1, target1, exp1, pol1 = sent_tuple1
+#     if len(holder1) == 0:
+#         holder1 = frozenset(["_"])
+#     if len(target1) == 0:
+#         target1 = frozenset(["_"])
+#     for holder2, target2, exp2, pol2 in list_of_sent_tuples:
+#         if len(holder2) == 0:
+#             holder2 = frozenset(["_"])
+#         if len(target2) == 0:
+#             target2 = frozenset(["_"])
+#         if (
+#             len(holder1.intersection(holder2)) > 0
+#             and len(target1.intersection(target2)) > 0
+#             and len(exp1.intersection(exp2)) > 0
+#         ):
+#             if keep_polarity:
+#                 if pol1 == pol2:
+#                     # print(holder1, target1, exp1, pol1)
+#                     # print(holder2, target2, exp2, pol2)
+#                     return True
+#             else:
+#                 # print(holder1, target1, exp1, pol1)
+#                 # print(holder2, target2, exp2, pol2)
+#                 return True
+#     return False
+
+# def weighted_score(sent_tuple1, list_of_sent_tuples):
+#     best_overlap = 0
+#     holder1, target1, exp1, pol1 = sent_tuple1
+#     if len(holder1) == 0:
+#         holder1 = frozenset(["_"])
+#     if len(target1) == 0:
+#         target1 = frozenset(["_"])
+#     for holder2, target2, exp2, pol2 in list_of_sent_tuples:
+#         if len(holder2) == 0:
+#             holder2 = frozenset(["_"])
+#         if len(target2) == 0:
+#             target2 = frozenset(["_"])
+#         if (
+#             len(holder2.intersection(holder1)) > 0
+#             and len(target2.intersection(target1)) > 0
+#             and len(exp2.intersection(exp1)) > 0
+#         ):
+#             holder_overlap = len(holder2.intersection(holder1)) / len(holder1)
+#             target_overlap = len(target2.intersection(target1)) / len(target1)
+#             exp_overlap = len(exp2.intersection(exp1)) / len(exp1)
+#             overlap = (holder_overlap + target_overlap + exp_overlap) / 3
+#             if overlap > best_overlap:
+#                 best_overlap = overlap
+#     return best_overlap
+
+
+# def tuple_precision(gold, pred, keep_polarity=True, weighted=True):
+#     """
+#     Weighted true positives / (true positives + false positives)
+#     """
+#     weighted_tp = []
+#     tp = []
+#     fp = []
+#     #
+#     for sent_idx in pred.keys():
+#         ptuples = pred[sent_idx]
+#         gtuples = gold[sent_idx]
+#         for stuple in ptuples:
+#             if sent_tuples_in_list(stuple, gtuples, keep_polarity):
+#                 if weighted:
+#                     #sc = weighted_score(stuple, gtuples)
+#                     #if sc != 1:
+#                         #print(sent_idx)
+#                         #print(sc)
+#                         #print()
+#                     weighted_tp.append(weighted_score(stuple, gtuples))
+#                     tp.append(1)
+#                 else:
+#                     weighted_tp.append(1)
+#                     tp.append(1)
+#             else:
+#                 #print(sent_idx)
+#                 fp.append(1)
+#     #print("weighted tp: {}".format(sum(weighted_tp)))
+#     #print("tp: {}".format(sum(tp)))
+#     #print("fp: {}".format(sum(fp)))
+#     return sum(weighted_tp) / (sum(tp) + sum(fp) + 0.0000000000000001)
+
+
+# def tuple_recall(gold, pred, keep_polarity=True, weighted=True):
+#     """
+#     Weighted true positives / (true positives + false negatives)
+#     """
+#     weighted_tp = []
+#     tp = []
+#     fn = []
+#     #
+#     assert len(gold) == len(pred)
+#     #
+#     for sent_idx in pred.keys():
+#         ptuples = pred[sent_idx]
+#         gtuples = gold[sent_idx]
+#         for stuple in gtuples:
+#             if sent_tuples_in_list(stuple, ptuples, keep_polarity):
+#                 if weighted:
+#                     weighted_tp.append(weighted_score(stuple, ptuples))
+#                     tp.append(1)
+#                 else:
+#                     weighted_tp.append(1)
+#                     tp.append(1)
+#             else:
+#                 fn.append(1)
+#     return sum(weighted_tp) / (sum(tp) + sum(fn) + 0.0000000000000001)
+
+
+# def tuple_f1(gold, pred, keep_polarity=True, weighted=True):
+#     prec = tuple_precision(gold, pred, keep_polarity, weighted)
+#     rec = tuple_recall(gold, pred, keep_polarity, weighted)
+#     print("prec: {}".format(prec))
+#     print("rec: {}".format(rec))
+#     return 2 * (prec * rec) / (prec + rec + 0.00000000000000001)
+
+
+def sent_tuples_in_list(sent_tuple1, list_of_sent_tuples, keep_polarity=True, mode="all"):
+    """
+    mode: "all" (SF1), "holder", "target", "expression", "targeted_strict"
+    """
     holder1, target1, exp1, pol1 = sent_tuple1
-    if len(holder1) == 0:
-        holder1 = frozenset(["_"])
-    if len(target1) == 0:
-        target1 = frozenset(["_"])
+    if len(holder1) == 0: holder1 = frozenset(["_"])
+    if len(target1) == 0: target1 = frozenset(["_"])
+    
     for holder2, target2, exp2, pol2 in list_of_sent_tuples:
-        if len(holder2) == 0:
-            holder2 = frozenset(["_"])
-        if len(target2) == 0:
-            target2 = frozenset(["_"])
-        if (
-            len(holder1.intersection(holder2)) > 0
-            and len(target1.intersection(target2)) > 0
-            and len(exp1.intersection(exp2)) > 0
-        ):
+        if len(holder2) == 0: holder2 = frozenset(["_"])
+        if len(target2) == 0: target2 = frozenset(["_"])
+        
+        match = False
+        # Logic check overlap dựa trên mode
+        if mode == "all":
+            if (len(holder1.intersection(holder2)) > 0 
+                and len(target1.intersection(target2)) > 0 
+                and len(exp1.intersection(exp2)) > 0):
+                match = True
+        elif mode == "holder":
+            if len(holder1.intersection(holder2)) > 0: match = True
+        elif mode == "target":
+            if len(target1.intersection(target2)) > 0: match = True
+        elif mode == "expression":
+            if len(exp1.intersection(exp2)) > 0: match = True
+        elif mode == "targeted_strict":
+            # Targeted F1 yêu cầu Exact Match Target 
+            if target1 == target2: match = True
+
+        if match:
             if keep_polarity:
-                if pol1 == pol2:
-                    # print(holder1, target1, exp1, pol1)
-                    # print(holder2, target2, exp2, pol2)
-                    return True
+                if pol1 == pol2: return True
             else:
-                # print(holder1, target1, exp1, pol1)
-                # print(holder2, target2, exp2, pol2)
                 return True
     return False
 
-
-def weighted_score(sent_tuple1, list_of_sent_tuples):
+def weighted_score(sent_tuple1, list_of_sent_tuples, mode="all"):
     best_overlap = 0
     holder1, target1, exp1, pol1 = sent_tuple1
-    if len(holder1) == 0:
-        holder1 = frozenset(["_"])
-    if len(target1) == 0:
-        target1 = frozenset(["_"])
+    if len(holder1) == 0: holder1 = frozenset(["_"])
+    if len(target1) == 0: target1 = frozenset(["_"])
+    
     for holder2, target2, exp2, pol2 in list_of_sent_tuples:
-        if len(holder2) == 0:
-            holder2 = frozenset(["_"])
-        if len(target2) == 0:
-            target2 = frozenset(["_"])
-        if (
-            len(holder2.intersection(holder1)) > 0
-            and len(target2.intersection(target1)) > 0
-            and len(exp2.intersection(exp1)) > 0
-        ):
-            holder_overlap = len(holder2.intersection(holder1)) / len(holder1)
-            target_overlap = len(target2.intersection(target1)) / len(target1)
-            exp_overlap = len(exp2.intersection(exp1)) / len(exp1)
-            overlap = (holder_overlap + target_overlap + exp_overlap) / 3
-            if overlap > best_overlap:
-                best_overlap = overlap
+        if len(holder2) == 0: holder2 = frozenset(["_"])
+        if len(target2) == 0: target2 = frozenset(["_"])
+        
+        # Tính overlap từng phần
+        h_ov = len(holder2.intersection(holder1)) / len(holder1) if len(holder1) > 0 else 0
+        t_ov = len(target2.intersection(target1)) / len(target1) if len(target1) > 0 else 0
+        e_ov = len(exp2.intersection(exp1)) / len(exp1) if len(exp1) > 0 else 0
+        
+        current_overlap = 0
+        
+        # Logic tính điểm overlap tổng dựa trên mode
+        if mode == "all":
+            # Điều kiện của SF1: Cả 3 phải khớp mới tính điểm
+            if (len(holder2.intersection(holder1)) > 0 and 
+                len(target2.intersection(target1)) > 0 and 
+                len(exp2.intersection(exp1)) > 0):
+                current_overlap = (h_ov + t_ov + e_ov) / 3
+        elif mode == "holder":
+            if len(holder2.intersection(holder1)) > 0: current_overlap = h_ov
+        elif mode == "target":
+            if len(target2.intersection(target1)) > 0: current_overlap = t_ov
+        elif mode == "expression":
+            if len(exp2.intersection(exp1)) > 0: current_overlap = e_ov
+        # Targeted strict không dùng weighted score (nó là exact match = 1 hoặc 0)
+
+        if current_overlap > best_overlap:
+            best_overlap = current_overlap
+            
     return best_overlap
 
-
-def tuple_precision(gold, pred, keep_polarity=True, weighted=True):
-    """
-    Weighted true positives / (true positives + false positives)
-    """
+def tuple_precision(gold, pred, keep_polarity=True, weighted=True, mode="all"):
     weighted_tp = []
     tp = []
     fp = []
-    #
     for sent_idx in pred.keys():
         ptuples = pred[sent_idx]
         gtuples = gold[sent_idx]
         for stuple in ptuples:
-            if sent_tuples_in_list(stuple, gtuples, keep_polarity):
-                if weighted:
-                    #sc = weighted_score(stuple, gtuples)
-                    #if sc != 1:
-                        #print(sent_idx)
-                        #print(sc)
-                        #print()
-                    weighted_tp.append(weighted_score(stuple, gtuples))
+            if sent_tuples_in_list(stuple, gtuples, keep_polarity, mode):
+                if weighted and mode != "targeted_strict":
+                    weighted_tp.append(weighted_score(stuple, gtuples, mode))
                     tp.append(1)
                 else:
                     weighted_tp.append(1)
                     tp.append(1)
             else:
-                #print(sent_idx)
                 fp.append(1)
-    #print("weighted tp: {}".format(sum(weighted_tp)))
-    #print("tp: {}".format(sum(tp)))
-    #print("fp: {}".format(sum(fp)))
-    return sum(weighted_tp) / (sum(tp) + sum(fp) + 0.0000000000000001)
+    return sum(weighted_tp) / (sum(tp) + sum(fp) + 1e-16)
 
-
-def tuple_recall(gold, pred, keep_polarity=True, weighted=True):
-    """
-    Weighted true positives / (true positives + false negatives)
-    """
+def tuple_recall(gold, pred, keep_polarity=True, weighted=True, mode="all"):
     weighted_tp = []
     tp = []
     fn = []
-    #
     assert len(gold) == len(pred)
-    #
     for sent_idx in pred.keys():
         ptuples = pred[sent_idx]
         gtuples = gold[sent_idx]
         for stuple in gtuples:
-            if sent_tuples_in_list(stuple, ptuples, keep_polarity):
-                if weighted:
-                    weighted_tp.append(weighted_score(stuple, ptuples))
+            if sent_tuples_in_list(stuple, ptuples, keep_polarity, mode):
+                if weighted and mode != "targeted_strict":
+                    weighted_tp.append(weighted_score(stuple, ptuples, mode))
                     tp.append(1)
                 else:
                     weighted_tp.append(1)
                     tp.append(1)
             else:
                 fn.append(1)
-    return sum(weighted_tp) / (sum(tp) + sum(fn) + 0.0000000000000001)
+    return sum(weighted_tp) / (sum(tp) + sum(fn) + 1e-16)
 
+def tuple_f1(gold, preds, keep_polarity=True, weighted=True, mode="all"):
+    prec = tuple_precision(gold, preds, keep_polarity, weighted, mode)
+    rec = tuple_recall(gold, preds, keep_polarity, weighted, mode)
+    return 2 * (prec * rec) / (prec + rec + 1e-16)
 
-def tuple_f1(gold, pred, keep_polarity=True, weighted=True):
-    prec = tuple_precision(gold, pred, keep_polarity, weighted)
-    rec = tuple_recall(gold, pred, keep_polarity, weighted)
-    print("prec: {}".format(prec))
-    print("rec: {}".format(rec))
-    return 2 * (prec * rec) / (prec + rec + 0.00000000000000001)
-
+# --- HÀM MỚI: TÍNH TẤT CẢ METRIC CÙNG LÚC ---
+def calculate_all_metrics(gold, preds):
+    metrics = {}
+    
+    # 1. SF1 (Sentiment Graph F1) - Chuẩn: Weighted + Polarity
+    metrics["SF1"] = tuple_f1(gold, preds, keep_polarity=True, weighted=True, mode="all")
+    
+    # 2. NSF1 (Non-polar SF1) - Chuẩn: Weighted + No Polarity
+    metrics["NSF1"] = tuple_f1(gold, preds, keep_polarity=False, weighted=True, mode="all")
+    
+    # 3. Span F1 (Holder, Target, Exp) - Chuẩn: Weighted + No Polarity 
+    metrics["Holder F1"] = tuple_f1(gold, preds, keep_polarity=False, weighted=True, mode="holder")
+    metrics["Target F1"] = tuple_f1(gold, preds, keep_polarity=False, weighted=True, mode="target")
+    metrics["Exp F1"]    = tuple_f1(gold, preds, keep_polarity=False, weighted=True, mode="expression")
+    
+    # 4. Targeted F1 - Chuẩn: Exact Target Match + Polarity (Weighted=False) [cite: 114, 174]
+    metrics["Targeted F1"] = tuple_f1(gold, preds, keep_polarity=True, weighted=False, mode="targeted_strict")
+    
+    return metrics
 
 def main():
     """
