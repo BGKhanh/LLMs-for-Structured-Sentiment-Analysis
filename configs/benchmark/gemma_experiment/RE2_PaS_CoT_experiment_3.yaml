@@ -37,14 +37,14 @@ data:
   examples_pool: "train"
   batch_size: 16
   num_samples: 100   # null = use all samples
-  num_workers: 2
+  num_workers: 8
 
 prompt:
   technique: "re2_pas_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
   language: "vi"
   n_shot: 3                # just for few-shot and few-shot CoT technique
   examples_pool_path: null
-  plus_mode: false         # just for plan-and-solve technique
+  plus_mode: true         # just for plan-and-solve technique
   add_method: "none"        # just for rereading technique
 
 output:
