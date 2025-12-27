@@ -48,7 +48,7 @@ prompt:
   add_method: "none"        # just for rereading technique
 
 output:
-  output_dir: "results/"
+  output_dir: "results/evaluate"
   output_file: "results.json"
   save_metadata: true
   save_config_copy: true

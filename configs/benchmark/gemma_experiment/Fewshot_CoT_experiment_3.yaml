@@ -6,8 +6,8 @@ random_seed: 42
 
 
 experiment:
-  name: "Gemma_Fewshot_CoT_experiment_evaluate"
-  description: "Few-shot CoT technique, n-shot = 3, google/gemma-3-4b-it"
+  name: "Gemma_Fewshot_CoT_experiment_benchmark_3"
+  description: "Few-shot CoT technique, n-shot = 3, google/gemma-3-4b-it, num_samples = 100"
   version: "1.0"
 
 model:
@@ -30,14 +30,14 @@ model:
 
 
 data:
-  dataset: "test"   # one of [train, dev, test]
+  dataset: "dev"   # one of [train, dev, test]
   train_dataset_path: "data/vitoed_new/test.json"
   dev_dataset_path: "data/vitoed_new/dev.json"
   test_dataset_path: "data/vitoed_new/test.json"
 
   examples_pool: "train"
   batch_size: 16
-  num_samples: null   # null = use all samples
+  num_samples: 100   # null = use all samples
   num_workers: 8
 
 prompt:
@@ -48,7 +48,7 @@ prompt:
   plus_mode: false
 
 output:
-  output_dir: "results/evaluate"
+  output_dir: "results/benchmark"
   output_file: "results.json"
   save_metadata: true
   save_config_copy: true
