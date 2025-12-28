@@ -7,6 +7,7 @@ def main():
     parser.add_argument("gold_file", help="gold json file")
     parser.add_argument("pred_file", help="prediction json file")
     parser.add_argument("--exclude_file", help="path to json file containing sent_ids to exclude", default=None)
+    parser.add_argument("--num_samples", type=int, help="number of samples to evaluate (from the beginning)", default=None)
 
     args = parser.parse_args()
 
@@ -32,6 +33,14 @@ def main():
         gold = [s for s in gold if s["sent_id"] not in exclude_set]
         preds = [s for s in preds if s["sent_id"] not in exclude_set]
         print(f"Excluded {len(exclude_ids)} IDs. Remaining samples: {len(gold)}")
+
+    if args.num_samples is not None:
+        gold = gold[:args.num_samples]
+        # Lọc preds để chỉ giữ lại các sent_id có trong danh sách gold đã cắt
+        # Điều này đảm bảo assert p.issubset(g) không bị lỗi
+        gold_ids = set(s["sent_id"] for s in gold)
+        preds = [s for s in preds if s["sent_id"] in gold_ids]
+        print(f"Limited to first {len(gold)} samples.")
 
     gold = dict([(s["sent_id"], convert_opinion_to_tuple(s)) for s in gold])
 
