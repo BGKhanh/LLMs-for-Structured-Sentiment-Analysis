@@ -1,0 +1,49 @@
+# configs/training/sft_gemma_qlora.yaml
+# QLoRA = 4-bit quantization + LoRA (memory efficient!)
+
+experiment_name: "gemma_sft_qlora"
+random_seed: 42
+
+model:
+  model_name_or_path: "google/gemma-3-4b-it"
+  model_type: "gemma"
+  load_in_4bit: true  # ✅ Enable 4-bit quantization
+  trust_remote_code: true
+  attn_implementation: "flash_attention_2"
+data:
+  train_dataset_path: "data/vitoed_new/train.json"
+  eval_dataset_path: "data/vitoed_new/dev.json"
+  max_seq_length: 2048
+  packing: false
+
+prompt:
+  technique: "few_shot"
+  language: "vi"
+  n_shot: 3
+  examples_pool_path: "data/vitoed_new/train.json"
+
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+  
+  use_qlora: true  # ✅ Enable QLoRA
+  bnb_4bit_compute_dtype: "bfloat16"
+  bnb_4bit_quant_type: "nf4"
+  bnb_4bit_use_double_quant: true
+
+training:
+  output_dir: "results/training/gemma_sft_qlora"
+  num_train_epochs: 3
+  per_device_train_batch_size: 8  # Can increase with QLoRA!
+  gradient_accumulation_steps: 2
+  learning_rate: 2.0e-4
+  logging_steps: 10
+  save_strategy: "epoch"
+  gradient_checkpointing: true
+  bf16: true

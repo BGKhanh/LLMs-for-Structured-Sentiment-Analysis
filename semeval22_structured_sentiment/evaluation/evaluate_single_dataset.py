@@ -27,7 +27,6 @@ def main():
             exclude_ids = json.load(f)
             sliced_ids = exclude_ids[:17]
             print(sliced_ids)
-            # Tạo set chứa cả int và string để đảm bảo khớp ID bất kể định dạng
             exclude_set = {str(x) for x in sliced_ids}
             
         gold = [s for s in gold if s["sent_id"] not in exclude_set]
@@ -36,8 +35,6 @@ def main():
 
     if args.num_samples is not None:
         gold = gold[:args.num_samples]
-        # Lọc preds để chỉ giữ lại các sent_id có trong danh sách gold đã cắt
-        # Điều này đảm bảo assert p.issubset(g) không bị lỗi
         gold_ids = set(s["sent_id"] for s in gold)
         preds = [s for s in preds if s["sent_id"] in gold_ids]
         print(f"Limited to first {len(gold)} samples.")

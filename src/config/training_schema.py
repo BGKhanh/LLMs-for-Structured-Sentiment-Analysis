@@ -97,6 +97,8 @@ class ModelConfig:
     load_in_4bit: bool = False
     load_in_8bit: bool = False
     
+    attn_implementation: Optional[Literal["eager", "sdpa", "flash_attention_2"]] = "flash_attention_2"
+
     # === Other ===
     trust_remote_code: bool = True
     cache_dir: Optional[str] = None
