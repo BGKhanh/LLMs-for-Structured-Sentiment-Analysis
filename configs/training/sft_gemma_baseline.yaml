@@ -73,7 +73,7 @@ training:
   logging_steps: 10
   save_strategy: "epoch"
   save_total_limit: 2
-  evaluation_strategy: "no"  # "epoch" to enable eval
+  eval_strategy: "no"  # "epoch" to enable eval
   
   # Precision & Optimization
   gradient_checkpointing: true
