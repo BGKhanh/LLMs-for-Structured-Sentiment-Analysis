@@ -72,30 +72,42 @@ def get_prompt_template(config):
     eng = (language == "en")
     
     # Create template based on technique
-    if technique == "rereading":
-        template = ReReadingPrompt(eng=eng)
-        
-    elif technique == "few_shot":
-        template = FewShotPrompt(
+    if technique == "few_shot":
+        return FewShotPrompt(
             eng=eng,
             n_shot=config.prompt.n_shot,
             examples_pool_path=config.prompt.examples_pool_path
         )
-        
+    
     elif technique == "few_shot_cot":
-        template = FewShotCoTPrompt(
+        return FewShotCoTPrompt(
             eng=eng,
-            n_shot=config.prompt.n_shot,
-            examples_pool_path=config.prompt.examples_pool_path
+            n_shot=config.prompt.n_shot
         )
-        
+    
     elif technique == "zero_shot_cot":
-        template = ZeroShotCoTPrompt(eng=eng)
-        
-    elif technique == "plan_and_solve":
-        template = PlanAndSolvePrompt(
+        return ZeroShotCoTPrompt(eng=eng)
+    
+    elif technique == "rereading":
+        return ReReadingPrompt(
             eng=eng,
-            plus_mode=config.prompt.plus_mode
+            add_method=self.config.prompt.add_method,
+            n_shot=config.prompt.n_shot,
+            examples_pool_path=examples_pool_path
+        )
+    
+    elif technique == "plan_and_solve" or technique == "plan_solve":
+        return PlanAndSolvePrompt(
+            eng=eng,
+            plus=self.config.prompt.plus_mode,
+            n_shot=config.prompt.n_shot  # Added n_shot support for PaS+CoT
+        )
+    
+    elif technique == "re2_pas_cot":
+        # This might be deprecated or standalone, kept for compatibility if needed
+        return Re2PaSCoTPrompt(
+            eng=eng,
+            n_shot=config.prompt.n_shot
         )
         
     else:
