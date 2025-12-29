@@ -17,14 +17,7 @@ from src.training import SentimentSFTTrainer, prepare_training_datasets
 from src.utils.random_seed import setup_reproducible_environment
 
 # Import prompt templates
-from src.prompt_templates import (
-    FewShotPrompt,
-    ZeroShotCoTPrompt,
-    FewShotCoTPrompt,
-    ReReadingPrompt,
-    PlanAndSolvePrompt
-)
-
+from src.prompt_templates import *
 
 def parse_args():
     """Parse command line arguments."""
