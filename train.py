@@ -14,7 +14,7 @@ from pathlib import Path
 
 from src.config import load_training_config, validate_training_config
 from src.training import SentimentSFTTrainer, prepare_training_datasets
-from src.utils.random_seed import set_seed
+from src.utils.random_seed import setup_reproducible_environment
 
 # Import prompt templates
 from src.prompt_templates import (
@@ -173,7 +173,7 @@ def main():
         
         # ========== STEP 3: Set random seed ==========
         print(f"🎲 Setting random seed: {config.random_seed}")
-        set_seed(config.random_seed)
+        setup_reproducible_environment(config.random_seed)
         print()
         
         # ========== STEP 4: Initialize trainer ==========
