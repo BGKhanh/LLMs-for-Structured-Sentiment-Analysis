@@ -65,7 +65,7 @@ class TrainingArguments(FlexibleConfig):
     logging_steps: int = 10
     save_strategy: str = "epoch"
     save_total_limit: int = 2
-    evaluation_strategy: str = "no"
+    eval_strategy: str = "no"
     
     # === Precision ===
     bf16: bool = True

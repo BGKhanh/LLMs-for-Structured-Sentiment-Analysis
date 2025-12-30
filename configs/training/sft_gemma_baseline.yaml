@@ -73,8 +73,12 @@ training:
   logging_steps: 10
   save_strategy: "epoch"
   save_total_limit: 2
-  eval_strategy: "no"  # "epoch" to enable eval
-  
+  # Evaluation
+  eval_strategy: "epoch"  # "epoch" to enable eval
+  save_strategy: "epoch"
+  load_best_model_at_end: true  # ✅ Load best checkpoint
+  metric_for_best_model: "eval_loss"  # ✅ Use loss to pick best
+  greater_is_better: false  # ✅ Lower loss is better
   # Precision & Optimization
   gradient_checkpointing: true
   bf16: true

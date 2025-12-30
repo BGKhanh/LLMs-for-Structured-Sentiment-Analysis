@@ -15,11 +15,10 @@ from typing import Optional
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    BitsAndBytesConfig,
-    TrainingArguments as HFTrainingArguments
+    BitsAndBytesConfig
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-from trl import SFTTrainer
+from trl import SFTTrainer, SFTConfig
 
 from ..config.training_schema import TrainingConfig
 
@@ -237,30 +236,49 @@ class SentimentSFTTrainer:
         print()
         
         try:
-            # Convert TrainingConfig to HF TrainingArguments
-            training_args = HFTrainingArguments(
+            # Convert TrainingConfig to SFTConfig (TRL's modern API)
+            sft_config = SFTConfig(
+                # === Output ===
                 output_dir=self.config.training.output_dir,
+                
+                # === Training Duration ===
                 num_train_epochs=self.config.training.num_train_epochs,
                 max_steps=self.config.training.max_steps,
+                
+                # === Batch Size & Gradient ===
                 per_device_train_batch_size=self.config.training.per_device_train_batch_size,
                 per_device_eval_batch_size=self.config.training.per_device_eval_batch_size,
                 gradient_accumulation_steps=self.config.training.gradient_accumulation_steps,
                 gradient_checkpointing=self.config.training.gradient_checkpointing,
+                
+                # === Optimizer ===
                 learning_rate=self.config.training.learning_rate,
                 weight_decay=self.config.training.weight_decay,
                 warmup_ratio=self.config.training.warmup_ratio,
                 lr_scheduler_type=self.config.training.lr_scheduler_type,
+                optim=self.config.training.optim,
+                
+                # === Logging & Saving ===
                 logging_steps=self.config.training.logging_steps,
                 save_strategy=self.config.training.save_strategy,
                 save_total_limit=self.config.training.save_total_limit,
-                evaluation_strategy=self.config.training.evaluation_strategy,
+                eval_strategy=self.config.training.eval_strategy,
+                
+                # === Precision ===
                 bf16=self.config.training.bf16,
                 fp16=self.config.training.fp16,
                 max_grad_norm=self.config.training.max_grad_norm,
-                optim=self.config.training.optim,
-                report_to="none",  # Disable wandb/tensorboard by default
+                
+                # === SFT-Specific Parameters ===
+                dataset_text_field="text",
+                max_seq_length=self.config.data.max_seq_length,
+                packing=self.config.data.packing,
+                
+                # === Other ===
+                report_to="none",
                 seed=self.config.random_seed,
-                # Add extra args from FlexibleConfig if any
+                
+                # === Extra args from FlexibleConfig ===
                 **self.config.training.extra_args
             )
             
@@ -268,13 +286,10 @@ class SentimentSFTTrainer:
             print("🔧 Initializing SFTTrainer...")
             self.trainer = SFTTrainer(
                 model=self.model,
-                args=training_args,
+                args=sft_config,
                 train_dataset=train_dataset,
                 eval_dataset=eval_dataset,
-                tokenizer=self.tokenizer,
-                dataset_text_field="text",
-                max_seq_length=self.config.data.max_seq_length,
-                packing=self.config.data.packing
+                tokenizer=self.tokenizer
             )
             
             print("✅ Trainer initialized\n")
