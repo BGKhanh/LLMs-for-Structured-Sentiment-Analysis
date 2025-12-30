@@ -22,6 +22,36 @@ from trl import SFTTrainer, SFTConfig
 
 from ..config.training_schema import TrainingConfig
 
+def patch_gemma3_attention_mask():
+    """
+    Monkey-patch Gemma 3 to force attention_mask to boolean.
+    This fixes the RuntimeError with eager/sdpa attention.
+    """
+    try:
+        from transformers.models.gemma3 import modeling_gemma3
+        
+        # Check if already patched to avoid recursion
+        if getattr(modeling_gemma3.Gemma3Model.forward, "_is_patched", False):
+            return
+
+        original_forward = modeling_gemma3.Gemma3Model.forward
+        
+        def patched_forward(self, *args, **kwargs):
+            # Force attention_mask to boolean if it exists
+            if 'attention_mask' in kwargs and kwargs['attention_mask'] is not None:
+                if kwargs['attention_mask'].dtype != torch.bool:
+                    kwargs['attention_mask'] = kwargs['attention_mask'].bool()
+            return original_forward(self, *args, **kwargs)
+        
+        patched_forward._is_patched = True
+        modeling_gemma3.Gemma3Model.forward = patched_forward
+        print("✅ Applied Gemma 3 Attention Mask Patch (Long -> Bool)")
+        
+    except ImportError:
+        print("⚠️ Could not import Gemma3Model for patching (Ignore if not using Gemma 3)")
+    except Exception as e:
+        print(f"⚠️ Failed to patch Gemma 3: {e}")
+
 
 class SentimentSFTTrainer:
     """
@@ -59,6 +89,9 @@ class SentimentSFTTrainer:
         print(f"📝 Experiment: {config.experiment_name}")
         print("="*70)
     
+        if "gemma-3" in config.model.model_name_or_path.lower():
+                patch_gemma3_attention_mask()
+    
     def setup(self) -> None:
         """
         Setup model, tokenizer, and PEFT configuration.
@@ -82,6 +115,9 @@ class SentimentSFTTrainer:
             
             self._load_tokenizer()
             self._load_model()
+            
+            self._freeze_vision_components()
+
             self._apply_peft()
             
             self.is_setup = True
@@ -90,6 +126,28 @@ class SentimentSFTTrainer:
         except Exception as e:
             print(f"\n❌ Setup failed: {str(e)}")
             raise RuntimeError(f"Failed to setup trainer: {e}")
+        
+    def _freeze_vision_components(self):
+        """Freeze vision tower for Gemma 3 if doing text-only training."""
+        if self.model is None:
+            return
+            
+        # Check if model has vision components (Gemma 3 specific)
+        if hasattr(self.model, "model") and hasattr(self.model.model, "vision_tower"):
+            print("❄️  Freezing Vision Tower (Text-only optimization)...")
+            try:
+                # Freeze vision tower
+                for param in self.model.model.vision_tower.parameters():
+                    param.requires_grad = False
+                
+                # Freeze multimodal projector if exists
+                if hasattr(self.model.model, "mm_projector"):
+                    for param in self.model.model.mm_projector.parameters():
+                        param.requires_grad = False
+                        
+                print("✅ Vision components frozen")
+            except Exception as e:
+                print(f"⚠️  Could not freeze vision components: {e}")
     
     def _load_tokenizer(self) -> None:
         """Load and configure tokenizer."""
@@ -287,7 +345,8 @@ class SentimentSFTTrainer:
                 model=self.model,
                 args=sft_config,
                 train_dataset=train_dataset,
-                eval_dataset=eval_dataset
+                eval_dataset=eval_dataset,
+                processing_class=self.tokenizer
             )
             
             print("✅ Trainer initialized\n")

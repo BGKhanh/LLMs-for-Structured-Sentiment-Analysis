@@ -79,7 +79,7 @@ training:
   metric_for_best_model: "eval_loss"  # ✅ Use loss to pick best
   greater_is_better: false  # ✅ Lower loss is better
   # Precision & Optimization
-  gradient_checkpointing: true
+  gradient_checkpointing: false
   bf16: true
   fp16: false
   max_grad_norm: 0.3
