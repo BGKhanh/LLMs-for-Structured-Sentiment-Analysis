@@ -18,7 +18,6 @@ model:
 data:
   train_dataset_path: "data/vitoed_new/train.json"
   eval_dataset_path: "data/vitoed_new/dev.json"
-  max_seq_length: 2048
   packing: false
 
 # Prompt configuration (REUSE from inference!)

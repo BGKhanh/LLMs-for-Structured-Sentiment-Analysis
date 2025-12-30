@@ -271,7 +271,6 @@ class SentimentSFTTrainer:
                 
                 # === SFT-Specific Parameters ===
                 dataset_text_field="text",
-                max_seq_length=self.config.data.max_seq_length,
                 packing=self.config.data.packing,
                 
                 # === Other ===
@@ -288,8 +287,7 @@ class SentimentSFTTrainer:
                 model=self.model,
                 args=sft_config,
                 train_dataset=train_dataset,
-                eval_dataset=eval_dataset,
-                tokenizer=self.tokenizer
+                eval_dataset=eval_dataset
             )
             
             print("✅ Trainer initialized\n")

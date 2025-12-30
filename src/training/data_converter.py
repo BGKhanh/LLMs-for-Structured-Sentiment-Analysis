@@ -3,45 +3,43 @@
 """
 Training data conversion utilities.
 
-Reuses SentimentDataset for data loading and prompt generation,
-then converts to SFTTrainer format.
+Converts SemEval dataset to HuggingFace Dataset format for SFTTrainer.
 """
 
 from src.utils.data_loader import SentimentDataset
-from torch.utils.data import Dataset
+from datasets import Dataset  # ✅ HuggingFace Dataset
 import json
-from typing import Callable
+from typing import Callable, Tuple, Optional
 
 
-class TrainingSentimentDataset(Dataset):
+def create_training_dataset(
+    data_path: str,
+    prompt_generator: Callable,
+    tokenizer
+) -> Dataset:
     """
-    Training dataset wrapper for structured sentiment analysis.
+    Create HuggingFace Dataset for SFT training.
     
-    Reuses SentimentDataset infrastructure, adds training format conversion.
-    """
-    
-    def __init__(
-        self,
-        data_path: str,
-        prompt_generator: Callable,
-        tokenizer
-    ):
-        # Reuse existing infrastructure!
-        self.base_dataset = SentimentDataset(
-            data_path=data_path,
-            prompt_generator=prompt_generator
-        )
-        self.tokenizer = tokenizer
-        print(f"✅ Initialized TrainingSentimentDataset: {len(self)} samples")
-    
-    def __len__(self):
-        return len(self.base_dataset)
-    
-    def __getitem__(self, idx):
-        # Get from base (has prompts + opinions)
-        sample = self.base_dataset[idx]
+    Args:
+        data_path: Path to SemEval JSON dataset
+        prompt_generator: Prompt template's get_prompt method
+        tokenizer: Tokenizer for chat template
         
-        # Build training format
+    Returns:
+        HuggingFace Dataset with "text" column
+    """
+    # Load data using existing infrastructure
+    sentiment_ds = SentimentDataset(
+        data_path=data_path,
+        prompt_generator=prompt_generator
+    )
+    
+    # Convert to list of formatted conversations
+    conversations = []
+    for i in range(len(sentiment_ds)):
+        sample = sentiment_ds[i]
+        
+        # Build messages
         messages = [
             {"role": "system", "content": sample["system_prompt"]},
             {"role": "user", "content": sample["user_prompt"]},
@@ -49,21 +47,46 @@ class TrainingSentimentDataset(Dataset):
         ]
         
         # Apply chat template
-        text = self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=False
-        )
+        try:
+            text = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=False
+            )
+        except Exception as e:
+            # Fallback: merge system into user if system role not supported
+            print(f"⚠️  Chat template failed for sample {i}, using fallback")
+            messages = [
+                {
+                    "role": "user",
+                    "content": f"{sample['system_prompt']}\n\n{sample['user_prompt']}"
+                },
+                {
+                    "role": "assistant",
+                    "content": json.dumps(sample["opinions"], ensure_ascii=False)
+                }
+            ]
+            text = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=False
+            )
         
-        return {"text": text}
+        conversations.append({"text": text})
+    
+    # Convert to HuggingFace Dataset
+    dataset = Dataset.from_list(conversations)
+    print(f"✅ Created HuggingFace Dataset: {len(dataset)} samples")
+    
+    return dataset
 
 
 def prepare_training_datasets(
     train_path: str,
-    eval_path: str,
+    eval_path: Optional[str],
     prompt_generator: Callable,
     tokenizer
-):
+) -> Tuple[Dataset, Optional[Dataset]]:
     """
     Prepare training and eval datasets.
     
@@ -76,10 +99,13 @@ def prepare_training_datasets(
     Returns:
         Tuple of (train_dataset, eval_dataset)
     """
-    train_ds = TrainingSentimentDataset(train_path, prompt_generator, tokenizer)
+    print("\n📊 Preparing Training Datasets")
+    print("="*70)
     
-    eval_ds = None
+    train_dataset = create_training_dataset(train_path, prompt_generator, tokenizer)
+    
+    eval_dataset = None
     if eval_path:
-        eval_ds = TrainingSentimentDataset(eval_path, prompt_generator, tokenizer)
+        eval_dataset = create_training_dataset(eval_path, prompt_generator, tokenizer)
     
-    return train_ds, eval_ds
+    return train_dataset, eval_dataset
