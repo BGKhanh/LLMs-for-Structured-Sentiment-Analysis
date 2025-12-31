@@ -5,7 +5,7 @@ import random
 from typing import Tuple, Literal, Optional, List, Dict, Any
 from torch.utils.data import Dataset
 from .base import BasePromptTemplate
-from .few_shot_CoT import FewShotCoTPrompt
+from .re2_pas_cot import Re2PaSCoTPrompt
 
 class ReReadingPrompt(BasePromptTemplate):
     """
@@ -69,8 +69,8 @@ class ReReadingPrompt(BasePromptTemplate):
                 self._load_examples_pool()
                 self._select_fixed_examples()
             elif self.add_method == "FewShot_CoT":
-                # Use hardcoded pool from FewShotCoTPrompt
-                pool = FewShotCoTPrompt.EXAMPLES_POOL_EN if self.eng else FewShotCoTPrompt.EXAMPLES_POOL_VI
+                # Use hardcoded pool from Re2PaSCoTPrompt
+                pool = Re2PaSCoTPrompt.EXAMPLES_POOL_EN if self.eng else Re2PaSCoTPrompt.EXAMPLES_POOL_VI
                 if len(pool) < self.n_shot:
                     print(f"⚠️ Warning: Requested {self.n_shot} shots but CoT pool only has {len(pool)}. Using all.")
                     self._selected_examples = pool
