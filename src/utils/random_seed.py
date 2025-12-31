@@ -26,9 +26,11 @@ def setup_reproducible_environment(seed: int = 42):
     torch.cuda.manual_seed_all(seed)  # For multi-GPU
     
     # Ensure deterministic behavior
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    if torch.cuda.is_available():
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
     
-    # Set environment variable for additional determinism
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    # STRICT deterministic
+    torch.use_deterministic_algorithms(True)
+
 

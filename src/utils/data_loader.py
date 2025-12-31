@@ -3,6 +3,8 @@ import json
 from typing import Dict, Any, List, Optional, Callable, Tuple
 from torch.utils.data import Dataset
 import torch
+import numpy as np
+import random
 
 
 class SentimentDataset(Dataset):
@@ -187,7 +189,13 @@ class SentimentCollator:
             "user_prompts": user_prompts       
         }
 
-
+def seed_worker(worker_id):
+    """
+    Worker init function to ensure reproducibility.
+    """
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
 
 # Helper function for easy DataLoader creation
 def create_sentiment_dataloader(
@@ -201,6 +209,7 @@ def create_sentiment_dataloader(
     add_generation_prompt: bool = True,
     chat_template_builder: Optional[Callable[[str, str], List[Dict[str, Any]]]] = None,
     enable_thinking: bool = False,
+    seed: int = 42,
 ):
     """
     Create DataLoader for sentiment analysis.
@@ -266,13 +275,19 @@ def create_sentiment_dataloader(
         enable_thinking=enable_thinking
     )
     
+    # Create generator for reproducibility
+    g = torch.Generator()
+    g.manual_seed(seed)
+    
     dataloader = DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
         collate_fn=collator,
-        pin_memory=True  # For faster GPU transfer
+        pin_memory=True,  # For faster GPU transfer
+        worker_init_fn=seed_worker,
+        generator=g
     )
     
     return dataloader

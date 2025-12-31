@@ -777,7 +777,8 @@ class HFInferencePipeline:
             batch_size=self.config.data.batch_size,
             num_workers=self.config.data.num_workers,
             chat_template_builder=self.model.chat_template_builder,
-            enable_thinking=self.config.model.generation_args.enable_thinking
+            enable_thinking=self.config.model.generation_args.enable_thinking,
+            seed=self.config.random_seed
         )
 
         if self.config.data.num_samples is not None and self.config.data.num_samples > 0:
@@ -1025,7 +1026,8 @@ class HFInferencePipeline:
             num_workers=self.config.data.num_workers,
             preloaded_data=self.dataset,  # cùng subset/thứ tự như Stage 1
             chat_template_builder=self.model.chat_template_builder,
-            enable_thinking=self.config.model.generation_args.enable_thinking
+            enable_thinking=self.config.model.generation_args.enable_thinking,
+            seed=self.config.random_seed
         )
 
         total_samples = len(stage2_dataloader.dataset)
