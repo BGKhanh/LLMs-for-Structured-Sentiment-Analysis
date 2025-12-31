@@ -6,15 +6,15 @@ random_seed: 42
 
 
 experiment:
-  name: "Re2_FewShot_experiment_benchmark_1"
-  description: "Re-reading + Few-shot technique, experiment 1, n-shot = 1, GemmaModel, num_samples = 100"
+  name: "Re2_FewShot_experiment_1"
+  description: "Re-reading + Few-shot technique, experiment 1, n-shot = 1, SeaLLModel"
   version: "1.0"
 
 model:
   # === MODEL LOADING ===
-  name: "gemma"
+  name: "seallm"
   init_args:
-    model_id: "google/gemma-3-4b-it"
+    model_id: "SeaLLMs/SeaLLMs-v3-7B-Chat"
     dtype: "bfloat16"
     device_map: "auto"
     trust_remote_code: true
@@ -30,13 +30,13 @@ model:
 
 data:
   dataset: "dev"   # one of [train, dev, test]
-  train_dataset_path: "data/vitoed_new/test.json"
-  dev_dataset_path: "data/vitoed_new/dev.json"
-  test_dataset_path: "data/vitoed_new/test.json"
+  train_dataset_path: "data/train.json"
+  dev_dataset_path: "data/dev.json"
+  test_dataset_path: "data/test.json"
 
   examples_pool: "train" # Pool to pick the 1 shot from
   batch_size: 16
-  num_samples: 100 # Run all samples
+  num_samples: null # Run all samples
   num_workers: 8
 
 prompt:
@@ -48,7 +48,7 @@ prompt:
   add_method: "FewShot" # Re-reading + Few-shot (from file)
 
 output:
-  output_dir: "results/benchmark"
+  output_dir: "results/"
   output_file: "results.json"
   save_metadata: true
   save_config_copy: true

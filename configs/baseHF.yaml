@@ -150,7 +150,7 @@ output:
 # model:
 #   name: "qwen"
 #   model_id: "Qwen/Qwen2.5-7B-Instruct"
-#   max_new_tokens: 1024
+#   max_new_tokens: 2048
 # prompt:
 #   technique: "few_shot"
 #   language: "en"

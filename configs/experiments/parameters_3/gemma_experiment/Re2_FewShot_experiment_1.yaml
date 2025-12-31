@@ -6,8 +6,8 @@ random_seed: 42
 
 
 experiment:
-  name: "Re2_FewShot_experiment_benchmark_1"
-  description: "Re-reading + Few-shot technique, experiment 1, n-shot = 1, GemmaModel, num_samples = 100"
+  name: "Re2_FewShot_experiment_1"
+  description: "Re-reading + Few-shot technique, experiment 1, n-shot = 1, generation parameters 3"
   version: "1.0"
 
 model:
@@ -23,20 +23,22 @@ model:
   # === GENERATION PARAMETERS ===
   generation_args:
     max_new_tokens: 2048
-    do_sample: false
-    temperature: 0.1
-    top_p: 0.95
-    top_k: 50
+    do_sample: true
+    temperature: 0.7
+    top_p: 0.8
+    top_k: 20
+    min_p: 0.0
+    enable_thinking: true
 
 data:
   dataset: "dev"   # one of [train, dev, test]
-  train_dataset_path: "data/vitoed_new/test.json"
+  train_dataset_path: "data/vitoed_new/train.json"
   dev_dataset_path: "data/vitoed_new/dev.json"
   test_dataset_path: "data/vitoed_new/test.json"
 
   examples_pool: "train" # Pool to pick the 1 shot from
   batch_size: 16
-  num_samples: 100 # Run all samples
+  num_samples: null # Run all samples
   num_workers: 8
 
 prompt:
@@ -48,7 +50,7 @@ prompt:
   add_method: "FewShot" # Re-reading + Few-shot (from file)
 
 output:
-  output_dir: "results/benchmark"
+  output_dir: "results/"
   output_file: "results.json"
   save_metadata: true
   save_config_copy: true

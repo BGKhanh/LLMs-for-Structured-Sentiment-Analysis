@@ -6,13 +6,13 @@ random_seed: 42
 
 
 experiment:
-  name: "Re2_FewShot_experiment_benchmark_1"
-  description: "Re-reading + Few-shot technique, experiment 1, n-shot = 1, GemmaModel, num_samples = 100"
+  name: "RE2_PaS_CoT_experiment_2"
+  description: "Re-reading + Plan and Solve + Chain-of-Though technique, experiment 2, n-shot = 2, generation parameters 2"
   version: "1.0"
 
 model:
   # === MODEL LOADING ===
-  name: "gemma"
+  name: "gemma"  # one of [gemma, mistral, qwen, llama]
   init_args:
     model_id: "google/gemma-3-4b-it"
     dtype: "bfloat16"
@@ -22,33 +22,33 @@ model:
 
   # === GENERATION PARAMETERS ===
   generation_args:
-    max_new_tokens: 2048
-    do_sample: false
+    max_new_tokens: 4096
+    do_sample: true
     temperature: 0.1
     top_p: 0.95
     top_k: 50
 
 data:
   dataset: "dev"   # one of [train, dev, test]
-  train_dataset_path: "data/vitoed_new/test.json"
+  train_dataset_path: "data/vitoed_new/train.json"
   dev_dataset_path: "data/vitoed_new/dev.json"
   test_dataset_path: "data/vitoed_new/test.json"
 
-  examples_pool: "train" # Pool to pick the 1 shot from
+  examples_pool: "train"
   batch_size: 16
-  num_samples: 100 # Run all samples
+  num_samples: null   # null = use all samples
   num_workers: 8
 
 prompt:
-  technique: "rereading"
+  technique: "re2_pas_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
   language: "vi"
-  n_shot: 1   
+  n_shot: 2                # just for few-shot and few-shot CoT technique
   examples_pool_path: null
-  plus_mode: false       
-  add_method: "FewShot" # Re-reading + Few-shot (from file)
+  plus_mode: false         # just for plan-and-solve technique
+  add_method: "none"        # just for rereading technique
 
 output:
-  output_dir: "results/benchmark"
+  output_dir: "results/"
   output_file: "results.json"
   save_metadata: true
   save_config_copy: true
