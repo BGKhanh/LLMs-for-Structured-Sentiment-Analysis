@@ -139,6 +139,21 @@ def _save_json(file_path: Path, data: Any, label: str) -> None:
     except Exception as e:
         raise OSError(f"Failed to save {label} to {file_path}: {e}")
 
+def get_cpu_model_name():
+    """
+    Get the model name of the CPU.
+    
+    Returns:
+        The model name of the CPU or None if not found.
+    """
+    try:
+        with open("/proc/cpuinfo") as f:
+            for line in f:
+                if "model name" in line:
+                    return line.split(":")[1].strip()
+    except Exception:
+        pass
+    return None
 
 def _build_metadata(
     config: 'Config',
@@ -170,7 +185,7 @@ def _build_metadata(
         "release": platform.release(),           # Kernel version
         "version": platform.version(),           # OS version details
         "machine": platform.machine(),           # e.g., 'x86_64'
-        "processor": platform.processor(),       # CPU model name
+        "processor": get_cpu_model_name(),       # CPU model name
         "architecture": platform.architecture()[0], # e.g., '64bit'
         "platform_details": platform.platform()  # Comprehensive string
     }
