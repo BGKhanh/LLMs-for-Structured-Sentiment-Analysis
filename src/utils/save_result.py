@@ -16,6 +16,9 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import sys
+import platform
+import psutil
+import os
 
 
 def save_experiment_results(
@@ -143,10 +146,7 @@ def _build_metadata(
     statistics: Optional[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
-    Build metadata dictionary (SIMPLIFIED - runtime info only).
-    
-    Rationale: Config info is redundant since config.json is saved.
-    Only save runtime-specific information here.
+    Build metadata dictionary containing runtime info, system specs, and library versions.
     
     Args:
         config: Config object
@@ -154,7 +154,7 @@ def _build_metadata(
         statistics: Optional statistics from pipeline
         
     Returns:
-        Metadata dictionary with runtime info only
+        Metadata dictionary with detailed environment info
     """
     import torch
     import transformers
@@ -163,23 +163,107 @@ def _build_metadata(
     if statistics is None:
         statistics = _calculate_statistics(results)
     
-    # Build metadata
+    # 1. System Info (using platform)
+    system_info = {
+        "system": platform.system(),             # e.g., 'Linux', 'Windows'
+        "node": platform.node(),                 # Hostname
+        "release": platform.release(),           # Kernel version
+        "version": platform.version(),           # OS version details
+        "machine": platform.machine(),           # e.g., 'x86_64'
+        "processor": platform.processor(),       # CPU model name
+        "architecture": platform.architecture()[0], # e.g., '64bit'
+        "platform_details": platform.platform()  # Comprehensive string
+    }
+    
+    # 2. Python Environment
+    python_info = {
+        "version": platform.python_version(),
+        "implementation": platform.python_implementation(), # CPython, PyPy
+        "compiler": platform.python_compiler(),
+        "build": platform.python_build()
+    }
+
+    # 3. Hardware Resources (using psutil)
+    hardware_info = {}
+    try:
+        import psutil
+        # CPU
+        freq = psutil.cpu_freq()
+        hardware_info["cpu"] = {
+            "physical_cores": psutil.cpu_count(logical=False),
+            "logical_cores": psutil.cpu_count(logical=True),
+            "max_frequency_mhz": f"{freq.max:.2f}" if freq else "N/A",
+            "current_frequency_mhz": f"{freq.current:.2f}" if freq else "N/A"
+        }
+        
+        # Memory (RAM)
+        vm = psutil.virtual_memory()
+        hardware_info["memory"] = {
+            "total_gb": round(vm.total / (1024**3), 2),
+            "available_gb": round(vm.available / (1024**3), 2),
+            "used_percent": vm.percent
+        }
+        
+        # Swap Memory
+        swap = psutil.swap_memory()
+        hardware_info["swap"] = {
+            "total_gb": round(swap.total / (1024**3), 2),
+            "used_percent": swap.percent
+        }
+        
+        # Disk Usage (Current Directory)
+        disk = psutil.disk_usage('.')
+        hardware_info["disk"] = {
+            "total_gb": round(disk.total / (1024**3), 2),
+            "free_gb": round(disk.free / (1024**3), 2),
+            "used_percent": disk.percent
+        }
+    except ImportError:
+        hardware_info["error"] = "psutil module not installed. Install it for detailed hardware stats."
+    except Exception as e:
+        hardware_info["error"] = f"Error retrieving hardware stats: {str(e)}"
+
+    # 4. GPU Info
+    gpu_info = {
+        "cuda_available": torch.cuda.is_available(),
+        "cuda_version": torch.version.cuda if torch.cuda.is_available() else None,
+        "cudnn_version": torch.backends.cudnn.version() if torch.cuda.is_available() else None,
+        "device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
+        "devices": []
+    }
+    
+    if torch.cuda.is_available():
+        for i in range(gpu_info["device_count"]):
+            try:
+                props = torch.cuda.get_device_properties(i)
+                gpu_info["devices"].append({
+                    "id": i,
+                    "name": props.name,
+                    "total_memory_gb": round(props.total_memory / (1024**3), 2),
+                    "capability": f"{props.major}.{props.minor}",
+                    "multi_processor_count": getattr(props, "multi_processor_count", "N/A")
+                })
+            except Exception:
+                gpu_info["devices"].append({"id": i, "error": "Unknown device"})
+
+    # 5. Libraries Versions
+    libraries_info = {
+        "torch": torch.__version__,
+        "transformers": transformers.__version__,
+    }
+
+    # Final Assembly
     metadata = {
-        # Timestamp (unique to this run)
         "timestamp": datetime.now().isoformat(),
-        
-        # Statistics (runtime metrics)
+        "experiment_name": config.experiment.name,
+        "model_name": config.model.name,
         "statistics": statistics,
-        
-        # Environment info (runtime environment)
         "environment": {
-            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
-            "torch_version": torch.__version__,
-            "transformers_version": transformers.__version__,
-            "cuda_available": torch.cuda.is_available(),
-            "cuda_version": torch.version.cuda if torch.cuda.is_available() else None,
-            "gpu_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
-            "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() and torch.cuda.device_count() > 0 else None,
+            "system": system_info,
+            "python": python_info,
+            "hardware": hardware_info,
+            "gpu": gpu_info,
+            "libraries": libraries_info
         }
     }
     
