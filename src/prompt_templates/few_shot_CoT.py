@@ -157,9 +157,8 @@ FORMAT JSON OUTPUT:
             prompt_parts.append("\nBây giờ, hãy phân tích trường hợp sau:\n")
             
         # 2. Input
-        input_section = f"""Input: "{text}" (sent_id: {sent_id})
-
-Hãy suy luận từng bước một, sau đó trả về JSON cuối cùng."""
+        input_section = f"""Input: "{text}" (sent_id: {sent_id})"""
+        
         prompt_parts.append(input_section)
         
         return "".join(prompt_parts)
