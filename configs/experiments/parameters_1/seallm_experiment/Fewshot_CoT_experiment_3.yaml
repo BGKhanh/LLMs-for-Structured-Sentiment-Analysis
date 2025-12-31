@@ -15,9 +15,10 @@ model:
   name: "seallm"  # one of [gemma, mistral, qwen, llama]
   init_args:
     model_id: "SeaLLMs/SeaLLMs-v3-7B-Chat"
-    dtype: "float16"
+    dtype: "bfloat16"
     device_map: "auto"
     trust_remote_code: true
+    attn_implementation: "flash_attention_2"
 
   # === GENERATION PARAMETERS ===
   generation_args:
@@ -26,19 +27,18 @@ model:
     temperature: 0.1
     top_p: 0.95
     top_k: 50
-    enable_thinking: true
 
 
 data:
   dataset: "dev"   # one of [train, dev, test]
-  train_dataset_path: "/kaggle/input/vitoed/train.json"
-  dev_dataset_path: "/kaggle/input/vitoed/dev.json"
-  test_dataset_path: "/kaggle/input/vitoed/test.json"
+  train_dataset_path: "data/vitoed_new/train.json"
+  dev_dataset_path: "data/vitoed_new/dev.json"
+  test_dataset_path: "data/vitoed_new/test.json"
 
   examples_pool: "train"
-  batch_size: 8
+  batch_size: 16
   num_samples: null   # null = use all samples
-  num_workers: 2
+  num_workers: 8
 
 prompt:
   technique: "few_shot_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
