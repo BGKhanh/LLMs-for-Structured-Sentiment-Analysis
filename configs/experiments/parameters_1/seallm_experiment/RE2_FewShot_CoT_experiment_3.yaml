@@ -7,7 +7,7 @@ random_seed: 42
 
 experiment:
   name: "Re2_FewShot_CoT_experiment_3"
-  description: "Re-reading + Few-shot CoT technique, experiment 3, n-shot = 3, GemmaModel"
+  description: "Re-reading + Few-shot CoT technique, experiment 3, n-shot = 3, SeaLLMs/SeaLLMs-v3-7B-Chat"
   version: "1.0"
 
 model:
