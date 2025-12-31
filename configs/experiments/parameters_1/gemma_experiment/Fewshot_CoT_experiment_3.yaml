@@ -6,18 +6,19 @@ random_seed: 42
 
 
 experiment:
-  name: "Gemma_Fewshot_CoT_experiment_3"
-  description: "Few-shot CoT technique, n-shot = 3, google/gemma-3-4b-it"
-  version: "1.0"
+  name: "Fewshot_CoT_experiment_3"
+  description: "Few-shot CoT technique, experiment 3, n-shot = 3"
+  version: "3.0"
 
 model:
   # === MODEL LOADING ===
   name: "gemma"  # one of [gemma, mistral, qwen, llama]
   init_args:
     model_id: "google/gemma-3-4b-it"
-    dtype: "float16"
+    dtype: "bfloat16"
     device_map: "auto"
     trust_remote_code: true
+    attn_implementation: "flash_attention_2"
 
   # === GENERATION PARAMETERS ===
   generation_args:
@@ -26,7 +27,6 @@ model:
     temperature: 0.1
     top_p: 0.95
     top_k: 50
-    enable_thinking: true
 
 
 data:
@@ -36,9 +36,9 @@ data:
   test_dataset_path: "/kaggle/input/vitoed/test.json"
 
   examples_pool: "train"
-  batch_size: 8
+  batch_size: 16
   num_samples: null   # null = use all samples
-  num_workers: 2
+  num_workers: 8
 
 prompt:
   technique: "few_shot_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
