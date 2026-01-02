@@ -6,8 +6,8 @@ random_seed: 42
 
 
 experiment:
-  name: "RE2_Zero_shot_CoT_experiment_benchmark_1"
-  description: "Re-reading + zero-shot Chain-of-Though technique, experiment 1, GemmaModel, num_samples = 100"
+  name: "RE2_PaS_CoT_experiment_1"
+  description: "Re-reading + Plan and Solve + Chain-of-Though technique, experiment 1, n-shot = 1, generation parameters 4"
   version: "1.0"
 
 model:
@@ -19,37 +19,36 @@ model:
     device_map: "auto"
     trust_remote_code: true
     attn_implementation: "flash_attention_2"
-
   # === GENERATION PARAMETERS ===
   generation_args:
-    max_new_tokens: 2048
-    do_sample: false
-    temperature: 0.1
+    max_new_tokens: 4096
+    do_sample: true
+    temperature: 1.0
     top_p: 0.95
-    top_k: 50
-
+    top_k: 64
+    min_p: 0.0
 
 data:
   dataset: "dev"   # one of [train, dev, test]
-  train_dataset_path: "data/vitoed_new/test.json"
+  train_dataset_path: "data/vitoed_new/train.json"
   dev_dataset_path: "data/vitoed_new/dev.json"
   test_dataset_path: "data/vitoed_new/test.json"
 
   examples_pool: "train"
   batch_size: 16
-  num_samples: 100   # null = use all samples
+  num_samples: null   # null = use all samples
   num_workers: 8
 
 prompt:
-  technique: "rereading"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
+  technique: "re2_pas_cot"   # rereading | few_shot | few_shot_cot | zero_shot_cot | plan_and_solve
   language: "vi"
-  n_shot: 0                # just for few-shot and few-shot CoT technique
+  n_shot: 1                # just for few-shot and few-shot CoT technique
   examples_pool_path: null
   plus_mode: false         # just for plan-and-solve technique
-  add_method: "0_CoT"        # just for rereading technique
+  add_method: "none"        # just for rereading technique
 
 output:
-  output_dir: "results/benchmark"
+  output_dir: "results/"
   output_file: "results.json"
   save_metadata: true
   save_config_copy: true
