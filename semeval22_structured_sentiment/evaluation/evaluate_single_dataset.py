@@ -7,6 +7,7 @@ def main():
     parser.add_argument("gold_file", help="gold json file")
     parser.add_argument("pred_file", help="prediction json file")
     parser.add_argument("--exclude_file", help="path to json file containing sent_ids to exclude", default=None)
+    parser.add_argument("--num_exclude", help="ids to exclude", default=None)
     parser.add_argument("--num_samples", type=int, help="number of samples to evaluate (from the beginning)", default=None)
 
     args = parser.parse_args()
@@ -25,7 +26,7 @@ def main():
     if args.exclude_file:
         with open(args.exclude_file, encoding="utf-8") as f:
             exclude_ids = json.load(f)
-            sliced_ids = exclude_ids[:17]
+            sliced_ids = exclude_ids[:args.num_exclude]
             print(sliced_ids)
             exclude_set = {str(x) for x in sliced_ids}
             
