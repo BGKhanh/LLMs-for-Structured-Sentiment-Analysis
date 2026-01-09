@@ -131,37 +131,25 @@ def postprocess_response(
         return json.dumps(default_result, ensure_ascii=False, indent=2)
  
     
-def extract_json_from_response(
-    raw_response: str,
-    model_type: str = "generic"
-) -> str:
+def extract_json_from_response(raw_response: str) -> str:
     """
-    Extract JSON from model's raw response (model-agnostic with model-specific preprocessing).
+    Extract JSON from model's raw response (generic extraction).
     
     Args:
         raw_response: Raw text from model
-        model_type: "gemma", "qwen", or "generic" (for special preprocessing)
     
     Returns:
         Extracted JSON string
+    
+    Example:
+        >>> json_str = extract_json_from_response(raw_output)
+        >>> parsed = json.loads(json_str)
     """
-    response = raw_response
+    import re
     
-    # === Model-specific preprocessing ===
-    if model_type == "gemma":
-        # Remove Gemma assistant markers
-        for marker in ["assistant:", "assistant", "<assistant>"]:
-            if marker in response:
-                response = response.split(marker, 1)[1].strip()
+    response = raw_response.strip()
     
-    elif model_type == "qwen":
-        # Remove Qwen thinking tokens
-        response = re.sub(r"<think>[\s\S]*?</think>\s*", "", response, flags=re.DOTALL)
-        if "<|thought|>" in response:
-            response = response.split("<|thought|>")[-1].strip()
-    
-    # === Generic extraction (works for all models) ===
-    # Strategy 1: Extract from ...     
+    # Strategy 1: Extract from ... ``` code blocks
     match = re.search(r'\s*([\s\S]*?)\s*```', response, re.DOTALL)
     if match:
         candidate = match.group(1).strip()
@@ -171,7 +159,17 @@ def extract_json_from_response(
         except json.JSONDecodeError:
             pass
     
-    # Strategy 2: Brace matching for first valid JSON
+    # Strategy 2: Extract from ``` ... ``` (without json tag)
+    match = re.search(r'```\s*([\s\S]*?)\s*```', response, re.DOTALL)
+    if match:
+        candidate = match.group(1).strip()
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            pass
+    
+    # Strategy 3: Brace matching for first valid JSON object
     first_brace = response.find('{')
     if first_brace != -1:
         open_braces = 0
@@ -188,5 +186,7 @@ def extract_json_from_response(
                     except json.JSONDecodeError:
                         break
     
-    # Strategy 3: Fallback - clean markdown
-    return response.replace('', '').replace('```', '').strip()
+    # Strategy 4: Fallback - clean markdown and return
+    cleaned = response.replace('', '').replace('```', '').strip()
+    return cleaned
+

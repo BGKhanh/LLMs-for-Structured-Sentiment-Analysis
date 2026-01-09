@@ -61,38 +61,46 @@ class VLLMModel:
     
     def cleanup(self) -> None:
         print("🧹 Starting vLLM cleanup...")
-        if hasattr(self, 'llm'):
-            del self.llm
-            self.llm = None
-        
-        if hasattr(self, 'sampling_params'):
-            del self.sampling_params
 
-        gc.collect()
+        # 1) vLLM shutdown (frees workers, KV cache, graphs)
+        if hasattr(self, "llm") and self.llm is not None:
+            try:
+                self.llm.shutdown()
+            except Exception as e:
+                print(f"⚠️ vLLM shutdown failed: {e}")
 
+        # 2) destroy model-parallel / distributed
         try:
             destroy_model_parallel()
-        except ImportError:
-            print("⚠️ Warning: Could not import destroy_model_parallel")
-        except Exception as e:
-            print(f"⚠️ Warning during distributed cleanup: {e}")
-            
+        except Exception:
+            pass
+
         try:
             destroy_distributed_environment()
         except Exception:
             pass
 
-        # 4. Dọn dẹp GPU Cache & IPC
+        # 3) remove refs & GC
+        if hasattr(self, "llm"):
+            del self.llm
+            self.llm = None
+        if hasattr(self, "sampling_params"):
+            del self.sampling_params
+
+        import gc
+        gc.collect()
+
+        # 4) CUDA cleanup
+        import torch
         if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            torch.cuda.synchronize()
-            
+            torch.cuda.empty_cache()      # reduce fragmentation (but not magically free reserved)
             try:
-                torch.cuda.ipc_collect()
+                torch.cuda.ipc_collect() # helpful if CUDA IPC was used
             except Exception:
                 pass
-                
-        print("✨ GPU memory cleanup completed!")
+
+        print("✨ vLLM cleanup completed!")
+
         
     def get_model_info(self) -> Dict[str, Any]:
         """Get model information."""
