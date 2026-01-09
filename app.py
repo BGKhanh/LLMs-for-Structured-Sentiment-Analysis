@@ -368,10 +368,10 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
                     json_output = gr.JSON()
                 
                 with gr.TabItem("📥 Full Input"):
-                    full_input_output = gr.Textbox(lines=15, show_copy_button=True)
+                    full_input_output = gr.Textbox(lines=15, max_lines=20)
                 
                 with gr.TabItem("🤖 Raw Response"):
-                    raw_response_output = gr.Textbox(lines=15, show_copy_button=True)
+                    raw_response_output = gr.Textbox(lines=15, max_lines=20)
                 
                 with gr.TabItem("ℹ️ Metadata"):
                     metadata_output = gr.Markdown()
