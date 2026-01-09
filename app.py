@@ -14,6 +14,7 @@ sys.path.append(os.getcwd())
 from src.demo.utils import convert_ssa_to_spacy
 from src.model.HFModel import HFModel
 from src.utils.postprocessing import postprocess_response
+from src.utils.random_seed import setup_reproducible_environment
 
 # Import prompt templates
 from src.prompt_templates import *
@@ -60,13 +61,28 @@ EXAMPLES_POOL_OPTIONS = {
 
 # === DEMO MANAGER CLASS ===
 class DemoManager:
-    def __init__(self):
+    def __init__(self, seed=42):
+        self.seed = seed
+        self.setup_seed(seed)
+        
         self.model = None
         self.current_model_name = None
         self.prompt_template = None
         self.current_prompt_config = None
         self.history = []
-        
+    
+    def setup_seed(self, seed):
+        """Setup reproducible environment with given seed."""
+        try:
+            setup_reproducible_environment(seed=seed)
+            self.seed = seed
+            print(f"✅ Reproducible environment initialized with seed={seed}")
+            return f"✅ Random seed set to {seed}"
+        except Exception as e:
+            error_msg = f"⚠️ Warning: Could not set deterministic mode: {str(e)}"
+            print(error_msg)
+            return error_msg
+            
     def load_model(self, model_name):
         """Load HFModel."""
         if self.current_model_name == model_name and self.model is not None:
