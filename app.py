@@ -5,6 +5,7 @@ import json
 import time
 import os
 import sys
+import inspect
 from datetime import datetime
 from pathlib import Path
 
@@ -20,9 +21,23 @@ from src.utils.random_seed import setup_reproducible_environment
 from src.prompt_templates import *
 
 # === PARAMETER REGISTRY ===
-from transformers import GenerationConfig, AutoConfig
+from transformers import GenerationConfig, AutoModelForCausalLM
 
-# Build generation param registry
+# Auto-discover init params from from_pretrained()
+INIT_PARAM_REGISTRY = {}
+try:
+    sig = inspect.signature(AutoModelForCausalLM.from_pretrained)
+    for param_name, param in sig.parameters.items():
+        if param_name not in ['pretrained_model_name_or_path', 'args', 'kwargs']:
+            default_val = param.default if param.default != inspect.Parameter.empty else None
+            INIT_PARAM_REGISTRY[param_name] = {
+                "default": default_val,
+                "type": type(default_val).__name__ if default_val is not None else "NoneType"
+            }
+except Exception as e:
+    print(f"Warning: Could not build init param registry: {e}")
+
+# Auto-discover generation params from GenerationConfig
 GENERATION_PARAM_REGISTRY = {}
 try:
     gen_config = GenerationConfig()
@@ -34,15 +49,6 @@ try:
             }
 except Exception as e:
     print(f"Warning: Could not build generation registry: {e}")
-
-# Common init params (manually curated for safety)
-INIT_PARAM_REGISTRY = {
-    "attn_implementation": {"default": None, "type": "str", "choices": [None, "flash_attention_2", "sdpa", "eager"]},
-    "torch_dtype": {"default": None, "type": "str", "choices": [None, "float16", "bfloat16", "float32"]},
-    "low_cpu_mem_usage": {"default": True, "type": "bool"},
-    "use_cache": {"default": True, "type": "bool"},
-    "rope_scaling": {"default": None, "type": "dict"},
-}
 
 # === GLOBAL CONFIG ===
 DEFAULT_MODEL_SUGGESTIONS = [
@@ -80,67 +86,71 @@ class DemoManager:
         self.active_gen_extra_args = {}
     
     # === EXTRA ARGS MANAGEMENT ===
-    def add_init_param(self, param_name):
-        """Add init param to active list."""
-        if not param_name or param_name in self.active_init_extra_args:
-            return self.render_init_extra_args()
+    def add_init_param(self, param_name, value_str):
+        """Add/update init param."""
+        if not param_name:
+            return self.get_init_extra_list(), self.render_init_extra_args()
         
-        if param_name in INIT_PARAM_REGISTRY:
-            self.active_init_extra_args[param_name] = INIT_PARAM_REGISTRY[param_name]["default"]
+        # Parse value
+        try:
+            # Try to parse as JSON for proper type conversion
+            value = json.loads(value_str)
+        except:
+            # If not JSON, use as string
+            value = value_str if value_str else None
         
-        return self.render_init_extra_args()
+        self.active_init_extra_args[param_name] = value
+        return self.get_init_extra_list(), self.render_init_extra_args()
     
     def remove_init_param(self, param_name):
-        """Remove init param from active list."""
-        self.active_init_extra_args.pop(param_name, None)
-        return self.render_init_extra_args()
-    
-    def update_init_param_value(self, param_name, value):
-        """Update init param value."""
+        """Remove init param."""
         if param_name in self.active_init_extra_args:
-            self.active_init_extra_args[param_name] = value
-        return self.render_init_extra_args()
+            self.active_init_extra_args.pop(param_name)
+        return self.get_init_extra_list(), self.render_init_extra_args()
     
-    def add_gen_param(self, param_name):
-        """Add generation param to active list."""
-        if not param_name or param_name in self.active_gen_extra_args:
-            return self.render_gen_extra_args()
+    def add_gen_param(self, param_name, value_str):
+        """Add/update generation param."""
+        if not param_name:
+            return self.get_gen_extra_list(), self.render_gen_extra_args()
         
-        if param_name in GENERATION_PARAM_REGISTRY:
-            self.active_gen_extra_args[param_name] = GENERATION_PARAM_REGISTRY[param_name]["default"]
+        # Parse value
+        try:
+            value = json.loads(value_str)
+        except:
+            value = value_str if value_str else None
         
-        return self.render_gen_extra_args()
+        self.active_gen_extra_args[param_name] = value
+        return self.get_gen_extra_list(), self.render_gen_extra_args()
     
     def remove_gen_param(self, param_name):
-        """Remove generation param from active list."""
-        self.active_gen_extra_args.pop(param_name, None)
-        return self.render_gen_extra_args()
-    
-    def update_gen_param_value(self, param_name, value):
-        """Update generation param value."""
+        """Remove generation param."""
         if param_name in self.active_gen_extra_args:
-            self.active_gen_extra_args[param_name] = value
-        return self.render_gen_extra_args()
+            self.active_gen_extra_args.pop(param_name)
+        return self.get_gen_extra_list(), self.render_gen_extra_args()
+    
+    def get_init_extra_list(self):
+        """Get list of active init params for display."""
+        if not self.active_init_extra_args:
+            return []
+        return [[k, str(v)] for k, v in self.active_init_extra_args.items()]
+    
+    def get_gen_extra_list(self):
+        """Get list of active gen params for display."""
+        if not self.active_gen_extra_args:
+            return []
+        return [[k, str(v)] for k, v in self.active_gen_extra_args.items()]
     
     def render_init_extra_args(self):
-        """Render active init extra args as markdown."""
+        """Render summary of init extra args."""
         if not self.active_init_extra_args:
-            return "_No extra init args added_"
-        
-        lines = ["**Active Extra Init Args:**\n"]
-        for name, value in self.active_init_extra_args.items():
-            lines.append(f"• `{name}`: {value}")
-        return "\n".join(lines)
+            return "_No extra init args_"
+        return f"**{len(self.active_init_extra_args)} extra init arg(s) active**"
     
     def render_gen_extra_args(self):
-        """Render active gen extra args as markdown."""
+        """Render summary of gen extra args."""
         if not self.active_gen_extra_args:
-            return "_No extra generation args added_"
-        
-        lines = ["**Active Extra Generation Args:**\n"]
-        for name, value in self.active_gen_extra_args.items():
-            lines.append(f"• `{name}`: {value}")
-        return "\n".join(lines)
+            return "_No extra generation args_"
+        return f"**{len(self.active_gen_extra_args)} extra gen arg(s) active**"
     
     # === MODEL MANAGEMENT ===
     def load_model(self, model_name, dtype, device_map, trust_remote_code):
@@ -149,12 +159,15 @@ class DemoManager:
             return f"✅ Model '{model_name}' already loaded."
         
         try:
-            # Build init args with extra params
+            # Convert trust_remote_code
+            trust_rc = None if trust_remote_code == "None" else (trust_remote_code == "True")
+            
+            # Build init args
             init_args = {
                 "model_id": model_name,
                 "dtype": dtype,
                 "device_map": device_map,
-                "trust_remote_code": trust_remote_code,
+                "trust_remote_code": trust_rc,
                 **self.active_init_extra_args
             }
             
@@ -174,7 +187,10 @@ class DemoManager:
             self.model.load_model()
             self.current_model_name = model_name
             
-            extra_info = f"\n🔧 Extra init args: {list(self.active_init_extra_args.keys())}" if self.active_init_extra_args else ""
+            extra_info = ""
+            if self.active_init_extra_args:
+                extra_info = f"\n🔧 Extra args: {', '.join(self.active_init_extra_args.keys())}"
+            
             return f"✅ Model '{model_name}' loaded!{extra_info}"
             
         except Exception as e:
@@ -182,26 +198,31 @@ class DemoManager:
             traceback.print_exc()
             return f"❌ Error: {str(e)}"
     
-    def update_generation_params(self, max_tokens, do_sample, temperature, top_p, top_k):
-        """Update generation params WITHOUT reloading model."""
+    def update_generation_params(self, max_tokens, temperature, top_p, top_k, do_sample):
+        """Update generation params."""
         if not self.model:
             return "⚠️ Load model first!"
         
         try:
-            # Build generation args with extra params
+            # Convert do_sample
+            do_sample_val = None if do_sample == "None" else (do_sample == "True")
+            
             gen_args = {
                 "max_new_tokens": int(max_tokens),
-                "do_sample": do_sample,
                 "temperature": float(temperature),
                 "top_p": float(top_p),
                 "top_k": int(top_k),
+                "do_sample": do_sample_val,
                 **self.active_gen_extra_args
             }
             
             self.model_config["generation_args"] = gen_args
             self.model.config = self.model_config
             
-            extra_info = f"\n🔧 Extra gen args: {list(self.active_gen_extra_args.keys())}" if self.active_gen_extra_args else ""
+            extra_info = ""
+            if self.active_gen_extra_args:
+                extra_info = f"\n🔧 Extra args: {', '.join(self.active_gen_extra_args.keys())}"
+            
             return f"✅ Generation params updated!{extra_info}"
             
         except Exception as e:
@@ -311,12 +332,7 @@ class DemoManager:
                 "time": metadata["timestamp"],
                 "config": config_str,
                 "exec": f"{exec_time:.2f}s",
-                "text": text,
-                "system_prompt": system_prompt,
-                "user_prompt": user_prompt,
-                "raw_response": raw_response,
-                "result": result,
-                "metadata": metadata
+                "text": text
             })
             
             full_input = f"**System Prompt:**\n{system_prompt}\n\n**User Prompt:**\n{user_prompt}"
@@ -340,8 +356,8 @@ demo_mgr = DemoManager(seed=42)
 with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 🧠 Structured Sentiment Analysis Demo")
     
-    # === MODEL SETUP & GENERATION PARAMS (SIDE BY SIDE) ===
-    with gr.Row(equal_height=True):
+    # === MODEL SETUP & GENERATION PARAMS ===
+    with gr.Row(equal_height=False):
         # LEFT: Model Setup
         with gr.Column(scale=1):
             gr.Markdown("### 🔧 Model Setup\n_Load once per session_")
@@ -358,22 +374,43 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
                 value="auto", 
                 label="dtype"
             )
+            
             device_map_input = gr.Textbox(value="auto", label="device_map")
-            trust_remote_code_check = gr.Checkbox(value=True, label="trust_remote_code")
+            
+            trust_remote_code_dropdown = gr.Dropdown(
+                choices=["True", "False", "None"],
+                value="True",
+                label="trust_remote_code"
+            )
             
             # Extra Init Args
             gr.Markdown("**Extra Init Args**")
-            init_param_search = gr.Dropdown(
-                choices=list(INIT_PARAM_REGISTRY.keys()),
-                label="🔍 Search parameter",
-                value=None
-            )
+            with gr.Row():
+                init_param_search = gr.Dropdown(
+                    choices=sorted(list(INIT_PARAM_REGISTRY.keys())),
+                    label="🔍 Parameter",
+                    value=None,
+                    scale=2
+                )
+                init_param_value = gr.Textbox(
+                    label="Value", 
+                    placeholder="e.g., flash_attention_2 or true",
+                    scale=2
+                )
+            
             with gr.Row():
                 add_init_btn = gr.Button("➕ Add", size="sm", scale=1)
-                init_param_value = gr.Textbox(label="Value", scale=2, placeholder="Enter value...")
                 remove_init_btn = gr.Button("❌ Remove", size="sm", scale=1)
             
-            init_extra_display = gr.Markdown("_No extra init args_")
+            init_extra_status = gr.Markdown("_No extra init args_")
+            
+            init_extra_table = gr.Dataframe(
+                headers=["Parameter", "Value"],
+                datatype=["str", "str"],
+                label="Active Extra Init Args",
+                interactive=False,
+                wrap=True
+            )
             
             load_model_btn = gr.Button("🔄 Load Model", variant="primary", size="lg")
             model_status = gr.Markdown("_No model loaded_")
@@ -386,21 +423,41 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
             temperature_slider = gr.Slider(0.0, 2.0, value=0.1, step=0.05, label="temperature")
             top_p_slider = gr.Slider(0.0, 1.0, value=0.9, step=0.05, label="top_p")
             top_k_slider = gr.Slider(1, 100, value=50, step=1, label="top_k")
-            do_sample_check = gr.Checkbox(value=False, label="do_sample")
+            
+            do_sample_dropdown = gr.Dropdown(
+                choices=["True", "False", "None"],
+                value="False",
+                label="do_sample"
+            )
             
             # Extra Gen Args
             gr.Markdown("**Extra Generation Args**")
-            gen_param_search = gr.Dropdown(
-                choices=list(GENERATION_PARAM_REGISTRY.keys()),
-                label="🔍 Search parameter",
-                value=None
-            )
+            with gr.Row():
+                gen_param_search = gr.Dropdown(
+                    choices=sorted(list(GENERATION_PARAM_REGISTRY.keys())),
+                    label="🔍 Parameter",
+                    value=None,
+                    scale=2
+                )
+                gen_param_value = gr.Textbox(
+                    label="Value", 
+                    placeholder="e.g., 1.1 or 3",
+                    scale=2
+                )
+            
             with gr.Row():
                 add_gen_btn = gr.Button("➕ Add", size="sm", scale=1)
-                gen_param_value = gr.Textbox(label="Value", scale=2, placeholder="Enter value...")
                 remove_gen_btn = gr.Button("❌ Remove", size="sm", scale=1)
             
-            gen_extra_display = gr.Markdown("_No extra gen args_")
+            gen_extra_status = gr.Markdown("_No extra generation args_")
+            
+            gen_extra_table = gr.Dataframe(
+                headers=["Parameter", "Value"],
+                datatype=["str", "str"],
+                label="Active Extra Generation Args",
+                interactive=False,
+                wrap=True
+            )
             
             update_gen_btn = gr.Button("🔄 Update Generation Params", variant="secondary", size="lg")
             gen_status = gr.Markdown("_Default params active_")
@@ -483,40 +540,40 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
     
     # Init extra args
     add_init_btn.click(
-        fn=lambda name, val: demo_mgr.update_init_param_value(name, val) if name and val else demo_mgr.add_init_param(name),
+        fn=demo_mgr.add_init_param,
         inputs=[init_param_search, init_param_value],
-        outputs=[init_extra_display]
+        outputs=[init_extra_table, init_extra_status]
     )
     
     remove_init_btn.click(
         fn=demo_mgr.remove_init_param,
         inputs=[init_param_search],
-        outputs=[init_extra_display]
+        outputs=[init_extra_table, init_extra_status]
     )
     
     # Gen extra args
     add_gen_btn.click(
-        fn=lambda name, val: demo_mgr.update_gen_param_value(name, val) if name and val else demo_mgr.add_gen_param(name),
+        fn=demo_mgr.add_gen_param,
         inputs=[gen_param_search, gen_param_value],
-        outputs=[gen_extra_display]
+        outputs=[gen_extra_table, gen_extra_status]
     )
     
     remove_gen_btn.click(
         fn=demo_mgr.remove_gen_param,
         inputs=[gen_param_search],
-        outputs=[gen_extra_display]
+        outputs=[gen_extra_table, gen_extra_status]
     )
     
     # Model & generation
     load_model_btn.click(
         fn=demo_mgr.load_model,
-        inputs=[model_input, dtype_dropdown, device_map_input, trust_remote_code_check],
+        inputs=[model_input, dtype_dropdown, device_map_input, trust_remote_code_dropdown],
         outputs=[model_status]
     )
     
     update_gen_btn.click(
         fn=demo_mgr.update_generation_params,
-        inputs=[max_tokens_slider, do_sample_check, temperature_slider, top_p_slider, top_k_slider],
+        inputs=[max_tokens_slider, temperature_slider, top_p_slider, top_k_slider, do_sample_dropdown],
         outputs=[gen_status]
     )
     
@@ -530,10 +587,10 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
     gr.Markdown("""
 ---
 **💡 Tips:**
+- Extra args: Select parameter → Enter value (JSON format: true/false/null/numbers/"strings") → Click Add
+- Remove: Select parameter → Click Remove
+- View active extra args in the table below
 - Load model once, update generation params anytime
-- Use extra args to add advanced parameters
-- Search parameters from dropdown, add with value, remove when not needed
-- All runs saved in history
     """)
 
 if __name__ == "__main__":
