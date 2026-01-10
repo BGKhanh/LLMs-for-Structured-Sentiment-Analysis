@@ -21,21 +21,38 @@ from src.utils.random_seed import setup_reproducible_environment
 from src.prompt_templates import *
 
 # === PARAMETER REGISTRY ===
-from transformers import GenerationConfig, AutoModelForCausalLM
+from transformers import GenerationConfig
 
-# Auto-discover init params from from_pretrained()
-INIT_PARAM_REGISTRY = {}
-try:
-    sig = inspect.signature(AutoModelForCausalLM.from_pretrained)
-    for param_name, param in sig.parameters.items():
-        if param_name not in ['pretrained_model_name_or_path', 'args', 'kwargs']:
-            default_val = param.default if param.default != inspect.Parameter.empty else None
-            INIT_PARAM_REGISTRY[param_name] = {
-                "default": default_val,
-                "type": type(default_val).__name__ if default_val is not None else "NoneType"
-            }
-except Exception as e:
-    print(f"Warning: Could not build init param registry: {e}")
+# INFRA/LOAD PARAMS (from_pretrained) - WHITELIST ONLY
+INFRA_LOAD_PARAMS = {
+    # Device & dtype
+    "device_map": {"default": "auto", "type": "str", "group": "Device"},
+    "torch_dtype": {"default": "auto", "type": "str", "group": "Device", 
+                    "choices": ["auto", "float16", "bfloat16", "float32"]},
+    "low_cpu_mem_usage": {"default": True, "type": "bool", "group": "Device"},
+    
+    # Performance / Attention
+    "attn_implementation": {"default": None, "type": "str", "group": "Performance",
+                           "choices": [None, "eager", "sdpa", "flash_attention_2"]},
+    
+    # Quantization
+    "load_in_4bit": {"default": False, "type": "bool", "group": "Quantization"},
+    "load_in_8bit": {"default": False, "type": "bool", "group": "Quantization"},
+    
+    # Safety
+    "trust_remote_code": {"default": True, "type": "bool", "group": "Safety"},
+}
+
+# RUNTIME/FORWARD PARAMS - Safe params that don't require reload
+RUNTIME_FORWARD_PARAMS = {
+    "use_cache": {"default": True, "type": "bool"},
+    "output_hidden_states": {"default": False, "type": "bool"},
+    "output_attentions": {"default": False, "type": "bool"},
+    "return_dict": {"default": True, "type": "bool"},
+}
+
+# Combine for extra args dropdown
+INIT_PARAM_REGISTRY = {**INFRA_LOAD_PARAMS, **RUNTIME_FORWARD_PARAMS}
 
 # Auto-discover generation params from GenerationConfig
 GENERATION_PARAM_REGISTRY = {}
@@ -91,12 +108,29 @@ class DemoManager:
         if not param_name:
             return self.get_init_extra_list(), self.render_init_extra_args()
         
-        # Parse value
+        # Get param info from registry
+        param_info = INIT_PARAM_REGISTRY.get(param_name, {})
+        param_type = param_info.get("type", "str")
+        
+        # Parse value based on type
         try:
-            # Try to parse as JSON for proper type conversion
-            value = json.loads(value_str)
+            if param_type == "bool":
+                # Handle bool: true/false/True/False/1/0
+                value = value_str.lower() in ['true', '1', 'yes']
+            elif param_type == "int":
+                value = int(value_str)
+            elif param_type == "float":
+                value = float(value_str)
+            elif param_type == "str":
+                if value_str.lower() == "none":
+                    value = None
+                else:
+                    value = value_str
+            else:
+                # Try JSON parse as fallback
+                value = json.loads(value_str)
         except:
-            # If not JSON, use as string
+            # Fallback to string
             value = value_str if value_str else None
         
         self.active_init_extra_args[param_name] = value
@@ -113,9 +147,25 @@ class DemoManager:
         if not param_name:
             return self.get_gen_extra_list(), self.render_gen_extra_args()
         
-        # Parse value
+        # Get param info from registry
+        param_info = GENERATION_PARAM_REGISTRY.get(param_name, {})
+        param_type = param_info.get("type", "str")
+        
+        # Parse value based on type
         try:
-            value = json.loads(value_str)
+            if param_type == "bool":
+                value = value_str.lower() in ['true', '1', 'yes']
+            elif param_type == "int":
+                value = int(value_str)
+            elif param_type == "float":
+                value = float(value_str)
+            elif param_type == "str":
+                if value_str.lower() == "none":
+                    value = None
+                else:
+                    value = value_str
+            else:
+                value = json.loads(value_str)
         except:
             value = value_str if value_str else None
         
@@ -159,21 +209,30 @@ class DemoManager:
             return f"✅ Model '{model_name}' already loaded."
         
         try:
-            # Convert trust_remote_code
-            trust_rc = None if trust_remote_code == "None" else (trust_remote_code == "True")
+            # Convert string values
+            trust_rc = trust_remote_code.lower() in ['true', '1'] if isinstance(trust_remote_code, str) else trust_remote_code
             
-            # Build init args
+            # Build init args with INFRA params
             init_args = {
                 "model_id": model_name,
-                "dtype": dtype,
+                "dtype": dtype if dtype != "auto" else None,
                 "device_map": device_map,
                 "trust_remote_code": trust_rc,
-                **self.active_init_extra_args
             }
+            
+            # Add extra args (separate INFRA vs RUNTIME)
+            infra_extras = {k: v for k, v in self.active_init_extra_args.items() 
+                           if k in INFRA_LOAD_PARAMS}
+            runtime_extras = {k: v for k, v in self.active_init_extra_args.items() 
+                             if k in RUNTIME_FORWARD_PARAMS}
+            
+            # Merge INFRA params into init_args
+            init_args.update(infra_extras)
             
             self.model_config = {
                 "model_id": model_name,
                 "init_args": init_args,
+                "runtime_forward_params": runtime_extras,  # Store separately
                 "generation_args": {
                     "max_new_tokens": 1024,
                     "do_sample": False,
@@ -188,8 +247,10 @@ class DemoManager:
             self.current_model_name = model_name
             
             extra_info = ""
-            if self.active_init_extra_args:
-                extra_info = f"\n🔧 Extra args: {', '.join(self.active_init_extra_args.keys())}"
+            if infra_extras:
+                extra_info += f"\n🔧 Infra extras: {', '.join(infra_extras.keys())}"
+            if runtime_extras:
+                extra_info += f"\n⚡ Runtime extras: {', '.join(runtime_extras.keys())}"
             
             return f"✅ Model '{model_name}' loaded!{extra_info}"
             
@@ -204,8 +265,8 @@ class DemoManager:
             return "⚠️ Load model first!"
         
         try:
-            # Convert do_sample
-            do_sample_val = None if do_sample == "None" else (do_sample == "True")
+            # Convert string values
+            do_sample_val = do_sample.lower() in ['true', '1'] if isinstance(do_sample, str) else do_sample
             
             gen_args = {
                 "max_new_tokens": int(max_tokens),
@@ -378,7 +439,7 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
             device_map_input = gr.Textbox(value="auto", label="device_map")
             
             trust_remote_code_dropdown = gr.Dropdown(
-                choices=["True", "False", "None"],
+                choices=["True", "False"],
                 value="True",
                 label="trust_remote_code"
             )
@@ -425,7 +486,7 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
             top_k_slider = gr.Slider(1, 100, value=50, step=1, label="top_k")
             
             do_sample_dropdown = gr.Dropdown(
-                choices=["True", "False", "None"],
+                choices=["True", "False"],
                 value="False",
                 label="do_sample"
             )
@@ -587,9 +648,15 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
     gr.Markdown("""
 ---
 **💡 Tips:**
-- Extra args: Select parameter → Enter value (JSON format: true/false/null/numbers/"strings") → Click Add
-- Remove: Select parameter → Click Remove
-- View active extra args in the table below
+- **Init Params Registry**: Whitelist-based (Device, Performance, Quantization, Safety groups)
+- **Value Format**: 
+  - Boolean: `true` / `false` (lowercase)
+  - Numbers: `1.1` / `3` / `50`
+  - Strings: `flash_attention_2` / `auto`
+  - None: `none` (lowercase)
+- **Two Types of Init Params**:
+  - 🔧 Infra/Load params (device_map, torch_dtype, attn_implementation, quantization...) → Require model reload
+  - ⚡ Runtime/Forward params (use_cache, output_hidden_states...) → No reload needed
 - Load model once, update generation params anytime
     """)
 
