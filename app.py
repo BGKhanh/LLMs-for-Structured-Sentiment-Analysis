@@ -337,12 +337,40 @@ class DemoManager:
         return f"**{len(self.active_gen_extra_args)} extra gen arg(s) active**"
     
     # === MODEL MANAGEMENT ===
+    def cleanup_model(self):
+        """Properly cleanup old model and free memory."""
+        if self.model is not None:
+            try:
+                # Delete model
+                del self.model
+                self.model = None
+                self.current_model_name = None
+                
+                # Force garbage collection
+                import gc
+                gc.collect()
+                
+                # Clear CUDA cache if available
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+                
+                print("🧹 Model cleanup completed")
+            except Exception as e:
+                print(f"⚠️ Cleanup warning: {e}")
+    
     def load_model(self, model_name, dtype, device_map, trust_remote_code):
         """Load model ONCE with init params."""
         if self.current_model_name == model_name and self.model is not None:
             return f"✅ Model '{model_name}' already loaded."
         
         try:
+            # CLEANUP OLD MODEL FIRST
+            if self.model is not None:
+                print(f"🧹 Cleaning up old model: {self.current_model_name}")
+                self.cleanup_model()
+            
             # Convert string values
             trust_rc = trust_remote_code.lower() in ['true', '1'] if isinstance(trust_remote_code, str) else trust_remote_code
             
@@ -376,9 +404,18 @@ class DemoManager:
                 }
             }
             
+            # Load new model
+            print(f"🔄 Loading new model: {model_name}")
             self.model = HFModel(self.model_config)
             self.model.load_model()
             self.current_model_name = model_name
+            
+            # Report GPU memory if available
+            import torch
+            if torch.cuda.is_available():
+                allocated = torch.cuda.memory_allocated() / 1024**3
+                reserved = torch.cuda.memory_reserved() / 1024**3
+                print(f"📊 GPU Memory: {allocated:.2f}GB allocated, {reserved:.2f}GB reserved")
             
             extra_info = ""
             if infra_extras:
