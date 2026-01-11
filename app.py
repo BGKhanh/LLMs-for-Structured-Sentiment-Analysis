@@ -23,32 +23,166 @@ from src.prompt_templates import *
 # === PARAMETER REGISTRY ===
 from transformers import GenerationConfig
 
-# INFRA/LOAD PARAMS (from_pretrained) - WHITELIST ONLY
+# FROM_PRETRAINED PARAMS - Extracted from HuggingFace docs
+# Source: https://huggingface.co/docs/transformers/v4.57.1/en/main_classes/model#transformers.PreTrainedModel.from_pretrained
 INFRA_LOAD_PARAMS = {
-    # Device & dtype
-    "device_map": {"default": "auto", "type": "str", "group": "Device"},
-    "torch_dtype": {"default": "auto", "type": "str", "group": "Device", 
-                    "choices": ["auto", "float16", "bfloat16", "float32"]},
-    "low_cpu_mem_usage": {"default": True, "type": "bool", "group": "Device"},
+    # Basic loading
+    "pretrained_model_name_or_path": {"default": None, "type": "str", "group": "Basic", "required": True},
+    "config": {"default": None, "type": "Union[PretrainedConfig, str]", "group": "Basic"},
+    "cache_dir": {"default": None, "type": "str", "group": "Cache"},
+    "force_download": {"default": False, "type": "bool", "group": "Cache"},
+    "local_files_only": {"default": False, "type": "bool", "group": "Cache"},
+    "token": {"default": None, "type": "Union[str, bool]", "group": "Auth"},
+    "revision": {"default": "main", "type": "str", "group": "Version"},
+    "use_safetensors": {"default": None, "type": "bool", "group": "Loading"},
+    "weights_only": {"default": True, "type": "bool", "group": "Loading"},
     
-    # Performance / Attention
-    "attn_implementation": {"default": None, "type": "str", "group": "Performance",
-                           "choices": [None, "eager", "sdpa", "flash_attention_2"]},
+    # TF/Flax loading
+    "from_tf": {"default": False, "type": "bool", "group": "Framework"},
+    "from_flax": {"default": False, "type": "bool", "group": "Framework"},
+    
+    # Model structure
+    "state_dict": {"default": None, "type": "dict", "group": "Advanced"},
+    "ignore_mismatched_sizes": {"default": False, "type": "bool", "group": "Advanced"},
+    
+    # Network & proxies
+    "proxies": {"default": None, "type": "dict", "group": "Network"},
+    
+    # Output control
+    "output_loading_info": {"default": False, "type": "bool", "group": "Debug"},
+    
+    # Attention implementation
+    "attn_implementation": {
+        "default": None, 
+        "type": "str", 
+        "group": "Performance",
+        "choices": ["eager", "sdpa", "flash_attention_2", "flash_attention_3"],
+        "description": "Attention implementation: eager (manual), sdpa (PyTorch), flash_attention_2/3"
+    },
+    
+    # Device & dtype - BIG MODEL INFERENCE
+    "dtype": {
+        "default": None, 
+        "type": "str", 
+        "group": "Device",
+        "choices": ["auto", "float16", "bfloat16", "float32"],
+        "description": "Override torch_dtype. 'auto' uses config, else loads in specified dtype"
+    },
+    "device_map": {
+        "default": None, 
+        "type": "Union[str, dict]", 
+        "group": "Device",
+        "description": "Device mapping: 'auto', 'cpu', 'cuda:0', or dict mapping modules to devices"
+    },
+    "max_memory": {
+        "default": None, 
+        "type": "dict", 
+        "group": "Device",
+        "description": "Dict of device:max_memory (e.g., {0: '10GB', 'cpu': '30GB'})"
+    },
+    "tp_plan": {
+        "default": None, 
+        "type": "str", 
+        "group": "Distributed",
+        "description": "Tensor parallel plan, currently only 'auto'"
+    },
+    "tp_size": {
+        "default": None, 
+        "type": "int", 
+        "group": "Distributed",
+        "description": "Tensor parallel degree"
+    },
+    "device_mesh": {
+        "default": None, 
+        "type": "torch.distributed.DeviceMesh", 
+        "group": "Distributed",
+        "description": "Device mesh for tensor parallelism"
+    },
+    "offload_folder": {
+        "default": None, 
+        "type": "str", 
+        "group": "Memory",
+        "description": "Folder for offloading weights to disk if device_map contains 'disk'"
+    },
+    "offload_buffers": {
+        "default": False, 
+        "type": "bool", 
+        "group": "Memory",
+        "description": "Whether to offload buffers with model parameters"
+    },
     
     # Quantization
-    "load_in_4bit": {"default": False, "type": "bool", "group": "Quantization"},
-    "load_in_8bit": {"default": False, "type": "bool", "group": "Quantization"},
+    "quantization_config": {
+        "default": None, 
+        "type": "Union[QuantizationConfigMixin, dict]", 
+        "group": "Quantization",
+        "description": "Quantization config (bitsandbytes, GPTQ, etc.)"
+    },
+    "load_in_4bit": {
+        "default": False, 
+        "type": "bool", 
+        "group": "Quantization",
+        "description": "Load model in 4-bit (bitsandbytes)"
+    },
+    "load_in_8bit": {
+        "default": False, 
+        "type": "bool", 
+        "group": "Quantization",
+        "description": "Load model in 8-bit (bitsandbytes)"
+    },
     
-    # Safety
-    "trust_remote_code": {"default": True, "type": "bool", "group": "Safety"},
+    # File structure
+    "subfolder": {
+        "default": "", 
+        "type": "str", 
+        "group": "Loading",
+        "description": "Subfolder in model repo where files are located"
+    },
+    "variant": {
+        "default": None, 
+        "type": "str", 
+        "group": "Loading",
+        "description": "Load weights from variant filename (e.g., 'fp16')"
+    },
+    
+    # Safety & trust
+    "trust_remote_code": {
+        "default": False, 
+        "type": "bool", 
+        "group": "Safety",
+        "description": "Allow loading custom code from model hub"
+    },
+    
+    # Advanced loading
+    "key_mapping": {
+        "default": None, 
+        "type": "dict", 
+        "group": "Advanced",
+        "description": "Mapping of weight names for compatible architectures"
+    },
+    
+    # Low-level device control
+    "torch_dtype": {
+        "default": None, 
+        "type": "str", 
+        "group": "Device",
+        "choices": ["float16", "bfloat16", "float32"],
+        "description": "Torch dtype (prefer using 'dtype' parameter)"
+    },
+    "low_cpu_mem_usage": {
+        "default": False, 
+        "type": "bool", 
+        "group": "Memory",
+        "description": "Load model in low CPU memory mode"
+    },
 }
 
-# RUNTIME/FORWARD PARAMS - Safe params that don't require reload
+# RUNTIME/FORWARD PARAMS - Safe params that can be set after loading
 RUNTIME_FORWARD_PARAMS = {
-    "use_cache": {"default": True, "type": "bool"},
-    "output_hidden_states": {"default": False, "type": "bool"},
-    "output_attentions": {"default": False, "type": "bool"},
-    "return_dict": {"default": True, "type": "bool"},
+    "use_cache": {"default": True, "type": "bool", "description": "Use KV cache for generation"},
+    "output_hidden_states": {"default": False, "type": "bool", "description": "Return all hidden states"},
+    "output_attentions": {"default": False, "type": "bool", "description": "Return attention weights"},
+    "return_dict": {"default": True, "type": "bool", "description": "Return ModelOutput instead of tuple"},
 }
 
 # Combine for extra args dropdown
