@@ -439,6 +439,7 @@ class DemoManager:
             # Convert string values
             do_sample_val = do_sample.lower() in ['true', '1'] if isinstance(do_sample, str) else do_sample
             
+            # Build generation args
             gen_args = {
                 "max_new_tokens": int(max_tokens),
                 "temperature": float(temperature),
@@ -448,14 +449,27 @@ class DemoManager:
                 **self.active_gen_extra_args
             }
             
+            # Validate: if do_sample=False, warn about sampling params
+            if not do_sample_val and (float(temperature) != 1.0 or float(top_p) != 1.0):
+                warning = "\n⚠️ Warning: do_sample=False → temperature, top_p, top_k will be IGNORED"
+            else:
+                warning = ""
+            
+            # Update config
             self.model_config["generation_args"] = gen_args
+            
+            # CRITICAL: Update model's config reference
             self.model.config = self.model_config
+            
+            # Verify update
+            actual_gen_args = self.model.config.get("generation_args", {})
+            verification = f"\n✓ Verified: do_sample={actual_gen_args.get('do_sample')}, temp={actual_gen_args.get('temperature')}"
             
             extra_info = ""
             if self.active_gen_extra_args:
                 extra_info = f"\n🔧 Extra args: {', '.join(self.active_gen_extra_args.keys())}"
             
-            return f"✅ Generation params updated!{extra_info}"
+            return f"✅ Generation params updated!{warning}{verification}{extra_info}"
             
         except Exception as e:
             return f"❌ Error: {str(e)}"
@@ -520,6 +534,16 @@ class DemoManager:
         try:
             start = time.time()
             system_prompt, user_prompt = self.prompt_template.get_prompt(text, f"demo_{len(self.history)+1}")
+            
+            # DEBUG: Print generation args being used
+            gen_args = self.model_config.get("generation_args", {})
+            print(f"\n🔍 DEBUG Generation Args:")
+            print(f"  - do_sample: {gen_args.get('do_sample')}")
+            print(f"  - temperature: {gen_args.get('temperature')}")
+            print(f"  - top_p: {gen_args.get('top_p')}")
+            print(f"  - top_k: {gen_args.get('top_k')}")
+            print(f"  - max_new_tokens: {gen_args.get('max_new_tokens')}")
+            
             raw_response, gen_time = self.model.generate_single(system_prompt, user_prompt)
             json_str = self.model.extract_response(raw_response)
             processed = postprocess_response(json_str, text, f"demo_{len(self.history)+1}")
@@ -535,7 +559,6 @@ class DemoManager:
             input_tokens = len(system_prompt.split()) + len(user_prompt.split())
             output_tokens = len(raw_response.split())
             
-            gen_params = self.model_config["generation_args"]
             metadata = {
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "execution_time": f"{exec_time:.3f}s",
@@ -545,7 +568,7 @@ class DemoManager:
                 "technique": config_str,
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
-                "generation_params": gen_params
+                "generation_params": gen_args
             }
             
             metadata_display = f"""⏱️ **Execution Time:** {exec_time:.3f}s (Gen: {gen_time:.3f}s)
@@ -556,7 +579,7 @@ class DemoManager:
 
 ⚙️ **Generation Parameters:**
 """
-            for k, v in gen_params.items():
+            for k, v in gen_args.items():
                 metadata_display += f"• {k}: {v}\n"
             
             self.history.insert(0, {
@@ -644,7 +667,10 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
                 wrap=True
             )
             
-            load_model_btn = gr.Button("🔄 Load Model", variant="primary", size="lg")
+            with gr.Row():
+                load_model_btn = gr.Button("🔄 Load Model", variant="primary", size="lg")
+                cleanup_btn = gr.Button("🧹 Cleanup Current Model", variant="stop", size="sm")
+            
             model_status = gr.Markdown("_No model loaded_")
         
         # RIGHT: Generation Params
@@ -769,6 +795,16 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
     )
     
     # === EVENT HANDLERS ===
+    
+    # Cleanup model
+    def cleanup_handler():
+        demo_mgr.cleanup_model()
+        return "✅ Model cleaned up. Memory freed."
+    
+    cleanup_btn.click(
+        fn=cleanup_handler,
+        outputs=[model_status]
+    )
     
     # Init extra args
     add_init_btn.click(
