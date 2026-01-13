@@ -613,7 +613,6 @@ custom_theme = gr.themes.Soft(
     secondary_hue="blue",
     neutral_hue="slate",
     font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"],
-    radius_size=gr.themes.Size(xs="4px", sm="8px", md="12px", lg="16px", xl="24px"),
 )
 
 custom_css = """
