@@ -56,24 +56,16 @@ def convert_ssa_to_spacy(text, ssa_json):
     nlp = get_spacy_model()
     doc = nlp(text)
     
-    # FIXED: Thêm màu sắc rõ ràng cho từng polarity
+    # FIXED: Màu sắc và layout rõ ràng
     options = {
-        "compact": False,
-        "bg": "#ffffff",
-        "distance": 120,
-        "color": "#333333",  # Màu text đậm hơn
-        "arrow_stroke": 3,   # Arrow dày hơn
-        "arrow_width": 10,   # Arrow rộng hơn
-        "font": "Arial, sans-serif",
-        # CRITICAL: Định nghĩa màu cho từng label
-        "colors": {
-            "Positive": "#22c55e",    # Green - rõ ràng
-            "Negative": "#ef4444",    # Red - rõ ràng
-            "Neutral": "#6b7280",     # Gray - rõ ràng
-            "positive": "#22c55e",    # Lowercase variant
-            "negative": "#ef4444",
-            "neutral": "#6b7280",
-        }
+        "compact": True,  # ← Compact mode để text không quá dài
+        "bg": "#f9fafb",
+        "distance": 100,  # ← Giảm distance để gọn hơn
+        "color": "#111827",
+        "arrow_stroke": 2,
+        "arrow_width": 8,
+        "font": "Inter, Arial, sans-serif",
+        "word_spacing": 25,  # ← Spacing giữa các từ
     }
 
     if isinstance(ssa_json, str):
@@ -126,8 +118,9 @@ def convert_ssa_to_spacy(text, ssa_json):
                     arcs.append({
                         "start": min(start_token_idx, end_token_idx),
                         "end": max(start_token_idx, end_token_idx),
-                        "label": polarity,  # Polarity sẽ được map với colors
-                        "dir": direction
+                        "label": polarity,
+                        "dir": direction,
+                        "color": "#22c55e" if polarity == "Positive" else "#ef4444" if polarity == "Negative" else "#6b7280"  # ← Direct color
                     })
         except Exception as e:
             print(f"⚠️ Error processing opinion: {e}")
@@ -148,35 +141,89 @@ def convert_ssa_to_spacy(text, ssa_json):
     # Render HTML
     html = displacy.render(ex, style="dep", manual=True, options=options, page=False)
     
-    # BONUS: Thêm CSS để làm nổi bật hơn
+    # CRITICAL FIX: Thêm CSS với !important để override displaCy defaults
     enhanced_html = f"""
-    <style>
-        .displacy-container {{
-            padding: 20px;
-            background: #fafafa;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-        }}
-        .displacy-word {{
-            font-size: 16px;
-            font-weight: 500;
-        }}
-        .displacy-tag {{
-            font-size: 12px;
-        }}
-        .displacy-arrow {{
-            stroke-width: 3px;
-        }}
-        .displacy-label {{
-            font-size: 14px;
-            font-weight: 700;
-            padding: 4px 8px;
-            border-radius: 4px;
-            background: white;
-            border: 2px solid currentColor;
-        }}
-    </style>
-    {html}
+    <div style="width: 100%; overflow-x: auto; overflow-y: hidden; padding: 10px 0;">
+        <style>
+            /* Container với scroll ngang */
+            .displacy-container {{
+                min-width: max-content !important;
+                padding: 30px 20px !important;
+                background: #ffffff !important;
+                border-radius: 8px !important;
+                border: 1px solid #e5e7eb !important;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+            }}
+            
+            /* Text đậm hơn */
+            .displacy-word {{
+                font-size: 16px !important;
+                font-weight: 600 !important;
+                color: #111827 !important;
+                fill: #111827 !important;
+            }}
+            
+            /* CRITICAL: Force arrow colors với !important */
+            .displacy-arrow {{
+                stroke-width: 3px !important;
+            }}
+            
+            /* Positive arrows */
+            .displacy-arrow[data-label="Positive"] {{
+                stroke: #22c55e !important;
+            }}
+            
+            /* Negative arrows */
+            .displacy-arrow[data-label="Negative"] {{
+                stroke: #ef4444 !important;
+            }}
+            
+            /* Neutral arrows */
+            .displacy-arrow[data-label="Neutral"] {{
+                stroke: #6b7280 !important;
+            }}
+            
+            /* Labels đậm và có màu */
+            .displacy-label {{
+                font-size: 13px !important;
+                font-weight: 700 !important;
+                fill: #ffffff !important;
+                stroke: none !important;
+            }}
+            
+            /* Label backgrounds */
+            .displacy-label[data-label="Positive"] {{
+                fill: #22c55e !important;
+            }}
+            
+            .displacy-label[data-label="Negative"] {{
+                fill: #ef4444 !important;
+            }}
+            
+            .displacy-label[data-label="Neutral"] {{
+                fill: #6b7280 !important;
+            }}
+            
+            /* Arrow heads */
+            marker path {{
+                fill: currentColor !important;
+            }}
+        </style>
+        {html}
+    </div>
     """
+    
+    # Post-process HTML để inject data-label attributes
+    for arc in arcs:
+        polarity = arc['label']
+        # Find và replace paths with data-label
+        enhanced_html = enhanced_html.replace(
+            f'<path class="displacy-arrow"',
+            f'<path class="displacy-arrow" data-label="{polarity}"'
+        )
+        enhanced_html = enhanced_html.replace(
+            f'<text class="displacy-label"',
+            f'<text class="displacy-label" data-label="{polarity}"'
+        )
     
     return enhanced_html

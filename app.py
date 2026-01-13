@@ -538,11 +538,8 @@ class DemoManager:
             # DEBUG: Print generation args being used
             gen_args = self.model_config.get("generation_args", {})
             print(f"\n🔍 DEBUG Generation Args:")
-            print(f"  - do_sample: {gen_args.get('do_sample')}")
-            print(f"  - temperature: {gen_args.get('temperature')}")
-            print(f"  - top_p: {gen_args.get('top_p')}")
-            print(f"  - top_k: {gen_args.get('top_k')}")
-            print(f"  - max_new_tokens: {gen_args.get('max_new_tokens')}")
+            print(f"  - generation config: {gen_args}")
+
             
             raw_response, gen_time = self.model.generate_single(system_prompt, user_prompt)
             json_str = self.model.extract_response(raw_response)
