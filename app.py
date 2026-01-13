@@ -607,21 +607,144 @@ class DemoManager:
 # Initialize Manager
 demo_mgr = DemoManager(seed=42)
 
+# === CUSTOM THEME & CSS ===
+custom_theme = gr.themes.Soft(
+    primary_hue="indigo",
+    secondary_hue="blue",
+    neutral_hue="slate",
+    font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"],
+    radius_size=gr.themes.Size(xs="4px", sm="8px", md="12px", lg="16px", xl="24px"),
+)
+
+custom_css = """
+/* Container */
+.gradio-container {
+    max-width: 1600px !important;
+    margin: auto;
+}
+
+/* Header */
+h1 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 2.5rem;
+    font-weight: 800;
+    text-align: center;
+    margin: 2rem 0;
+    letter-spacing: -0.02em;
+}
+
+/* Section headers */
+h3 {
+    color: #4338ca;
+    font-weight: 700;
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #e0e7ff;
+    padding-bottom: 0.5rem;
+}
+
+/* Cards */
+.model-setup-card, .gen-params-card {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* Primary button */
+button.primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4) !important;
+    transition: all 0.3s ease !important;
+}
+
+button.primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5) !important;
+}
+
+/* Secondary button */
+button.secondary {
+    background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
+    color: white !important;
+}
+
+/* Compact spacing */
+.compact-row {
+    gap: 0.5rem !important;
+}
+
+/* Table styling */
+.dataframe {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+/* Tab styling */
+.tab-nav button {
+    font-weight: 500;
+    border-radius: 8px 8px 0 0;
+}
+
+.tab-nav button[aria-selected="true"] {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+/* Improve markdown */
+.markdown-text {
+    line-height: 1.7;
+}
+
+/* Status messages */
+.status-success {
+    color: #059669;
+    font-weight: 600;
+}
+
+.status-error {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+/* Add subtle animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+"""
+
 # === GRADIO UI ===
-with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="SSA Demo", theme=custom_theme, css=custom_css) as demo:
     gr.Markdown("# 🧠 Structured Sentiment Analysis Demo")
+    gr.Markdown("_Advanced NLP inference with configurable prompting techniques_")
+    
+    gr.Markdown("---")
     
     # === MODEL SETUP & GENERATION PARAMS ===
-    with gr.Row(equal_height=False):
+    with gr.Row(equal_height=False, elem_classes="compact-row"):
         # LEFT: Model Setup
-        with gr.Column(scale=1):
-            gr.Markdown("### 🔧 Model Setup\n_Load once per session_")
+        with gr.Column(scale=1, elem_classes="model-setup-card"):
+            gr.Markdown("### 🔧 Model Setup")
+            gr.Markdown("_Load once per session_")
             
             model_input = gr.Dropdown(
                 choices=DEFAULT_MODEL_SUGGESTIONS,
                 value=DEFAULT_MODEL_SUGGESTIONS[0],
                 label="Model Name",
-                allow_custom_value=True
+                allow_custom_value=True,
+                elem_id="model-selector"
             )
             
             dtype_dropdown = gr.Dropdown(
@@ -639,86 +762,89 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
             )
             
             # Extra Init Args
-            gr.Markdown("**Extra Init Args**")
-            with gr.Row():
-                init_param_search = gr.Dropdown(
-                    choices=sorted(list(INIT_PARAM_REGISTRY.keys())),
-                    label="🔍 Parameter",
-                    value=None,
-                    scale=2
+            with gr.Accordion("🔧 Extra Init Args", open=False):
+                with gr.Row():
+                    init_param_search = gr.Dropdown(
+                        choices=sorted(list(INIT_PARAM_REGISTRY.keys())),
+                        label="Parameter",
+                        value=None,
+                        scale=2
+                    )
+                    init_param_value = gr.Textbox(
+                        label="Value", 
+                        placeholder="e.g., flash_attention_2 or true",
+                        scale=2
+                    )
+                
+                with gr.Row():
+                    add_init_btn = gr.Button("➕ Add", size="sm", scale=1)
+                    remove_init_btn = gr.Button("❌ Remove", size="sm", scale=1)
+                
+                init_extra_status = gr.Markdown("_No extra init args_")
+                
+                init_extra_table = gr.Dataframe(
+                    headers=["Parameter", "Value"],
+                    datatype=["str", "str"],
+                    label="Active Extra Init Args",
+                    interactive=False,
+                    wrap=True
                 )
-                init_param_value = gr.Textbox(
-                    label="Value", 
-                    placeholder="e.g., flash_attention_2 or true",
-                    scale=2
-                )
             
             with gr.Row():
-                add_init_btn = gr.Button("➕ Add", size="sm", scale=1)
-                remove_init_btn = gr.Button("❌ Remove", size="sm", scale=1)
+                load_model_btn = gr.Button("🔄 Load Model", variant="primary", size="lg", elem_classes="primary")
+                cleanup_btn = gr.Button("🧹 Cleanup", variant="stop", size="sm")
             
-            init_extra_status = gr.Markdown("_No extra init args_")
-            
-            init_extra_table = gr.Dataframe(
-                headers=["Parameter", "Value"],
-                datatype=["str", "str"],
-                label="Active Extra Init Args",
-                interactive=False,
-                wrap=True
-            )
-            
-            with gr.Row():
-                load_model_btn = gr.Button("🔄 Load Model", variant="primary", size="lg")
-                cleanup_btn = gr.Button("🧹 Cleanup Current Model", variant="stop", size="sm")
-            
-            model_status = gr.Markdown("_No model loaded_")
+            model_status = gr.Markdown("_No model loaded_", elem_classes="markdown-text")
         
         # RIGHT: Generation Params
-        with gr.Column(scale=1):
-            gr.Markdown("### ⚙️ Generation Parameters\n_Update anytime_")
+        with gr.Column(scale=1, elem_classes="gen-params-card"):
+            gr.Markdown("### ⚙️ Generation Parameters")
+            gr.Markdown("_Update anytime without reload_")
             
-            max_tokens_slider = gr.Slider(128, 4096, value=1024, step=128, label="max_new_tokens")
-            temperature_slider = gr.Slider(0.0, 2.0, value=0.1, step=0.05, label="temperature")
-            top_p_slider = gr.Slider(0.0, 1.0, value=0.9, step=0.05, label="top_p")
-            top_k_slider = gr.Slider(1, 100, value=50, step=1, label="top_k")
+            with gr.Row():
+                max_tokens_slider = gr.Slider(128, 4096, value=1024, step=128, label="max_new_tokens")
+                do_sample_dropdown = gr.Dropdown(
+                    choices=["True", "False"],
+                    value="False",
+                    label="do_sample"
+                )
             
-            do_sample_dropdown = gr.Dropdown(
-                choices=["True", "False"],
-                value="False",
-                label="do_sample"
-            )
+            with gr.Row():
+                temperature_slider = gr.Slider(0.0, 2.0, value=0.1, step=0.05, label="temperature")
+                top_p_slider = gr.Slider(0.0, 1.0, value=0.9, step=0.05, label="top_p")
+                top_k_slider = gr.Slider(1, 100, value=50, step=1, label="top_k")
             
             # Extra Gen Args
-            gr.Markdown("**Extra Generation Args**")
-            with gr.Row():
-                gen_param_search = gr.Dropdown(
-                    choices=sorted(list(GENERATION_PARAM_REGISTRY.keys())),
-                    label="🔍 Parameter",
-                    value=None,
-                    scale=2
+            with gr.Accordion("🔧 Extra Generation Args", open=False):
+                with gr.Row():
+                    gen_param_search = gr.Dropdown(
+                        choices=sorted(list(GENERATION_PARAM_REGISTRY.keys())),
+                        label="Parameter",
+                        value=None,
+                        scale=2
+                    )
+                    gen_param_value = gr.Textbox(
+                        label="Value", 
+                        placeholder="e.g., 1.1 or 3",
+                        scale=2
+                    )
+                
+                with gr.Row():
+                    add_gen_btn = gr.Button("➕ Add", size="sm", scale=1)
+                    remove_gen_btn = gr.Button("❌ Remove", size="sm", scale=1)
+                
+                gen_extra_status = gr.Markdown("_No extra generation args_")
+                
+                gen_extra_table = gr.Dataframe(
+                    headers=["Parameter", "Value"],
+                    datatype=["str", "str"],
+                    label="Active Extra Generation Args",
+                    interactive=False,
+                    wrap=True
                 )
-                gen_param_value = gr.Textbox(
-                    label="Value", 
-                    placeholder="e.g., 1.1 or 3",
-                    scale=2
-                )
             
-            with gr.Row():
-                add_gen_btn = gr.Button("➕ Add", size="sm", scale=1)
-                remove_gen_btn = gr.Button("❌ Remove", size="sm", scale=1)
-            
-            gen_extra_status = gr.Markdown("_No extra generation args_")
-            
-            gen_extra_table = gr.Dataframe(
-                headers=["Parameter", "Value"],
-                datatype=["str", "str"],
-                label="Active Extra Generation Args",
-                interactive=False,
-                wrap=True
-            )
-            
-            update_gen_btn = gr.Button("🔄 Update Generation Params", variant="secondary", size="lg")
-            gen_status = gr.Markdown("_Default params active_")
+            update_gen_btn = gr.Button("🔄 Update Generation Params", variant="secondary", size="lg", elem_classes="secondary")
+            gen_status = gr.Markdown("_Default params active_", elem_classes="markdown-text")
     
     # === PROMPT CONFIG ===
     with gr.Accordion("🎯 Prompt Technique", open=True):
@@ -743,39 +869,43 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
         )
     
     # === INFERENCE ===
+    gr.Markdown("---")
+    gr.Markdown("## 🚀 Inference")
+    
     with gr.Row():
         with gr.Column(scale=1):
-            gr.Markdown("### 📝 Input")
             input_text = gr.Textbox(
-                label="Text",
+                label="📝 Input Text",
                 lines=8,
+                placeholder="Enter Vietnamese text for sentiment analysis...",
                 value="Tôi rất thích sản phẩm này nhưng nhân viên thái độ tệ quá."
             )
-            run_btn = gr.Button("🚀 Run Inference", variant="primary", size="lg")
+            run_btn = gr.Button("🚀 Run Inference", variant="primary", size="lg", elem_classes="primary")
         
         with gr.Column(scale=2):
-            gr.Markdown("### 📊 Results")
             with gr.Tabs():
                 with gr.TabItem("🕸️ Visualization"):
-                    html_output = gr.HTML()
+                    html_output = gr.HTML(label="SSA Graph")
                 
-                with gr.TabItem("📄 JSON"):
-                    json_output = gr.JSON()
+                with gr.TabItem("📄 JSON Output"):
+                    json_output = gr.JSON(label="Structured Result")
                 
                 with gr.TabItem("📥 Full Input"):
-                    full_input_output = gr.Textbox(lines=15, max_lines=20)
+                    full_input_output = gr.Textbox(lines=15, max_lines=20, label="Complete Input")
                 
                 with gr.TabItem("🤖 Raw Response"):
-                    raw_response_output = gr.Textbox(lines=15, max_lines=20)
+                    raw_response_output = gr.Textbox(lines=15, max_lines=20, label="Model Output")
                 
                 with gr.TabItem("ℹ️ Metadata"):
-                    metadata_output = gr.Markdown()
+                    metadata_output = gr.Markdown(label="Run Metadata")
     
     # === HISTORY ===
-    gr.Markdown("### 🕰️ Run History")
+    gr.Markdown("---")
+    gr.Markdown("## 🕰️ Run History")
     history_table = gr.Dataframe(
         headers=["ID", "Time", "Technique", "Exec", "Input"],
-        datatype=["number", "str", "str", "str", "str"]
+        datatype=["number", "str", "str", "str", "str"],
+        elem_classes="dataframe"
     )
     
     # === DYNAMIC UI ===
@@ -854,17 +984,39 @@ with gr.Blocks(title="SSA Demo", theme=gr.themes.Soft()) as demo:
     
     gr.Markdown("""
 ---
-**💡 Tips:**
-- **Init Params Registry**: Whitelist-based (Device, Performance, Quantization, Safety groups)
-- **Value Format**: 
-  - Boolean: `true` / `false` (lowercase)
-  - Numbers: `1.1` / `3` / `50`
-  - Strings: `flash_attention_2` / `auto`
-  - None: `none` (lowercase)
-- **Two Types of Init Params**:
-  - 🔧 Infra/Load params (device_map, torch_dtype, attn_implementation, quantization...) → Require model reload
-  - ⚡ Runtime/Forward params (use_cache, output_hidden_states...) → No reload needed
-- Load model once, update generation params anytime
+## 💡 Quick Guide
+
+**Model Setup:**
+- Select model from dropdown or enter custom HuggingFace model ID
+- Configure device, dtype, and attention implementation
+- Add extra init args for advanced control (quantization, memory optimization)
+- Load model once and reuse throughout session
+
+**Generation Parameters:**
+- Adjust sampling strategy with `do_sample` toggle
+- Fine-tune temperature, top-p, top-k for output control
+- **Note:** Sampling params only work when `do_sample=True`
+- Update parameters anytime without reloading model
+
+**Extra Args Format:**
+- Boolean: `true` / `false`
+- Numbers: `1.1` / `50`  
+- Strings: `flash_attention_2` / `auto`
+- None: `none`
+
+**Prompting Techniques:**
+- Few-shot: Learn from examples
+- Chain-of-Thought: Step-by-step reasoning
+- Plan-and-Solve: Strategic decomposition
+- Re-reading: Enhanced context processing
+
+**Tips:**
+- 🔧 Use extra args for model-specific optimizations
+- 📊 Check metadata tab for detailed performance metrics
+- 🧹 Cleanup model before loading a new one to free memory
+- 🕰️ View history to compare different configurations
+
+Built with ❤️ using Transformers & Gradio
     """)
 
 if __name__ == "__main__":
