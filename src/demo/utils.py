@@ -56,13 +56,24 @@ def convert_ssa_to_spacy(text, ssa_json):
     nlp = get_spacy_model()
     doc = nlp(text)
     
+    # FIXED: Thêm màu sắc rõ ràng cho từng polarity
     options = {
         "compact": False,
         "bg": "#ffffff",
         "distance": 120,
-        "color": "#000000",
-        "arrow_stroke": 2,
-        "arrow_width": 8,
+        "color": "#333333",  # Màu text đậm hơn
+        "arrow_stroke": 3,   # Arrow dày hơn
+        "arrow_width": 10,   # Arrow rộng hơn
+        "font": "Arial, sans-serif",
+        # CRITICAL: Định nghĩa màu cho từng label
+        "colors": {
+            "Positive": "#22c55e",    # Green - rõ ràng
+            "Negative": "#ef4444",    # Red - rõ ràng
+            "Neutral": "#6b7280",     # Gray - rõ ràng
+            "positive": "#22c55e",    # Lowercase variant
+            "negative": "#ef4444",
+            "neutral": "#6b7280",
+        }
     }
 
     if isinstance(ssa_json, str):
@@ -73,7 +84,7 @@ def convert_ssa_to_spacy(text, ssa_json):
 
     opinions = ssa_json.get("opinions", [])
     if not opinions:
-        return f"<div style='padding: 20px;'>No opinions found in text.</div>"
+        return f"<div style='padding: 20px; font-size: 16px; color: #666;'>No opinions found in text.</div>"
 
     words = [token.text for token in doc]
     
@@ -115,12 +126,18 @@ def convert_ssa_to_spacy(text, ssa_json):
                     arcs.append({
                         "start": min(start_token_idx, end_token_idx),
                         "end": max(start_token_idx, end_token_idx),
-                        "label": polarity,
+                        "label": polarity,  # Polarity sẽ được map với colors
                         "dir": direction
                     })
         except Exception as e:
-            print(f"Error processing opinion: {e}")
+            print(f"⚠️ Error processing opinion: {e}")
             continue
+
+    if not arcs:
+        return f"""<div style='padding: 20px; font-size: 16px; color: #666;'>
+            <p>Opinions found but could not visualize relationships.</p>
+            <p>Total opinions: {len(opinions)}</p>
+        </div>"""
 
     # Config manual data
     ex = {
@@ -131,4 +148,35 @@ def convert_ssa_to_spacy(text, ssa_json):
     # Render HTML
     html = displacy.render(ex, style="dep", manual=True, options=options, page=False)
     
-    return html
+    # BONUS: Thêm CSS để làm nổi bật hơn
+    enhanced_html = f"""
+    <style>
+        .displacy-container {{
+            padding: 20px;
+            background: #fafafa;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }}
+        .displacy-word {{
+            font-size: 16px;
+            font-weight: 500;
+        }}
+        .displacy-tag {{
+            font-size: 12px;
+        }}
+        .displacy-arrow {{
+            stroke-width: 3px;
+        }}
+        .displacy-label {{
+            font-size: 14px;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: white;
+            border: 2px solid currentColor;
+        }}
+    </style>
+    {html}
+    """
+    
+    return enhanced_html
