@@ -53,19 +53,20 @@ def convert_ssa_to_spacy(text, ssa_json):
     Returns:
         HTML string để hiển thị.
     """
+    import re
+    
     nlp = get_spacy_model()
     doc = nlp(text)
     
-    # FIXED: Màu sắc và layout rõ ràng
     options = {
-        "compact": True,  # ← Compact mode để text không quá dài
-        "bg": "#f9fafb",
-        "distance": 100,  # ← Giảm distance để gọn hơn
+        "compact": True,
+        "bg": "#ffffff",
+        "distance": 100,
         "color": "#111827",
         "arrow_stroke": 2,
         "arrow_width": 8,
         "font": "Inter, Arial, sans-serif",
-        "word_spacing": 25,  # ← Spacing giữa các từ
+        "word_spacing": 25,
     }
 
     if isinstance(ssa_json, str):
@@ -87,11 +88,12 @@ def convert_ssa_to_spacy(text, ssa_json):
             char_to_token[i] = token.i
 
     arcs = []
+    arc_colors = {}  # Map arc index → color
     
     # Duyệt qua các opinions để tạo arrows
+    arc_idx = 0
     for op in opinions:
         try:
-            # Handle format variants
             expr_raw = op.get("Polar_expression", [[None]])[0][0]
             target_raw = op.get("Target", [[None]])[0][0]
             polarity = op.get("Polarity", "Neutral")
@@ -99,29 +101,37 @@ def convert_ssa_to_spacy(text, ssa_json):
             if not expr_raw or not target_raw:
                 continue
 
-            # Tìm vị trí sử dụng hàm chung từ postprocessing
             expr_pos_str = extract_position(text, expr_raw)
             target_pos_str = extract_position(text, target_raw)
             
-            # Convert to tuple
             expr_span = parse_position_to_tuple(expr_pos_str)
             target_span = parse_position_to_tuple(target_pos_str)
             
             if expr_span and target_span and expr_span != (0, 0) and target_span != (0, 0):
-                # Map sang token index
                 start_token_idx = char_to_token.get(expr_span[0])
                 end_token_idx = char_to_token.get(target_span[0])
                 
                 if start_token_idx is not None and end_token_idx is not None:
                     direction = "left" if start_token_idx > end_token_idx else "right"
                     
+                    # Determine color
+                    if polarity == "Positive":
+                        color = "#22c55e"
+                    elif polarity == "Negative":
+                        color = "#ef4444"
+                    else:
+                        color = "#6b7280"
+                    
                     arcs.append({
                         "start": min(start_token_idx, end_token_idx),
                         "end": max(start_token_idx, end_token_idx),
                         "label": polarity,
-                        "dir": direction,
-                        "color": "#22c55e" if polarity == "Positive" else "#ef4444" if polarity == "Negative" else "#6b7280"  # ← Direct color
+                        "dir": direction
                     })
+                    
+                    arc_colors[arc_idx] = color
+                    arc_idx += 1
+                    
         except Exception as e:
             print(f"⚠️ Error processing opinion: {e}")
             continue
@@ -132,7 +142,6 @@ def convert_ssa_to_spacy(text, ssa_json):
             <p>Total opinions: {len(opinions)}</p>
         </div>"""
 
-    # Config manual data
     ex = {
         "words": [{"text": w, "tag": ""} for w in words],
         "arcs": arcs
@@ -141,89 +150,66 @@ def convert_ssa_to_spacy(text, ssa_json):
     # Render HTML
     html = displacy.render(ex, style="dep", manual=True, options=options, page=False)
     
-    # CRITICAL FIX: Thêm CSS với !important để override displaCy defaults
+    # CRITICAL: Post-process HTML để inject màu trực tiếp vào SVG paths
+    # displaCy generates paths in order, so we can map by index
+    
+    # Find all <g class="displacy-arrow"> blocks
+    pattern = r'(<g class="displacy-arrow">.*?</g>)'
+    arrow_blocks = re.findall(pattern, html, re.DOTALL)
+    
+    # Replace each arrow block with colored version
+    for idx, block in enumerate(arrow_blocks):
+        if idx in arc_colors:
+            color = arc_colors[idx]
+            
+            # Replace stroke color in path
+            new_block = re.sub(
+                r'stroke="[^"]*"',
+                f'stroke="{color}" stroke-width="3"',
+                block
+            )
+            
+            # Replace marker color
+            new_block = re.sub(
+                r'fill="[^"]*"',
+                f'fill="{color}"',
+                new_block
+            )
+            
+            # Replace label text color
+            new_block = re.sub(
+                r'(<text[^>]*class="displacy-label"[^>]*)(>)',
+                rf'\1 fill="{color}" font-weight="bold" font-size="14"\2',
+                new_block
+            )
+            
+            html = html.replace(block, new_block)
+    
+    # Wrap with scrollable container
     enhanced_html = f"""
     <div style="width: 100%; overflow-x: auto; overflow-y: hidden; padding: 10px 0;">
         <style>
-            /* Container với scroll ngang */
             .displacy-container {{
                 min-width: max-content !important;
                 padding: 30px 20px !important;
                 background: #ffffff !important;
                 border-radius: 8px !important;
                 border: 1px solid #e5e7eb !important;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
             }}
             
-            /* Text đậm hơn */
             .displacy-word {{
                 font-size: 16px !important;
                 font-weight: 600 !important;
-                color: #111827 !important;
                 fill: #111827 !important;
             }}
             
-            /* CRITICAL: Force arrow colors với !important */
-            .displacy-arrow {{
-                stroke-width: 3px !important;
-            }}
-            
-            /* Positive arrows */
-            .displacy-arrow[data-label="Positive"] {{
-                stroke: #22c55e !important;
-            }}
-            
-            /* Negative arrows */
-            .displacy-arrow[data-label="Negative"] {{
-                stroke: #ef4444 !important;
-            }}
-            
-            /* Neutral arrows */
-            .displacy-arrow[data-label="Neutral"] {{
-                stroke: #6b7280 !important;
-            }}
-            
-            /* Labels đậm và có màu */
             .displacy-label {{
-                font-size: 13px !important;
+                font-size: 14px !important;
                 font-weight: 700 !important;
-                fill: #ffffff !important;
-                stroke: none !important;
-            }}
-            
-            /* Label backgrounds */
-            .displacy-label[data-label="Positive"] {{
-                fill: #22c55e !important;
-            }}
-            
-            .displacy-label[data-label="Negative"] {{
-                fill: #ef4444 !important;
-            }}
-            
-            .displacy-label[data-label="Neutral"] {{
-                fill: #6b7280 !important;
-            }}
-            
-            /* Arrow heads */
-            marker path {{
-                fill: currentColor !important;
             }}
         </style>
         {html}
     </div>
     """
-    
-    # Post-process HTML để inject data-label attributes
-    for arc in arcs:
-        polarity = arc['label']
-        # Find và replace paths with data-label
-        enhanced_html = enhanced_html.replace(
-            f'<path class="displacy-arrow"',
-            f'<path class="displacy-arrow" data-label="{polarity}"'
-        )
-        enhanced_html = enhanced_html.replace(
-            f'<text class="displacy-label"',
-            f'<text class="displacy-label" data-label="{polarity}"'
-        )
     
     return enhanced_html

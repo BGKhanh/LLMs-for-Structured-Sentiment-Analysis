@@ -232,13 +232,14 @@ JSON OUTPUT FORMAT:
     
     def _get_user_prompt_ps_vi(self, text: str, sent_id: str) -> str:
         """Vietnamese user prompt for PS (basic)."""
-        return f"""Phân tích cảm xúc cho văn bản sau (sent_id: {sent_id}):
-"{text}"
+        return f"""
+Đầu tiên hãy hiểu vấn đề và vạch ra kế hoạch để giải quyết. 
+Sau đó, hãy thực hiện kế hoạch, phân tích từng bước và đưa ra câu trả lời cuối cùng. 
+Vui lòng sinh ra quy trình cụ thể theo các bước: 
+[Hiểu vấn đề], [Lập kế hoạch], [Phân tích chi tiết], [Câu trả lời].
 
-Hãy cùng phân tích bài toán này. Trước tiên hãy hiểu vấn đề và lập kế hoạch giải quyết. Sau đó, thực hiện kế hoạch để giải quyết vấn đề theo các bước sau:
-Đầu tiên, hãy vạch ra một kế hoạch để xác định tất cả các opinions và các thành phần của chúng trong câu.
-Sau đó, thực hiện kế hoạch đó từng bước một để đưa ra phân tích chi tiết.
-Cuối cùng, tổng hợp tất cả các phân tích vào một khối JSON duy nhất.
+Phân tích cảm xúc cho văn bản sau (sent_id: {sent_id}):
+"{text}"
 """
     
     def _get_user_prompt_ps_plus_vi(self, text: str, sent_id: str) -> str:
@@ -281,13 +282,14 @@ Cuối cùng, tổng hợp tất cả các phân tích vào một khối JSON du
     
     def _get_user_prompt_ps_en(self, text: str, sent_id: str) -> str:
         """English user prompt for PS (basic)."""
-        return f"""Analyze the sentiment for the following text (sent_id: {sent_id}):
-"{text}"
+        return f"""
+Let's first understand the problem and devise a plan to solve the problem. 
+Then, let's carry out the plan, solve the problem step by step and give the ultimate answer.
+Please explicitly generate the mentioned process: 
+[Problem Understanding], [Plan], [Detailed Analysis], [Answer].
 
-Let's break down this problem. First, let's understand the issue and plan the solution. Then, execute the plan to solve the problem in the following steps:
-First, outline a plan to identify all opinions and their components in the sentence.
-Next, execute that plan step-by-step to provide a detailed analysis.
-Finally, summarize all analyses into a single JSON block.
+Analyze the sentiment for the following text (sent_id: {sent_id}):
+"{text}"
 """
 
     def _get_user_prompt_ps_plus_en(self, text: str, sent_id: str) -> str:
