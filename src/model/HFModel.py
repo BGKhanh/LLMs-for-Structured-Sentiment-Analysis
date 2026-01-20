@@ -102,10 +102,15 @@ class HFModel:
         
         # Handle dtype conversion
         dtype_val = self.init_args.get("dtype", "auto")
-        if isinstance(dtype_val, str) and dtype_val != "auto" and hasattr(torch, dtype_val):
-            dtype = getattr(torch, dtype_val)
+        if isinstance(dtype_val, str):
+            if dtype_val == "auto" or dtype_val is None or dtype_val == "None":
+                dtype = None  # Let transformers auto-detect
+            elif hasattr(torch, dtype_val):
+                dtype = getattr(torch, dtype_val)
+            else:
+                dtype = None
         else:
-            dtype = dtype_val
+            dtype = dtype_val  # Already a torch.dtype object
 
         try:
             # === 1. Load Tokenizer ===
