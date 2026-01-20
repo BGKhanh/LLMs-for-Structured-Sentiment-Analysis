@@ -5,6 +5,7 @@ from spacy import displacy
 import json
 import warnings
 from src.utils.postprocessing import extract_position
+import re
 
 warnings.filterwarnings("ignore")
 
@@ -38,7 +39,7 @@ def parse_position_to_tuple(position_str: str) -> tuple:
 def convert_ssa_to_spacy(text, ssa_json):
     """
     Convert SSA JSON output to spaCy displacy visualization.
-    Fixed version with proper layering: arcs on top, entities below.
+    Fixed version with SVG manipulation for proper arc visibility.
     """
     nlp = get_spacy_model()
     doc = nlp(text)
@@ -156,17 +157,18 @@ def convert_ssa_to_spacy(text, ssa_json):
         for i in range(2, 10):
             colors[f"{label} (×{i})"] = color_mapping[label]
     
-    # Render dependency graph (arcs)
+    # Render dependency graph (arcs) with custom options
     dep_html = displacy.render(
         {"words": [{"text": w, "tag": ""} for w in words], "arcs": arcs},
         style="dep",
         manual=True,
         options={
             "compact": False, 
-            "distance": 150,
-            "arrow_stroke": 2.5,
-            "arrow_width": 10,
-            "offset_x": 0
+            "distance": 120,
+            "arrow_stroke": 3,
+            "arrow_width": 12,
+            "word_spacing": 25,
+            "bg": "#ffffff"
         },
         page=False
     )
@@ -180,105 +182,118 @@ def convert_ssa_to_spacy(text, ssa_json):
         page=False
     )
     
-    # CRITICAL FIX: Reverse order - dependency ABOVE, entities BELOW
+    # CRITICAL: Modify SVG to increase arc stroke and opacity
+    # Find and replace arc paths in dep_html
+    for i, arc in enumerate(arcs):
+        pol = arc['label']
+        
+        # Determine color based on polarity
+        if pol.lower() == 'positive':
+            arc_color = '#16a34a'
+        elif pol.lower() == 'negative':
+            arc_color = '#dc2626'
+        else:
+            arc_color = '#6b7280'
+        
+        # Replace the arc path with enhanced styling
+        dep_html = re.sub(
+            r'<path class="displacy-arrow"[^>]*fill="none"[^>]*/>',
+            f'<path class="displacy-arrow" fill="none" stroke="{arc_color}" stroke-width="4" opacity="1.0"/>',
+            dep_html,
+            count=1
+        )
+    
+    # Enhance label text styling in SVG
+    dep_html = re.sub(
+        r'<text class="displacy-label"([^>]*)>',
+        r'<text class="displacy-label"\1 style="font-weight: 900; font-size: 16px;">',
+        dep_html
+    )
+    
+    # Combine with proper CSS
     combined_html = f"""
-    <div style="width: 100%; overflow-x: auto; padding: 20px 0; background: white;">
+    <div style="width: 100%; overflow-x: auto; padding: 20px 0; background: #ffffff;">
         <style>
-            /* Container for proper layering */
-            .ssa-container {{
-                position: relative;
-                background: white;
+            /* Force SVG elements to be visible */
+            svg.displacy {{
+                background: transparent !important;
             }}
             
-            /* Dependency layer - ABOVE */
-            .dep-layer {{
-                position: relative;
-                z-index: 10;
-                margin-bottom: -30px; /* Overlap with entity layer */
-                padding-bottom: 40px;
-            }}
-            
-            /* Entity layer - BELOW */
-            .ent-layer {{
-                position: relative;
-                z-index: 1;
-                padding-top: 10px;
-                background: white;
-            }}
-            
-            /* Dependency arrows styling */
+            /* Make arrows BOLD and VISIBLE */
             .displacy-arrow {{
-                stroke-width: 2.5px !important;
+                stroke-width: 4px !important;
+                opacity: 1.0 !important;
                 fill: none !important;
             }}
             
-            /* Arc labels - positioned ABOVE the curve */
+            /* Arc labels - white background with dark text */
             text.displacy-label {{
-                font-size: 14px !important;
-                font-weight: 700 !important;
-                fill: #1f2937 !important;
+                font-size: 16px !important;
+                font-weight: 900 !important;
+                fill: #000000 !important;
                 paint-order: stroke fill !important;
                 stroke: #ffffff !important;
-                stroke-width: 4px !important;
+                stroke-width: 6px !important;
                 stroke-linecap: round !important;
                 stroke-linejoin: round !important;
             }}
             
+            /* Word spacing */
+            text.displacy-token {{
+                font-size: 16px !important;
+            }}
+            
             /* Entity highlights */
             mark.displacy-ent {{
-                font-weight: 600 !important;
-                padding: 3px 5px !important;
-                border-radius: 3px !important;
+                font-weight: 700 !important;
+                padding: 4px 6px !important;
+                border-radius: 4px !important;
                 border-bottom: 3px solid !important;
-                font-size: 15px !important;
-                line-height: 2.2 !important;
+                font-size: 16px !important;
+                line-height: 2.5 !important;
+                display: inline-block !important;
             }}
             
             span.displacy-ent {{
-                font-size: 12px !important;
-                font-weight: 700 !important;
-                padding: 2px 6px !important;
-                border-radius: 3px !important;
-                margin-left: 3px !important;
+                font-size: 13px !important;
+                font-weight: 800 !important;
+                padding: 3px 7px !important;
+                border-radius: 4px !important;
+                margin-left: 4px !important;
                 vertical-align: middle !important;
+                display: inline-block !important;
             }}
             
-            /* Polarity-specific colors */
-            .arc-positive {{
-                stroke: #16a34a !important;
+            /* Container spacing */
+            .ssa-viz {{
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
             }}
             
-            .arc-negative {{
-                stroke: #dc2626 !important;
+            .dep-container {{
+                margin-bottom: 10px;
+                min-height: 120px;
             }}
             
-            .arc-neutral {{
-                stroke: #6b7280 !important;
+            .ent-container {{
+                margin-top: 10px;
+                padding-top: 10px;
             }}
         </style>
         
-        <div class="ssa-container">
-            <!-- Dependency layer FIRST (on top) -->
-            <div class="dep-layer">
+        <div class="ssa-viz">
+            <!-- Dependency arcs -->
+            <div class="dep-container">
                 {dep_html}
             </div>
             
-            <!-- Entity layer SECOND (below) -->
-            <div class="ent-layer">
+            <!-- Entity labels -->
+            <div class="ent-container">
                 {ent_html}
             </div>
         </div>
     </div>
     """
-    
-    # Apply polarity colors to arcs
-    for arc in arcs:
-        pol = arc['label'].lower()
-        arc_class = f"arc-{pol}"
-        combined_html = combined_html.replace(
-            '<path class="displacy-arrow"',
-            f'<path class="displacy-arrow {arc_class}"',
-            1
-        )
     
     return combined_html
