@@ -58,14 +58,14 @@ def convert_ssa_to_spacy(text, ssa_json):
     
     # FIXED: Màu sắc và layout rõ ràng
     options = {
-        "compact": True,  # ← Compact mode để text không quá dài
-        "bg": "#f9fafb",
-        "distance": 100,  # ← Giảm distance để gọn hơn
+        "compact": False,  # ← Chuyển về False để có không gian hơn cho arrows
+        "bg": "#ffffff",
+        "distance": 150,  # ← Tăng lên để arrows rõ hơn
         "color": "#111827",
-        "arrow_stroke": 2,
-        "arrow_width": 8,
-        "font": "Inter, Arial, sans-serif",
-        "word_spacing": 25,  # ← Spacing giữa các từ
+        "arrow_stroke": 3,  # ← Tăng từ 2 lên 3
+        "arrow_width": 12,  # ← Tăng từ 8 lên 12
+        "font": "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+        "word_spacing": 30,
     }
 
     if isinstance(ssa_json, str):
@@ -143,87 +143,114 @@ def convert_ssa_to_spacy(text, ssa_json):
     
     # CRITICAL FIX: Thêm CSS với !important để override displaCy defaults
     enhanced_html = f"""
-    <div style="width: 100%; overflow-x: auto; overflow-y: hidden; padding: 10px 0;">
+    <div style="width: 100%; overflow-x: auto; overflow-y: visible; padding: 20px 0;">
         <style>
-            /* Container với scroll ngang */
+            /* Container */
             .displacy-container {{
                 min-width: max-content !important;
-                padding: 30px 20px !important;
+                padding: 40px 20px !important;
                 background: #ffffff !important;
                 border-radius: 8px !important;
-                border: 1px solid #e5e7eb !important;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+                border: 1px solid #d1d5db !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
             }}
             
-            /* Text đậm hơn */
+            /* Words - Đậm hơn */
             .displacy-word {{
-                font-size: 16px !important;
-                font-weight: 600 !important;
+                font-size: 18px !important;
+                font-weight: 700 !important;
                 color: #111827 !important;
                 fill: #111827 !important;
             }}
             
-            /* CRITICAL: Force arrow colors với !important */
+            /* Arrows - ĐẬM VÀ RÕ */
             .displacy-arrow {{
-                stroke-width: 3px !important;
+                stroke-width: 4px !important;
+                opacity: 1.0 !important;
+                fill: none !important;
             }}
             
-            /* Positive arrows */
-            .displacy-arrow[data-label="Positive"] {{
-                stroke: #22c55e !important;
-            }}
-            
-            /* Negative arrows */
-            .displacy-arrow[data-label="Negative"] {{
-                stroke: #ef4444 !important;
-            }}
-            
-            /* Neutral arrows */
-            .displacy-arrow[data-label="Neutral"] {{
-                stroke: #6b7280 !important;
-            }}
-            
-            /* Labels đậm và có màu */
-            .displacy-label {{
-                font-size: 13px !important;
-                font-weight: 700 !important;
-                fill: #ffffff !important;
+            /* Arrow Heads - Đầu mũi tên rõ hơn */
+            marker path {{
+                fill: currentColor !important;
+                opacity: 1.0 !important;
                 stroke: none !important;
             }}
             
-            /* Label backgrounds */
-            .displacy-label[data-label="Positive"] {{
-                fill: #22c55e !important;
+            /* Màu arrows theo Polarity - SUPER IMPORTANT */
+            g.displacy-arrow:has(text[data-label="Positive"]) path {{
+                stroke: #16a34a !important;
             }}
             
-            .displacy-label[data-label="Negative"] {{
-                fill: #ef4444 !important;
+            g.displacy-arrow:has(text[data-label="Negative"]) path {{
+                stroke: #dc2626 !important;
             }}
             
-            .displacy-label[data-label="Neutral"] {{
-                fill: #6b7280 !important;
+            g.displacy-arrow:has(text[data-label="Neutral"]) path {{
+                stroke: #52525b !important;
             }}
             
-            /* Arrow heads */
-            marker path {{
-                fill: currentColor !important;
+            /* Labels trên arrows - ĐẬM VÀ CÓ BACKGROUND */
+            .displacy-label {{
+                font-size: 15px !important;
+                font-weight: 800 !important;
+                fill: #ffffff !important;
+                stroke: none !important;
+                text-shadow: 0 1px 2px rgba(0,0,0,0.2) !important;
+            }}
+            
+            /* Background rectangles cho labels */
+            text.displacy-label::before {{
+                content: '';
+                position: absolute;
+                background: currentColor;
+                padding: 4px 8px;
+                border-radius: 4px;
+            }}
+            
+            /* Màu background labels */
+            text.displacy-label[data-label="Positive"] {{
+                paint-order: stroke fill !important;
+                stroke: #16a34a !important;
+                stroke-width: 16px !important;
+                stroke-linecap: round !important;
+            }}
+            
+            text.displacy-label[data-label="Negative"] {{
+                paint-order: stroke fill !important;
+                stroke: #dc2626 !important;
+                stroke-width: 16px !important;
+                stroke-linecap: round !important;
+            }}
+            
+            text.displacy-label[data-label="Neutral"] {{
+                paint-order: stroke fill !important;
+                stroke: #52525b !important;
+                stroke-width: 16px !important;
+                stroke-linecap: round !important;
+            }}
+            
+            /* Arc paths có opacity đầy đủ */
+            svg path {{
+                opacity: 1.0 !important;
+            }}
+            
+            /* Toàn bộ SVG rõ ràng */
+            svg {{
+                overflow: visible !important;
             }}
         </style>
         {html}
     </div>
     """
     
-    # Post-process HTML để inject data-label attributes
+    # Inject data-label attributes (giữ nguyên logic lines 217-227)
     for arc in arcs:
         polarity = arc['label']
-        # Find và replace paths with data-label
         enhanced_html = enhanced_html.replace(
-            f'<path class="displacy-arrow"',
-            f'<path class="displacy-arrow" data-label="{polarity}"'
-        )
-        enhanced_html = enhanced_html.replace(
-            f'<text class="displacy-label"',
-            f'<text class="displacy-label" data-label="{polarity}"'
+            '<text class="displacy-label"',
+            f'<text class="displacy-label" data-label="{polarity}"',
+            1  # Only first occurrence per arc
         )
     
     return enhanced_html
