@@ -19,7 +19,7 @@ generation_kwargs:
     - "<|im_end|>"
     - "<|eot_id|>"
     - "<end_of_turn>"
-  max_new_tokens: 4096
+  max_new_tokens: 1024
   temperature: 0.1
   top_p: 0.95
   top_k: 50
