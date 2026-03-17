@@ -246,18 +246,12 @@ Phân tích cảm xúc cho văn bản sau (sent_id: {sent_id}):
         """Vietnamese user prompt for PS+ (enhanced) & PaS+CoT."""
         
         # 1. Instruction
-        instruction = """Hãy thực hiện một phân tích chi tiết theo quy trình Plan-and-Solve (PaS) sau:
-
-1. [TRÍCH XUẤT ỨNG VIÊN]: Đọc kỹ văn bản. Xác định và liệt kê danh sách các cụm từ (spans) tiềm năng chứa cảm xúc (Polar Expressions) hoặc mô tả hành vi/trạng thái.
-2. [LẬP KẾ HOẠCH]: 
-   - Rà soát lại danh sách ứng viên ở Bước 1. Loại bỏ các cụm từ không rõ ràng hoặc trùng lặp (nếu có).
-   - Nêu chiến lược xử lý: thứ tự phân tích, cách tiếp cận các thành phần. Xác định Source/Target nếu chúng bị ẩn.
-   - Nhận diện các đặc điểm chung/thách thức có thể gặp phải trong văn bản này.
-   - Xác nhận sẽ phân tích đầy đủ 5 thành phần cho mỗi Opinion.
-3. [THỰC THI SUY LUẬN]:
-   - Với mỗi Opinion trong kế hoạch, hãy phân tích chi tiết các thành phần: Source, Target, Polar_expression, Polarity, Intensity.
-   - BẮT BUỘC: Với mỗi giá trị gán nhãn, phải kèm theo lý giải ngắn gọn (Reasoning) dựa trên ngữ cảnh, tiếng lóng hoặc ẩn ý.
-4. [TỔNG HỢP]: Trình bày kết quả cuối cùng dưới dạng JSON.
+        instruction = """
+Đầu tiên hãy hiểu vấn đề, trích xuất các thành phần chủ thể, đối tượng, biểu thức cảm xúc của từng ý kiến (opinion), và vạch ra kế hoạch để giải quyết.
+Sau đó, hãy thực hiện kế hoạch, phân tích từng bước, thiết lập các mối liên kết giữa các thành phần, phân định nhãn cực tính 
+(lưu ý kỹ đến tính chính xác trong xác định liên kết giữa các thành phần và các yếu tố ngữ cảnh mỉa mai) và đưa ra câu trả lời cuối cùng.
+Vui lòng sinh ra quy trình cụ thể theo các bước: 
+[Hiểu vấn đề], [Lập kế hoạch], [Phân tích chi tiết], [Câu trả lời].
 """
         parts = [instruction]
 

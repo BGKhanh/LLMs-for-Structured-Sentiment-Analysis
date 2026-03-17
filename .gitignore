@@ -221,5 +221,18 @@ semeval22_structured_sentiment/evaluation/metadata
 # Results
 results/
 
-# GoT module
-lm-evaluation-harness/
+# lm-eval framework module
+lm-evaluation-harness/docs/
+lm-evaluation-harness/tests/
+lm-evaluation-harness/examples/
+lm-evaluation-harness/templates/
+lm-evaluation-harness/scripts/
+lm-evaluation-harness/lm_eval/tasks/*
+!lm-evaluation-harness/lm_eval/tasks/vietnamese_ssa/
+!lm-evaluation-harness/lm_eval/tasks/vietnamese_ssa/**
+!lm-evaluation-harness/lm_eval/tasks/__init__.py
+!lm-evaluation-harness/lm_eval/tasks/_factory.py
+!lm-evaluation-harness/lm_eval/tasks/_index.py
+!lm-evaluation-harness/lm_eval/tasks/_yaml_loader.py
+!lm-evaluation-harness/lm_eval/tasks/manager.py
+!lm-evaluation-harness/lm_eval/tasks/README.md
