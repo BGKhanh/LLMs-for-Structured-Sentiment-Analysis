@@ -138,6 +138,8 @@ def main():
         examples_pool_path=args.examples_pool_path,
         dataset_dir=args.dataset_dir,
     )
+    # Prevent lm-eval's hot-reload from replacing the configured module
+    task_utils.__mtime__ = Path(task_utils.__file__).stat().st_mtime_ns
     print(f"  System prompt length: {len(system_prompt)} chars\n")
 
     # ── 3. Run evaluation ───────────────────────────────────────────────
