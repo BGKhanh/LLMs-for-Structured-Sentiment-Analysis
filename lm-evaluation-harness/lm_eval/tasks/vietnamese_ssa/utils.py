@@ -181,17 +181,20 @@ def doc_to_target(doc: Dict[str, Any]) -> str:
 # =========================================================================
 # Filter: extract JSON from model response
 # =========================================================================
-def extract_and_postprocess(resps: List[List[str]], docs: List[Dict]) -> List[str]:
+def extract_and_postprocess(resps: List[List[str]], docs: List[Dict]) -> List[List[str]]:
     """Custom filter function: extract JSON then normalize to SemEval format.
 
     Called via filter_list -> function: !function utils.extract_and_postprocess
+
+    Input:  resps = [[raw_response], [raw_response], ...] (one list per doc)
+    Output: [[processed_json], [processed_json], ...] (keep list-of-list for pipeline)
     """
     filtered = []
     for resp_list, doc in zip(resps, docs):
         raw = resp_list[0] if resp_list else "{}"
         extracted = extract_json_from_response(raw)
         processed = postprocess_response(extracted, doc["text"], doc["sent_id"])
-        filtered.append(processed)
+        filtered.append([processed])
     return filtered
 
 
