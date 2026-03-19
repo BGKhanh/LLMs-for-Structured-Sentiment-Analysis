@@ -1,14 +1,22 @@
 """
 Bridge module between lm-evaluation-harness and the project's existing code.
 
-Provides all !function references used in vietnamese_ssa.yaml:
-- configure(): module-level setup for prompt template (called from wrapper script)
-- load_dataset(): load local JSON data as HuggingFace DatasetDict
-- doc_to_text(): build user prompt per document
-- doc_to_target(): serialize ground truth
-- process_results(): compute per-doc SemEval raw scores
-- corpus-level aggregation functions for 6 metrics
-- extract/filter functions for JSON extraction from model responses
+All configuration is driven by ``--metadata`` passed via CLI:
+    lm-eval run --tasks vietnamese_ssa \
+        --metadata '{"technique":"few_shot","language":"vi","n_shot":3}'
+
+The load_dataset() function receives metadata as **kwargs, calls configure()
+to setup prompt templates, and pre-computes system_prompt + user_prompt for
+every document. This eliminates module-level state issues entirely.
+
+YAML references:
+- custom_dataset: !function utils.load_dataset
+- description: "{{system_prompt}}"       (Jinja2, renders from doc field)
+- doc_to_text: "{{user_prompt}}"         (Jinja2, renders from doc field)
+- doc_to_target: "{{opinions_json}}"     (Jinja2, renders from doc field)
+- process_results: !function utils.process_results
+- filter_fn: !function utils.extract_and_postprocess
+- aggregation: !function utils.<metric>_agg
 """
 
 import sys
@@ -21,7 +29,7 @@ import datasets
 # ---------------------------------------------------------------------------
 # Resolve project root so we can import from src/
 # ---------------------------------------------------------------------------
-_PROJECT_ROOT = Path(__file__).resolve().parents[4]  # up from tasks/vietnamese_ssa/
+_PROJECT_ROOT = Path(__file__).resolve().parents[4]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
@@ -33,161 +41,153 @@ from src.prompt_templates import (
     Re2PaSCoTPrompt,
 )
 from src.utils.postprocessing import extract_json_from_response, postprocess_response
-
-# Evaluation helpers from SemEval scripts
 from semeval22_structured_sentiment.evaluation.evaluate import (
     convert_opinion_to_tuple,
     sent_tuples_in_list,
     weighted_score,
 )
 
-# =========================================================================
-# Module-level state (set once via configure(), read by !function callables)
-# =========================================================================
-_template = None
-_dataset_paths: Dict[str, str] = {
-    "train": str(_PROJECT_ROOT / "data" / "vitoed_new" / "train.json"),
-    "dev": str(_PROJECT_ROOT / "data" / "vitoed_new" / "dev.json"),
-    "test": str(_PROJECT_ROOT / "data" / "vitoed_new" / "test.json"),
-}
-
 _EPSILON = 1e-16
 
 
 # =========================================================================
-# configure() - called from wrapper script before simple_evaluate()
+# Prompt template factory (stateless, called inside load_dataset)
 # =========================================================================
-def configure(
+def _build_template(
     technique: str,
     language: str = "vi",
     n_shot: int = 0,
     plus_mode: bool = False,
     add_method: str = "none",
     examples_pool_path: Optional[str] = None,
-    dataset_dir: Optional[str] = None,
-) -> str:
-    """Setup prompt template and dataset paths. Must be called once before eval.
-
-    Args:
-        technique: One of few_shot, few_shot_cot, rereading, plan_and_solve, re2_pas_cot.
-        language: 'vi' or 'en'.
-        n_shot: Number of few-shot examples.
-        plus_mode: PS+ mode for plan_and_solve.
-        add_method: Enhancement method for rereading (none, 0_CoT, FewShot, etc.).
-        examples_pool_path: Path to examples pool JSON for few-shot techniques.
-        dataset_dir: Override dataset directory (default: data/vitoed_new).
+):
+    """Create and prepare a prompt template instance.
 
     Returns:
-        System prompt string (to pass as system_instruction to simple_evaluate).
+        Prepared BasePromptTemplate instance.
     """
-    global _template, _dataset_paths
-
     eng = language == "en"
 
-    # Override dataset paths if provided
-    if dataset_dir:
-        base = Path(dataset_dir)
-        if not base.is_absolute():
-            base = _PROJECT_ROOT / base
-        _dataset_paths = {
-            "train": str(base / "train.json"),
-            "dev": str(base / "dev.json"),
-            "test": str(base / "test.json"),
-        }
-
-    # Resolve examples_pool_path for few-shot techniques
-    if examples_pool_path is None and n_shot > 0:
-        examples_pool_path = _dataset_paths["train"]
-
-    # Factory: create prompt template instance
     if technique == "few_shot":
-        _template = FewShotPrompt(
-            eng=eng, n_shot=n_shot, examples_pool_path=examples_pool_path
-        )
+        tpl = FewShotPrompt(eng=eng, n_shot=n_shot, examples_pool_path=examples_pool_path)
     elif technique == "few_shot_cot":
-        _template = FewShotCoTPrompt(eng=eng, n_shot=n_shot)
+        tpl = FewShotCoTPrompt(eng=eng, n_shot=n_shot)
     elif technique == "rereading":
-        _template = ReReadingPrompt(
-            eng=eng,
-            add_method=add_method,
-            n_shot=n_shot,
+        tpl = ReReadingPrompt(
+            eng=eng, add_method=add_method, n_shot=n_shot,
             examples_pool_path=examples_pool_path,
         )
     elif technique in ("plan_and_solve", "plan_solve"):
-        _template = PlanAndSolvePrompt(eng=eng, plus=plus_mode, n_shot=n_shot)
+        tpl = PlanAndSolvePrompt(eng=eng, plus=plus_mode, n_shot=n_shot)
     elif technique == "re2_pas_cot":
-        _template = Re2PaSCoTPrompt(eng=eng, n_shot=n_shot)
+        tpl = Re2PaSCoTPrompt(eng=eng, n_shot=n_shot)
     else:
         raise ValueError(
             f"Unknown technique: {technique}. "
             "Supported: few_shot, few_shot_cot, rereading, plan_and_solve, re2_pas_cot"
         )
 
-    _template.prepare()
-    return _template._system_prompt_cache
+    tpl.prepare()
+    return tpl
 
 
 # =========================================================================
-# Dataset loading (!function reference)
+# Dataset loading (receives --metadata as **kwargs)
 # =========================================================================
 def load_dataset(**kwargs) -> datasets.DatasetDict:
-    """Load local JSON files as a HuggingFace DatasetDict.
+    """Load local JSON and pre-compute prompts for every document.
 
     Called by lm-eval via ``custom_dataset: !function utils.load_dataset``.
+    Receives ``--metadata`` CLI values as keyword arguments.
+
+    Required metadata keys:
+        technique (str): Prompt technique name.
+
+    Optional metadata keys:
+        language (str): 'vi' or 'en' (default: 'vi').
+        n_shot (int): Number of few-shot examples (default: 0).
+        plus_mode (bool): PS+ mode for plan_and_solve (default: false).
+        add_method (str): Enhancement for rereading (default: 'none').
+        examples_pool_path (str): Path to examples pool JSON.
+        dataset_dir (str): Override dataset directory.
     """
+    technique = kwargs.get("technique")
+    if not technique:
+        raise ValueError(
+            "Missing 'technique' in --metadata. Example: "
+            "--metadata '{\"technique\":\"few_shot\",\"language\":\"vi\",\"n_shot\":3}'"
+        )
+
+    language = kwargs.get("language", "vi")
+    n_shot = int(kwargs.get("n_shot", 0))
+    plus_mode = bool(kwargs.get("plus_mode", False))
+    add_method = str(kwargs.get("add_method", "none"))
+    dataset_dir = kwargs.get("dataset_dir", None)
+
+    # Resolve dataset paths
+    if dataset_dir:
+        base = Path(dataset_dir)
+        if not base.is_absolute():
+            base = _PROJECT_ROOT / base
+    else:
+        base = _PROJECT_ROOT / "data" / "vitoed_new"
+
+    dataset_paths = {
+        "train": base / "train.json",
+        "dev": base / "dev.json",
+        "test": base / "test.json",
+    }
+
+    # Resolve examples pool
+    examples_pool_path = kwargs.get("examples_pool_path", None)
+    if examples_pool_path is None and n_shot > 0:
+        examples_pool_path = str(dataset_paths["train"])
+
+    # Build and prepare prompt template
+    template = _build_template(
+        technique=technique,
+        language=language,
+        n_shot=n_shot,
+        plus_mode=plus_mode,
+        add_method=add_method,
+        examples_pool_path=examples_pool_path,
+    )
+    system_prompt = template._system_prompt_cache
+
+    # Load each split, pre-compute prompts
     splits = {}
-    for split_name, path in _dataset_paths.items():
-        p = Path(path)
-        if not p.exists():
+    for split_name, path in dataset_paths.items():
+        if not path.exists():
             continue
-        with open(p, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             raw = json.load(f)
-        # Flatten opinions to JSON string for HF Dataset compatibility
+
         records = []
         for sample in raw:
-            records.append(
-                {
-                    "sent_id": sample["sent_id"],
-                    "text": sample["text"],
-                    "opinions_json": json.dumps(
-                        sample.get("opinions", []), ensure_ascii=False
-                    ),
-                }
-            )
+            text = sample["text"]
+            sent_id = str(sample["sent_id"])
+            _, user_prompt = template.get_prompt(text, sent_id)
+
+            records.append({
+                "sent_id": sample["sent_id"],
+                "text": text,
+                "opinions_json": json.dumps(sample.get("opinions", []), ensure_ascii=False),
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+            })
         splits[split_name] = datasets.Dataset.from_list(records)
 
     return datasets.DatasetDict(splits)
 
 
 # =========================================================================
-# doc_to_text / doc_to_target (!function references)
-# =========================================================================
-def doc_to_text(doc: Dict[str, Any]) -> str:
-    """Build user prompt for a single document.
-
-    System prompt is handled separately via ``system_instruction`` parameter.
-    """
-    if _template is None:
-        raise RuntimeError("utils.configure() must be called before evaluation.")
-    _, user_prompt = _template.get_prompt(doc["text"], str(doc["sent_id"]))
-    return user_prompt
-
-
-def doc_to_target(doc: Dict[str, Any]) -> str:
-    """Return ground truth as a JSON string for logging/reference."""
-    return doc["opinions_json"]
-
-
-# =========================================================================
 # Filter: extract JSON from model response
 # =========================================================================
 def extract_and_postprocess(resps: List[List[str]], docs: List[Dict]) -> List[List[str]]:
-    """Custom filter function: extract JSON then normalize to SemEval format.
+    """Custom filter: extract JSON then normalize to SemEval format.
 
-    Called via filter_list -> function: !function utils.extract_and_postprocess
-
-    Input:  resps = [[raw_response], [raw_response], ...] (one list per doc)
-    Output: [[processed_json], [processed_json], ...] (keep list-of-list for pipeline)
+    Input:  resps = [[raw_response], ...] (one list per doc)
+    Output: [[processed_json], ...]       (keep list-of-list for pipeline)
     """
     filtered = []
     for resp_list, doc in zip(resps, docs):
@@ -201,60 +201,22 @@ def extract_and_postprocess(resps: List[List[str]], docs: List[Dict]) -> List[Li
 # =========================================================================
 # process_results: per-doc metric computation
 # =========================================================================
-def _build_opinion_dict(doc: Dict[str, Any]) -> Dict[str, Any]:
-    """Reconstruct a full sample dict from doc fields for evaluate.py functions."""
-    return {
+def process_results(doc: Dict[str, Any], results: List[str]) -> Dict[str, Any]:
+    """Compute per-document raw scores for corpus-level aggregation.
+
+    Returns dict mapping metric_name -> (weighted_tp, num_pred, num_gold).
+    """
+    response = results[0] if results else "{}"
+
+    # Gold
+    gold_sample = {
         "sent_id": str(doc["sent_id"]),
         "text": doc["text"],
         "opinions": json.loads(doc["opinions_json"]),
     }
-
-
-def _compute_per_doc_scores(
-    gold_tuples: List, pred_tuples: List
-) -> Dict[str, Tuple[float, int, int]]:
-    """Compute per-doc raw scores for all 6 metrics.
-
-    Returns dict mapping metric_name -> (sum_weighted_tp, num_pred, num_gold).
-    """
-    modes = {
-        "SF1": ("all", True, True),
-        "NSF1": ("all", False, True),
-        "Holder_F1": ("holder", False, True),
-        "Target_F1": ("target", False, True),
-        "Exp_F1": ("expression", False, True),
-        "Targeted_F1": ("targeted_strict", True, False),
-    }
-
-    scores = {}
-    for metric_name, (mode, keep_polarity, use_weighted) in modes.items():
-        w_tp = 0.0
-        for pt in pred_tuples:
-            if sent_tuples_in_list(pt, gold_tuples, keep_polarity=keep_polarity, mode=mode):
-                if use_weighted:
-                    w_tp += weighted_score(pt, gold_tuples, mode=mode)
-                else:
-                    w_tp += 1.0
-
-        scores[metric_name] = (w_tp, len(pred_tuples), len(gold_tuples))
-
-    return scores
-
-
-def process_results(doc: Dict[str, Any], results: List[str]) -> Dict[str, Any]:
-    """Compute per-document raw scores for corpus-level aggregation.
-
-    Called by lm-eval after filtering. Each metric key maps to a tuple
-    ``(weighted_tp, num_pred, num_gold)`` that the custom aggregation
-    functions will sum across all documents.
-    """
-    response = results[0] if results else "{}"
-
-    # Build gold sample
-    gold_sample = _build_opinion_dict(doc)
     gold_tuples = convert_opinion_to_tuple(gold_sample)
 
-    # Build pred sample from model response
+    # Pred
     try:
         pred_data = json.loads(response)
         pred_sample = {
@@ -266,49 +228,53 @@ def process_results(doc: Dict[str, Any], results: List[str]) -> Dict[str, Any]:
     except (json.JSONDecodeError, KeyError, TypeError):
         pred_tuples = []
 
-    return _compute_per_doc_scores(gold_tuples, pred_tuples)
+    # Compute scores for all 6 metrics
+    modes = {
+        "SF1": ("all", True, True),
+        "NSF1": ("all", False, True),
+        "Holder_F1": ("holder", False, True),
+        "Target_F1": ("target", False, True),
+        "Exp_F1": ("expression", False, True),
+        "Targeted_F1": ("targeted_strict", True, False),
+    }
+    scores = {}
+    for name, (mode, keep_polarity, use_weighted) in modes.items():
+        w_tp = 0.0
+        for pt in pred_tuples:
+            if sent_tuples_in_list(pt, gold_tuples, keep_polarity=keep_polarity, mode=mode):
+                w_tp += weighted_score(pt, gold_tuples, mode=mode) if use_weighted else 1.0
+        scores[name] = (w_tp, len(pred_tuples), len(gold_tuples))
+
+    return scores
 
 
 # =========================================================================
-# Corpus-level aggregation functions (registered in metric_list via !function)
+# Corpus-level aggregation functions
 # =========================================================================
 def _corpus_f1(items: List[Tuple[float, int, int]]) -> float:
-    """Generic corpus-level F1 from per-doc (weighted_tp, num_pred, num_gold) tuples."""
+    """Corpus-level F1 from per-doc (weighted_tp, num_pred, num_gold) tuples."""
     total_wtp = sum(x[0] for x in items)
     total_pred = sum(x[1] for x in items)
     total_gold = sum(x[2] for x in items)
-
     precision = total_wtp / (total_pred + _EPSILON)
     recall = total_wtp / (total_gold + _EPSILON)
-    f1 = 2 * precision * recall / (precision + recall + _EPSILON)
-    return f1
+    return 2 * precision * recall / (precision + recall + _EPSILON)
 
 
 def sf1_agg(items):
-    """Corpus-level Sentiment Graph F1 (SF1)."""
     return _corpus_f1(items)
-
 
 def nsf1_agg(items):
-    """Corpus-level Non-polar SF1 (NSF1)."""
     return _corpus_f1(items)
-
 
 def holder_f1_agg(items):
-    """Corpus-level Holder F1."""
     return _corpus_f1(items)
-
 
 def target_f1_agg(items):
-    """Corpus-level Target F1."""
     return _corpus_f1(items)
-
 
 def exp_f1_agg(items):
-    """Corpus-level Expression F1."""
     return _corpus_f1(items)
 
-
 def targeted_f1_agg(items):
-    """Corpus-level Targeted F1."""
     return _corpus_f1(items)
