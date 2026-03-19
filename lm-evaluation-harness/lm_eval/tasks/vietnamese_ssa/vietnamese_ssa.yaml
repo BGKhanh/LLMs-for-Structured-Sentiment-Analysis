@@ -2,7 +2,7 @@ task: vietnamese_ssa
 dataset_path: null
 custom_dataset: !function utils.load_dataset
 output_type: generate_until
-test_split: dev
+test_split: test
 training_split: train
 validation_split: dev
 
@@ -20,8 +20,10 @@ generation_kwargs:
     - "<|im_end|>"
     - "<|eot_id|>"
     - "<end_of_turn>"
-  max_gen_toks: 1024
+  max_new_tokens: 2048
   temperature: 0
+  top_p: 0.95
+  top_k: 50
   do_sample: false
 
 filter_list:
