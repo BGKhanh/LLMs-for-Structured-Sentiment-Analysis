@@ -204,7 +204,12 @@ def extract_and_postprocess(resps: List[List[str]], docs: List[Dict]) -> List[Li
 def process_results(doc: Dict[str, Any], results: List[str]) -> Dict[str, Any]:
     """Compute per-document raw scores for corpus-level aggregation.
 
-    Returns dict mapping metric_name -> (weighted_tp, num_pred, num_gold).
+    Returns dict mapping metric_name ->
+        (weighted_tp_prec, num_pred, weighted_tp_rec, num_gold).
+
+    Precision and recall require separate weighted-TP accumulators because
+    ``weighted_score(tuple, list)`` is asymmetric: the denominator is always
+    the span length of the *first* argument.
     """
     response = results[0] if results else "{}"
 
@@ -228,7 +233,14 @@ def process_results(doc: Dict[str, Any], results: List[str]) -> Dict[str, Any]:
     except (json.JSONDecodeError, KeyError, TypeError):
         pred_tuples = []
 
-    # Compute scores for all 6 metrics
+    # Compute scores for all 6 metrics.
+    # IMPORTANT: SemEval-2022 precision/recall are computed with different
+    # denominators and (weighted) numerators:
+    # - precision: iterate over *pred* tuples and match against gold
+    # - recall:    iterate over *gold* tuples and match against pred
+    #
+    # weighted_score is not symmetric because overlap denominators use the
+    # first tuple's span lengths, so we must call it with the correct order.
     modes = {
         "SF1": ("all", True, True),
         "NSF1": ("all", False, True),
@@ -239,11 +251,19 @@ def process_results(doc: Dict[str, Any], results: List[str]) -> Dict[str, Any]:
     }
     scores = {}
     for name, (mode, keep_polarity, use_weighted) in modes.items():
-        w_tp = 0.0
+        # Precision numerator: iterate predictions (tp) only.
+        w_tp_prec = 0.0
         for pt in pred_tuples:
             if sent_tuples_in_list(pt, gold_tuples, keep_polarity=keep_polarity, mode=mode):
-                w_tp += weighted_score(pt, gold_tuples, mode=mode) if use_weighted else 1.0
-        scores[name] = (w_tp, len(pred_tuples), len(gold_tuples))
+                w_tp_prec += weighted_score(pt, gold_tuples, mode=mode) if use_weighted else 1.0
+
+        # Recall numerator: iterate gold (tp) only.
+        w_tp_rec = 0.0
+        for gt in gold_tuples:
+            if sent_tuples_in_list(gt, pred_tuples, keep_polarity=keep_polarity, mode=mode):
+                w_tp_rec += weighted_score(gt, pred_tuples, mode=mode) if use_weighted else 1.0
+
+        scores[name] = (w_tp_prec, len(pred_tuples), w_tp_rec, len(gold_tuples))
 
     return scores
 
@@ -251,13 +271,35 @@ def process_results(doc: Dict[str, Any], results: List[str]) -> Dict[str, Any]:
 # =========================================================================
 # Corpus-level aggregation functions
 # =========================================================================
-def _corpus_f1(items: List[Tuple[float, int, int]]) -> float:
-    """Corpus-level F1 from per-doc (weighted_tp, num_pred, num_gold) tuples."""
-    total_wtp = sum(x[0] for x in items)
+def _corpus_f1(items: List[Tuple]) -> float:
+    """Corpus-level F1 from per-doc tuples.
+
+    Supports both:
+    - (weighted_tp, num_pred, num_gold)  [legacy; precision/recall share numerator]
+    - (weighted_tp_prec, num_pred, weighted_tp_rec, num_gold) [SemEval-2022-correct]
+    """
+    if not items:
+        return 0.0
+
+    if len(items[0]) == 3:
+        # Legacy behavior (kept only for backward compatibility).
+        total_wtp = sum(x[0] for x in items)
+        total_pred = sum(x[1] for x in items)
+        total_gold = sum(x[2] for x in items)
+        precision = total_wtp / (total_pred + _EPSILON)
+        recall = total_wtp / (total_gold + _EPSILON)
+        return 2 * precision * recall / (precision + recall + _EPSILON)
+
+    if len(items[0]) != 4:
+        raise ValueError(f"Unexpected per-doc score tuple length: {len(items[0])}")
+
+    total_wtp_prec = sum(x[0] for x in items)
     total_pred = sum(x[1] for x in items)
-    total_gold = sum(x[2] for x in items)
-    precision = total_wtp / (total_pred + _EPSILON)
-    recall = total_wtp / (total_gold + _EPSILON)
+    total_wtp_rec = sum(x[2] for x in items)
+    total_gold = sum(x[3] for x in items)
+
+    precision = total_wtp_prec / (total_pred + _EPSILON)
+    recall = total_wtp_rec / (total_gold + _EPSILON)
     return 2 * precision * recall / (precision + recall + _EPSILON)
 
 
