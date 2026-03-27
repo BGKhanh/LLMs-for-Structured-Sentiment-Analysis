@@ -15,6 +15,7 @@ from .blocks import (
     few_shot_block,
     few_shot_question_block,
     pas_instruction_block,
+    re2_examples_block,
     rereading_block,
 )
 
@@ -113,6 +114,9 @@ class ReReadingContent:
             return
         if self.add_method in ("FewShot", "FewShot_CoT", "few_shot", "cot_demo"):
             k = min(self.n_shot, len(pool))
+            # Keep legacy behavior:
+            # - FewShot: random sample fixed once
+            # - FewShot_CoT: take first k from pool
             if self.add_method in ("FewShot_CoT", "cot_demo"):
                 self._examples = pool[:k]
             else:
@@ -145,10 +149,16 @@ class ReReadingContent:
     def user_prompt(self, text: str, sent_id: str) -> str:
         parts: list[str] = []
         if self._examples:
-            if self.add_method in ("FewShot_CoT", "cot_demo"):
-                parts.append(cot_demo_block(self._examples, self.language))
-            else:
-                parts.append(few_shot_block(self._examples, self.language))
+            # IMPORTANT: For RE2 + FewShot/FewShot_CoT, examples must include
+            # the re-reading trigger inside each example (see legacy re_reading.py).
+            include_reasoning = self.add_method in ("FewShot_CoT", "cot_demo")
+            parts.append(
+                re2_examples_block(
+                    self._examples,
+                    include_reasoning=include_reasoning,
+                    language=self.language,
+                )
+            )
             parts.append(
                 "\nNow, analyze the following case:\n"
                 if self.language == "en"
@@ -173,25 +183,12 @@ class PlanAndSolveContent:
         self._examples: list[dict[str, Any]] = []
 
     def setup(self, pool: list[dict[str, Any]]) -> None:
-        # Keep legacy behavior: only load examples when plus and n_shot > 0.
-        if self.plus and self.n_shot > 0:
-            k = min(self.n_shot, len(pool))
-            self._examples = pool[:k]
+        # As per latest requirement: PaS and CoT are no longer combined.
+        # Do not load or attach any CoT demo examples here.
+        self._examples = []
 
     def user_prompt(self, text: str, sent_id: str) -> str:
         parts: list[str] = [pas_instruction_block(plus=self.plus, language=self.language)]
-        if self._examples:
-            title = (
-                "HERE ARE SOME DEMONSTRATION EXAMPLES (PLEASE FOLLOW SIMILAR PROCESS):"
-                if self.language == "en"
-                else "DƯỚI ĐÂY LÀ MỘT SỐ VÍ DỤ MINH HỌA (HÃY LÀM THEO QUY TRÌNH TƯƠNG TỰ):"
-            )
-            parts.append("\n\n" + title + "\n\n" + cot_demo_block(self._examples, self.language))
-            parts.append(
-                "\nNow, analyze the following case:\n"
-                if self.language == "en"
-                else "\nBây giờ, hãy phân tích trường hợp sau:\n"
-            )
 
         if self.language == "en":
             parts.append(f'Analyze the sentiment for the following text (sent_id: {sent_id}):\n"{text}"')

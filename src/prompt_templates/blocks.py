@@ -179,3 +179,49 @@ Trả về KẾT QUẢ CHÍNH XÁC theo cấu trúc JSON đã yêu cầu."""
     )
     return f"{base_q}\n\n{reread}"
 
+
+# ---------------------------------------------------------------------------
+# Re-reading example formatting (copied from legacy ReReadingPrompt)
+# ---------------------------------------------------------------------------
+def re2_examples_block(
+    examples: list[dict[str, Any]],
+    *,
+    include_reasoning: bool = False,
+    language: str = "vi",
+) -> str:
+    """Build RE2-style examples section where each example includes re-reading."""
+    if language == "en":
+        section = "HERE ARE SOME DEMONSTRATION EXAMPLES:\n\n"
+        header = "=== EXAMPLE"
+        for i, ex in enumerate(examples, 1):
+            text = ex.get("text", "")
+            q1 = f'Analyze the sentiment for the following text: "{text}"'
+            q2 = f"Read the question again: {q1}"
+            section += f"{header} {i} ===\n"
+            section += f"{q1}\n\n{q2}\n\n"
+            if include_reasoning and "reasoning" in ex:
+                section += f"Reasoning:\n{ex.get('reasoning','')}\n\n"
+            if include_reasoning:
+                output_data = ex.get("output", {})
+            else:
+                output_data = {"text": text, "opinions": _simplify_opinions(ex.get("opinions", []))}
+            section += f"Output:\n{json.dumps(output_data, ensure_ascii=False, indent=2)}\n\n"
+        return section.strip()
+
+    section = "DƯỚI ĐÂY LÀ MỘT SỐ VÍ DỤ MINH HỌA:\n\n"
+    header = "=== VÍ DỤ"
+    for i, ex in enumerate(examples, 1):
+        text = ex.get("text", "")
+        q1 = f'Phân tích cảm xúc cho văn bản sau: "{text}"'
+        q2 = f"Đọc lại câu hỏi: {q1}"
+        section += f"{header} {i} ===\n"
+        section += f"{q1}\n\n{q2}\n\n"
+        if include_reasoning and "reasoning" in ex:
+            section += f"Reasoning:\n{ex.get('reasoning','')}\n\n"
+        if include_reasoning:
+            output_data = ex.get("output", {})
+        else:
+            output_data = {"text": text, "opinions": _simplify_opinions(ex.get("opinions", []))}
+        section += f"Output:\n{json.dumps(output_data, ensure_ascii=False, indent=2)}\n\n"
+    return section.strip()
+
