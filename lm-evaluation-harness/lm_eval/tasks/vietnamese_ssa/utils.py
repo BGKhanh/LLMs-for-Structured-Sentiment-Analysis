@@ -5,7 +5,7 @@ All configuration is driven by ``--metadata`` passed via CLI:
     lm-eval run --tasks vietnamese_ssa \
         --metadata '{"technique":"few_shot","language":"vi","n_shot":3}'
 
-The load_dataset() function receives metadata as **kwargs, calls configure()
+The load_dataset() function receives metadata as **kwargs, builds prompt creator
 to setup prompt templates, and pre-computes system_prompt + user_prompt for
 every document. This eliminates module-level state issues entirely.
 
@@ -33,13 +33,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[4]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from src.prompt_templates import (
-    FewShotPrompt,
-    FewShotCoTPrompt,
-    ReReadingPrompt,
-    PlanAndSolvePrompt,
-    Re2PaSCoTPrompt,
-)
+from src.prompt_templates import build_prompt_creator
 from src.utils.postprocessing import extract_json_from_response, postprocess_response
 from semeval22_structured_sentiment.evaluation.evaluate import (
     convert_opinion_to_tuple,
@@ -51,44 +45,46 @@ _EPSILON = 1e-16
 
 
 # =========================================================================
-# Prompt template factory (stateless, called inside load_dataset)
+# Legacy prompt template factory (kept as comments for safe rollback)
 # =========================================================================
-def _build_template(
-    technique: str,
-    language: str = "vi",
-    n_shot: int = 0,
-    plus_mode: bool = False,
-    add_method: str = "none",
-    examples_pool_path: Optional[str] = None,
-):
-    """Create and prepare a prompt template instance.
-
-    Returns:
-        Prepared BasePromptTemplate instance.
-    """
-    eng = language == "en"
-
-    if technique == "few_shot":
-        tpl = FewShotPrompt(eng=eng, n_shot=n_shot, examples_pool_path=examples_pool_path)
-    elif technique == "few_shot_cot":
-        tpl = FewShotCoTPrompt(eng=eng, n_shot=n_shot)
-    elif technique == "rereading":
-        tpl = ReReadingPrompt(
-            eng=eng, add_method=add_method, n_shot=n_shot,
-            examples_pool_path=examples_pool_path,
-        )
-    elif technique in ("plan_and_solve", "plan_solve"):
-        tpl = PlanAndSolvePrompt(eng=eng, plus=plus_mode, n_shot=n_shot)
-    elif technique == "re2_pas_cot":
-        tpl = Re2PaSCoTPrompt(eng=eng, n_shot=n_shot)
-    else:
-        raise ValueError(
-            f"Unknown technique: {technique}. "
-            "Supported: few_shot, few_shot_cot, rereading, plan_and_solve, re2_pas_cot"
-        )
-
-    tpl.prepare()
-    return tpl
+#
+# from src.prompt_templates import (
+#     FewShotPrompt,
+#     FewShotCoTPrompt,
+#     ReReadingPrompt,
+#     PlanAndSolvePrompt,
+#     Re2PaSCoTPrompt,
+# )
+#
+# def _build_template(
+#     technique: str,
+#     language: str = "vi",
+#     n_shot: int = 0,
+#     plus_mode: bool = False,
+#     add_method: str = "none",
+#     examples_pool_path: Optional[str] = None,
+# ):
+#     eng = language == "en"
+#     if technique == "few_shot":
+#         tpl = FewShotPrompt(eng=eng, n_shot=n_shot, examples_pool_path=examples_pool_path)
+#     elif technique == "few_shot_cot":
+#         tpl = FewShotCoTPrompt(eng=eng, n_shot=n_shot)
+#     elif technique == "rereading":
+#         tpl = ReReadingPrompt(
+#             eng=eng, add_method=add_method, n_shot=n_shot,
+#             examples_pool_path=examples_pool_path,
+#         )
+#     elif technique in ("plan_and_solve", "plan_solve"):
+#         tpl = PlanAndSolvePrompt(eng=eng, plus=plus_mode, n_shot=n_shot)
+#     elif technique == "re2_pas_cot":
+#         tpl = Re2PaSCoTPrompt(eng=eng, n_shot=n_shot)
+#     else:
+#         raise ValueError(
+#             f"Unknown technique: {technique}. "
+#             "Supported: few_shot, few_shot_cot, rereading, plan_and_solve, re2_pas_cot"
+#         )
+#     tpl.prepare()
+#     return tpl
 
 
 # =========================================================================
@@ -143,8 +139,8 @@ def load_dataset(**kwargs) -> datasets.DatasetDict:
     if examples_pool_path is None and n_shot > 0:
         examples_pool_path = str(dataset_paths["train"])
 
-    # Build and prepare prompt template
-    template = _build_template(
+    # Build and prepare prompt creator (new prompt_templates refactor API)
+    creator = build_prompt_creator(
         technique=technique,
         language=language,
         n_shot=n_shot,
@@ -152,7 +148,7 @@ def load_dataset(**kwargs) -> datasets.DatasetDict:
         add_method=add_method,
         examples_pool_path=examples_pool_path,
     )
-    system_prompt = template._system_prompt_cache
+    system_prompt = creator._system_prompt_cache
 
     # Load each split, pre-compute prompts
     splits = {}
@@ -166,7 +162,7 @@ def load_dataset(**kwargs) -> datasets.DatasetDict:
         for sample in raw:
             text = sample["text"]
             sent_id = str(sample["sent_id"])
-            _, user_prompt = template.get_prompt(text, sent_id)
+            _, user_prompt = creator.get_prompt(text, sent_id)
 
             records.append({
                 "sent_id": sample["sent_id"],
