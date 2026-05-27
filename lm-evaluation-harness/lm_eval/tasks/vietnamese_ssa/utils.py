@@ -45,49 +45,6 @@ _EPSILON = 1e-16
 
 
 # =========================================================================
-# Legacy prompt template factory (kept as comments for safe rollback)
-# =========================================================================
-#
-# from src.prompt_templates import (
-#     FewShotPrompt,
-#     FewShotCoTPrompt,
-#     ReReadingPrompt,
-#     PlanAndSolvePrompt,
-#     Re2PaSCoTPrompt,
-# )
-#
-# def _build_template(
-#     technique: str,
-#     language: str = "vi",
-#     n_shot: int = 0,
-#     plus_mode: bool = False,
-#     add_method: str = "none",
-#     examples_pool_path: Optional[str] = None,
-# ):
-#     eng = language == "en"
-#     if technique == "few_shot":
-#         tpl = FewShotPrompt(eng=eng, n_shot=n_shot, examples_pool_path=examples_pool_path)
-#     elif technique == "few_shot_cot":
-#         tpl = FewShotCoTPrompt(eng=eng, n_shot=n_shot)
-#     elif technique == "rereading":
-#         tpl = ReReadingPrompt(
-#             eng=eng, add_method=add_method, n_shot=n_shot,
-#             examples_pool_path=examples_pool_path,
-#         )
-#     elif technique in ("plan_and_solve", "plan_solve"):
-#         tpl = PlanAndSolvePrompt(eng=eng, plus=plus_mode, n_shot=n_shot)
-#     elif technique == "re2_pas_cot":
-#         tpl = Re2PaSCoTPrompt(eng=eng, n_shot=n_shot)
-#     else:
-#         raise ValueError(
-#             f"Unknown technique: {technique}. "
-#             "Supported: few_shot, few_shot_cot, rereading, plan_and_solve, re2_pas_cot"
-#         )
-#     tpl.prepare()
-#     return tpl
-
-
-# =========================================================================
 # Dataset loading (receives --metadata as **kwargs)
 # =========================================================================
 def load_dataset(**kwargs) -> datasets.DatasetDict:
@@ -229,14 +186,7 @@ def process_results(doc: Dict[str, Any], results: List[str]) -> Dict[str, Any]:
     except (json.JSONDecodeError, KeyError, TypeError):
         pred_tuples = []
 
-    # Compute scores for all 6 metrics.
-    # IMPORTANT: SemEval-2022 precision/recall are computed with different
-    # denominators and (weighted) numerators:
-    # - precision: iterate over *pred* tuples and match against gold
-    # - recall:    iterate over *gold* tuples and match against pred
-    #
-    # weighted_score is not symmetric because overlap denominators use the
-    # first tuple's span lengths, so we must call it with the correct order.
+
     modes = {
         "SF1": ("all", True, True),
         "NSF1": ("all", False, True),

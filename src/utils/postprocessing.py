@@ -80,6 +80,9 @@ def extract_json_from_response(raw_response: str) -> str:
     7. Fallback field-by-field extraction
     """
     response = raw_response.strip()
+    
+    # Fix whitespace issue from vllm decoder
+    response = response.replace("▁", " ")
 
     # Bước 1: Extract block giữa ```json...``` (fix bug backtick invisible)
     match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response)
