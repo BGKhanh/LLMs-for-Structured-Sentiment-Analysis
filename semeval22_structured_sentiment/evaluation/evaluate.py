@@ -6,36 +6,24 @@ import os
 import json
 from underthesea import word_tokenize
 
-# from nltk.tokenize.simple import SpaceTokenizer
+from nltk.tokenize import SpaceTokenizer
 
-# tk = SpaceTokenizer()
+_TOKENIZER_MAP = {
+    "vi": VietnameseTokenizer,
+}
+_DEFAULT_TOKENIZER = SpaceTokenizer  # fallback cho en, eu, ca, es, no, ...
 
-class VietnameseTokenizer:
-    def span_tokenize(self, text):
-        """
-        Tokenizer tiếng Việt dùng underthesea,
-        tách riêng từng từ đơn (bỏ merge multiword tokens)
-        và trả về offset (start, end) cho từng từ.
-        """
-        # B1: Lấy chuỗi token có dấu "_" nối multiword
-        tokenized_text = word_tokenize(text, format="text")
-        # Ví dụ: "Trường Đại_học Quốc_gia Hà_Nội rất đẹp ."
+def get_tokenizer(language: str):
+    """Return tokenizer instance cho language code tương ứng."""
+    cls = _TOKENIZER_MAP.get(language, _DEFAULT_TOKENIZER)
+    return cls()
 
-        # B2: Thay "_" -> " " rồi split lại để có token đơn
-        tokens = tokenized_text.replace("_", " ").split()
+def set_tokenizer(language: str):
+    """Set module-level tokenizer — gọi một lần khi load dataset."""
+    global tk
+    tk = get_tokenizer(language)
 
-        token_offsets = []
-        cursor = 0
-        for tok in tokens:
-            start = text.find(tok, cursor)
-            if start == -1:
-                # fallback nếu token bị trùng lặp trong câu
-                start = text.find(tok)
-            end = start + len(tok)
-            token_offsets.append((start, end))
-            cursor = end
-        return token_offsets
-
+# Module-level default (giữ backward compatibility)
 tk = VietnameseTokenizer()
 
 def convert_char_offsets_to_token_idxs(char_offsets, token_offsets):

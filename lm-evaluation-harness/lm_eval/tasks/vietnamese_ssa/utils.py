@@ -39,6 +39,7 @@ from semeval22_structured_sentiment.evaluation.evaluate import (
     convert_opinion_to_tuple,
     sent_tuples_in_list,
     weighted_score,
+    set_tokenizer,
 )
 
 _EPSILON = 1e-16
@@ -77,6 +78,8 @@ def load_dataset(**kwargs) -> datasets.DatasetDict:
     add_method = str(kwargs.get("add_method", "none"))
     dataset_dir = kwargs.get("dataset_dir", None)
 
+    set_tokenizer(language)
+    
     # Resolve dataset paths
     if dataset_dir:
         base = Path(dataset_dir)
