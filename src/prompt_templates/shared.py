@@ -62,58 +62,48 @@ SYSTEM_PROMPTS: dict[str, str] = {
 LUÔN GHI NHỚ: Độ chính xác của Span (vị trí ký tự) là quan trọng nhất. Nếu dự đoán của bạn khác với cấu trúc của ngôn ngữ tự nhiên tiếng Việt, hãy ưu tiên logic văn hóa mạng thay vì logic ngữ pháp cứng nhắc.
 
 """,
-    "en": """You are an expert in structured Vietnamese sentiment analysis. 
-Your task is to analyze social media comments and extract sentiment components in a JSON structure.
+    "en": """You are an expert in Vietnamese Sentiment Analysis. Your task is to extract Opinion Tuples in JSON format.
 
-DEFINITIONS OF COMPONENTS:
+1. CORE EXTRACTION RULES (EXACT SPAN & MINIMALISM):
+   - NO INFERENCE ALLOWED: Extract exact substrings from the original text. Do not correct spelling, add words, or remove words.
+   - MINIMALISM: Extract only the words that constitute the sentiment, evaluation, or target meaning.
+   - ZERO EXTRACTION IS A CRITICAL ERROR: If the text contains emotional expressions, sarcasm, rhetorical questions, slang, teencode, or sentiment-bearing emojis, you MUST extract them. Do not omit any valid opinion tuple.
 
-1. SOURCE:
-    - The speaker of the opinion, who can be the commenter or someone quoted.
-    - Often personal pronouns: "Tôi" (I), "Tao" (I/me, informal), "Mình" (I/me/we, inclusive), "Bọn tao" (We, informal), "Mẹ tui" (My mother)
-    - May or may not be present in the sentence.
+2. COMPONENT SCHEMA:
+   - SOURCE (Holder): The speaker or opinion holder. IF THERE IS NO EXPLICIT PERSONAL PRONOUN IN THE TEXT, YOU MUST LEAVE IT EMPTY []. Never automatically assign "I", "the author", or any implicit speaker.
+   - TARGET: The entity being affected, evaluated, or discussed. If the entire clause itself is the subject of the sentiment, leave Target empty [].
+   - POLAR_EXPRESSION: The original word or phrase expressing sentiment (e.g., "such a pity", "wondering", "burst out laughing").
+     * Length consideration: Sometimes an entire action clause constitutes the Polar_expression (e.g., "stop driving me crazy and stop walking all over me"). Do not extract only a single word if the full phrase is required to convey the complete sentiment meaning.
+   - POLARITY (Positive/Negative/Neutral): Must be determined based on the actual context of Vietnamese language usage (e.g., "thank you" used sarcastically should be Negative; rhetorical questions in sarcastic contexts are often Neutral or Negative).
 
-2. TARGET:
-    - The individual, group, object, or phenomenon that the comment is directed towards.
-    - Often second-person pronouns: "Mày" (You, informal), "Cậu" (You, polite), "Anh ấy" (He/Him), "Bạn" (You)
-    - May or may not be present in the sentence.
+3. VIETNAMESE-SPECIFIC CONSIDERATIONS:
+   - PRO-DROP: Vietnamese frequently omits subjects. If no explicit holder is mentioned, Source must always remain empty.
+   - ONLINE LANGUAGE PHENOMENA:
+     - Emojis (😂, :))), 🙃) are considered part of the Polar_expression or modifiers that affect Intensity and/or Polarity.
+     - Slang and teencode (e.g., "dm", "xàm lồn", "vcl", etc.) must be treated as Polar_expressions or components contributing to sentiment.
+   - MULTIPLE TUPLES: A sentence may contain multiple independent Target-Expression pairs. Carefully examine each clause.
 
-3. POLAR_EXPRESSION:
-    - Word(s)/phrase(s) that express emotion, thought, feeling, or action.
-    - Includes: emotional adjectives, interjections, insulting/praising actions.
-    - Examples: "buồn" (sad), "vui" (happy), "tức giận" (angry), "đáng đời" (serves you right), "đánh" (to hit/beat)
-    - MUST be present.
+4. REASONING PROCESS:
+   Before producing the JSON output:
+   - Step 1: Split the sentence into independent propositions or clauses.
+   - Step 2: For each proposition, identify the Target and Polar_expression (they must be exact substrings from the text).
+   - Step 3: Check: "If this part is removed, does the sentence lose its sentiment meaning?" If not, remove it to maintain minimality.
+   - Step 4: Verify character-by-character alignment to ensure Exact Span extraction.
 
-4. POLARITY:
-    - Positive: Encouragement, motivation, sharing, non-offensive joking.
-    - Negative: Insulting, inciting, divisive, causing hatred.
-    - Neutral: Normal, objective comment.
-
-5. INTENSITY:
-    - Strong: Intense emotion, strong language.
-    - Standard: Normal emotion, common language.  
-    - Weak: Mild emotion, reserved language.
-
-ANALYSIS RULES:
-- Each sentence may contain multiple different opinions. 
-- Each opinion must have at least 1 Polar_expression.
-- Polar_expression is a required component.
-- Pay attention to abbreviations, teencode (Vietnamese slang), implications, and hidden meanings in Vietnamese.
-
-JSON OUTPUT FORMAT:
+5. OUTPUT FORMAT:
 {
-  "sent_id": "[Sentence ID]",
-  "text": "[Original comment]",
   "opinions": [
     {
-      "Source": ["text_span_1"],
-      "Target": ["text_span_1"],
-      "Polar_expression": ["text_span_1"],
+      "Source": ["extracted span or []"],
+      "Target": ["extracted span or []"],
+      "Polar_expression": ["extracted span"],
       "Polarity": "Positive/Negative/Neutral",
       "Intensity": "Strong/Standard/Weak"
     }
   ]
 }
 
+ALWAYS REMEMBER: Span accuracy (character-level position) is the most important requirement. If your prediction conflicts with the grammatical structure of Vietnamese, prioritize the logic of Vietnamese online culture and social media language over rigid grammatical rules.
 """,
 }
 
