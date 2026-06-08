@@ -46,8 +46,8 @@ def set_tokenizer(language: str):
     global tk
     tk = get_tokenizer(language)
 
-# # Module-level default (giữ backward compatibility)
-# tk = VietnameseTokenizer()
+# Module-level default (giữ backward compatibility)
+tk = VietnameseTokenizer()
 
 def convert_char_offsets_to_token_idxs(char_offsets, token_offsets):
     """
