@@ -8,6 +8,29 @@ from underthesea import word_tokenize
 
 from nltk.tokenize import SpaceTokenizer
 
+
+class VietnameseTokenizer:
+    def span_tokenize(self, text):
+        """
+        Tokenizer tiếng Việt dùng underthesea,
+        tách riêng từng từ đơn (bỏ merge multiword tokens)
+        và trả về offset (start, end) cho từng từ.
+        """
+        tokenized_text = word_tokenize(text, format="text")
+
+        tokens = tokenized_text.replace("_", " ").split()
+
+        token_offsets = []
+        cursor = 0
+        for tok in tokens:
+            start = text.find(tok, cursor)
+            if start == -1:
+                start = text.find(tok)
+            end = start + len(tok)
+            token_offsets.append((start, end))
+            cursor = end
+        return token_offsets
+    
 _TOKENIZER_MAP = {
     "vi": VietnameseTokenizer,
 }
@@ -23,8 +46,8 @@ def set_tokenizer(language: str):
     global tk
     tk = get_tokenizer(language)
 
-# Module-level default (giữ backward compatibility)
-tk = VietnameseTokenizer()
+# # Module-level default (giữ backward compatibility)
+# tk = VietnameseTokenizer()
 
 def convert_char_offsets_to_token_idxs(char_offsets, token_offsets):
     """
