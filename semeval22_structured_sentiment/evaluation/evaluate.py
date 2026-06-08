@@ -4,22 +4,25 @@ from __future__ import print_function, division
 import sys
 import os
 import json
-from underthesea import word_tokenize
 
-from nltk.tokenize import SpaceTokenizer
+from nltk.tokenize.simple import SpaceTokenizer   # dùng .simple cho chắc chắn
+
+# Guard: underthesea chỉ cần cho tiếng Việt
+try:
+    from underthesea import word_tokenize
+    _UNDERTHESEA_AVAILABLE = True
+except ImportError:
+    _UNDERTHESEA_AVAILABLE = False
 
 
 class VietnameseTokenizer:
     def span_tokenize(self, text):
-        """
-        Tokenizer tiếng Việt dùng underthesea,
-        tách riêng từng từ đơn (bỏ merge multiword tokens)
-        và trả về offset (start, end) cho từng từ.
-        """
+        if not _UNDERTHESEA_AVAILABLE:
+            raise RuntimeError(
+                "underthesea chưa được cài. Chạy: pip install underthesea"
+            )
         tokenized_text = word_tokenize(text, format="text")
-
         tokens = tokenized_text.replace("_", " ").split()
-
         token_offsets = []
         cursor = 0
         for tok in tokens:
@@ -30,24 +33,22 @@ class VietnameseTokenizer:
             token_offsets.append((start, end))
             cursor = end
         return token_offsets
-    
+
+
 _TOKENIZER_MAP = {
     "vi": VietnameseTokenizer,
 }
-_DEFAULT_TOKENIZER = SpaceTokenizer  # fallback cho en, eu, ca, es, no, ...
 
 def get_tokenizer(language: str):
-    """Return tokenizer instance cho language code tương ứng."""
-    cls = _TOKENIZER_MAP.get(language, _DEFAULT_TOKENIZER)
+    cls = _TOKENIZER_MAP.get(language, SpaceTokenizer)
     return cls()
 
 def set_tokenizer(language: str):
-    """Set module-level tokenizer — gọi một lần khi load dataset."""
     global tk
     tk = get_tokenizer(language)
 
-# Module-level default (giữ backward compatibility)
-tk = VietnameseTokenizer()
+# Module-level default — luôn có giá trị dù underthesea có cài hay không
+tk = VietnameseTokenizer() if _UNDERTHESEA_AVAILABLE else SpaceTokenizer()
 
 def convert_char_offsets_to_token_idxs(char_offsets, token_offsets):
     """
