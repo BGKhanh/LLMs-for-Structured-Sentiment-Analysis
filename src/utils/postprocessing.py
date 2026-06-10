@@ -3,6 +3,7 @@
 import json
 import re
 from typing import Any
+from copy import deepcopy as _deepcopy
 
 
 def extract_position(text: str, expression: str) -> str:
@@ -299,3 +300,135 @@ def postprocess_response(response_text: str, original_text: str, sent_id: Any) -
     except json.JSONDecodeError:
         return json.dumps({"sent_id": sent_id, "text": original_text, "opinions": []},
                           ensure_ascii=False, indent=2)
+        
+        
+        
+def _char_offsets_to_tokens_safe(char_offsets, token_offsets, sent_id, error_set):
+    """Map char offsets → token indices, ghi nhận lỗi vào error_set."""
+    token_idxs = []
+    for offset in char_offsets:
+        try:
+            b, e = map(int, offset.split(":"))
+        except Exception:
+            error_set.add(sent_id)
+            continue
+        intoken, found = False, False
+        for i, (tb, te) in enumerate(token_offsets):
+            if tb == b:
+                intoken = True
+                found = True
+            if intoken:
+                token_idxs.append(i)
+            if te == e:
+                intoken = False
+        if not found:
+            error_set.add(sent_id)
+    if not token_idxs and char_offsets:
+        error_set.add(sent_id)
+    return frozenset(token_idxs)
+
+
+def _check_mapping_errors(gold_list) -> set:
+    """Chạy tokenizer mapping trên gold, trả về set sent_id có lỗi."""
+    from semeval22_structured_sentiment.evaluation.evaluate import tk
+    error_set = set()
+    for sample in gold_list:
+        text     = sample.get("text", "")
+        sent_id  = sample.get("sent_id")
+        opinions = sample.get("opinions", [])
+        token_offsets = list(tk.span_tokenize(text))
+        for opinion in opinions:
+            for field in ["Source", "Target", "Polar_expression"]:
+                char_idxs = opinion.get(field, [None, []])[1] or []
+                _char_offsets_to_tokens_safe(
+                    char_idxs, token_offsets, sent_id, error_set
+                )
+    return error_set
+
+
+def _print_cleaning_summary(original, cleaned, removed_ids, stats):
+    total = len(removed_ids)
+    print(f"  {'─'*44}")
+    print(f"  Original  : {len(original):>5} samples")
+    print(f"  Cleaned   : {len(cleaned):>5} samples")
+    print(f"  Removed   : {total:>5} samples")
+    if total:
+        print(f"  ├─ Empty opinions : {len(stats['empty_opinions'])}")
+        print(f"  └─ Mapping errors : {len(stats['mapping_errors'])}")
+    print(f"  {'─'*44}\n")
+
+
+def clean_gold_data(
+    gold_list: list,
+    language: str = "vi",
+    max_iters: int = 50,
+    verbose: bool = True,
+) -> tuple:
+    """
+    Validate và clean gold data trước inference.
+
+    Mỗi vòng lặp kiểm tra theo thứ tự:
+      1. Loại bỏ sample có opinions=[]
+      2. Loại bỏ sample có lỗi char offset → token mapping
+
+    Args:
+        gold_list : List[dict] — raw gold data
+        language  : Language code, dùng để set tokenizer đúng
+        max_iters : Giới hạn số vòng lặp
+        verbose   : In tiến trình và tổng kết
+
+    Returns:
+        clean_gold  : list — gold đã được clean
+        removed_ids : list — sent_ids đã bị loại (dedup, giữ thứ tự)
+        stats       : dict — {"empty_opinions": [...], "mapping_errors": [...]}
+    """
+
+    gold_cur    = _deepcopy(gold_list)
+    removed_ids = []
+    stats       = {"empty_opinions": [], "mapping_errors": []}
+
+    if verbose:
+        print(f"\n[clean_gold_data] {len(gold_list)} samples | language='{language}'")
+
+    for iteration in range(1, max_iters + 1):
+
+        # ── Bước 1: opinions rỗng ──────────────────────────────────
+        empty_ids = {
+            s.get("sent_id") for s in gold_cur
+            if not s.get("opinions")
+        }
+        if empty_ids:
+            stats["empty_opinions"].extend(sorted(empty_ids))
+            removed_ids.extend(sorted(empty_ids))
+            gold_cur = [s for s in gold_cur if s.get("sent_id") not in empty_ids]
+            if verbose:
+                print(f"  [Iter {iteration}] Empty opinions "
+                      f"({len(empty_ids)}): {sorted(empty_ids)}")
+            continue
+
+        # ── Bước 2: mapping errors ─────────────────────────────────
+        mapping_errors = _check_mapping_errors(gold_cur)
+        if mapping_errors:
+            stats["mapping_errors"].extend(sorted(mapping_errors))
+            removed_ids.extend(sorted(mapping_errors))
+            gold_cur = [s for s in gold_cur if s.get("sent_id") not in mapping_errors]
+            if verbose:
+                print(f"  [Iter {iteration}] Mapping errors "
+                      f"({len(mapping_errors)}): {sorted(mapping_errors)}")
+            continue
+
+        if verbose:
+            print(f"  [Iter {iteration}] All checks passed ✓")
+        break
+
+    # Dedup, giữ thứ tự xuất hiện
+    seen, unique_removed = set(), []
+    for sid in removed_ids:
+        if sid not in seen:
+            unique_removed.append(sid)
+            seen.add(sid)
+
+    if verbose:
+        _print_cleaning_summary(gold_list, gold_cur, unique_removed, stats)
+
+    return gold_cur, unique_removed, stats

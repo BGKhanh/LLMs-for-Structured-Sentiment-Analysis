@@ -34,7 +34,11 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from src.prompt_templates import build_prompt_creator
-from src.utils.postprocessing import extract_json_from_response, postprocess_response
+from src.utils.postprocessing import (
+    extract_json_from_response, 
+    postprocess_response,
+    clean_gold_data,
+)
 from semeval22_structured_sentiment.evaluation.evaluate import (
     convert_opinion_to_tuple,
     sent_tuples_in_list,
@@ -77,7 +81,8 @@ def load_dataset(**kwargs) -> datasets.DatasetDict:
     plus_mode = bool(kwargs.get("plus_mode", False))
     add_method = str(kwargs.get("add_method", "none"))
     dataset_dir = kwargs.get("dataset_dir", None)
-
+    clean_data  = bool(kwargs.get("clean_data", True))
+    
     set_tokenizer(language)
     
     # Resolve dataset paths
@@ -118,6 +123,11 @@ def load_dataset(**kwargs) -> datasets.DatasetDict:
         with open(path, "r", encoding="utf-8") as f:
             raw = json.load(f)
 
+        if clean_data:
+            raw, removed_ids, _ = clean_gold_data(
+                raw, language=language, verbose=True
+            )
+            
         records = []
         for sample in raw:
             text = sample["text"]
