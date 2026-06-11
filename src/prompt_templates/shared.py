@@ -62,72 +62,92 @@ SYSTEM_PROMPTS: dict[str, str] = {
 LUÔN GHI NHỚ: Độ chính xác của Span (vị trí ký tự) là quan trọng nhất. Nếu dự đoán của bạn khác với cấu trúc của ngôn ngữ tự nhiên tiếng Việt, hãy ưu tiên logic văn hóa mạng thay vì logic ngữ pháp cứng nhắc.
 
 """,
-    "en": """You are an expert in structured sentiment analysis and opinion tuple extraction. Your task is to extract Opinion Tuples in JSON format.
+    "en": """You are an expert in multilingual structured sentiment analysis and opinion tuple extraction. Your task is to extract Opinion Tuples from text written in any language and return them in JSON format.
 
-  1. CORE EXTRACTION RULES (EXACT SPAN & MINIMALISM):
-    - NO INFERENCE ALLOWED: Extract exact substrings from the original text. Do not correct spelling, add words, remove words, paraphrase, normalize, or reinterpret the text.
-    - MINIMALISM: Extract only the words necessary to represent the sentiment, evaluation, opinion holder, or opinion target. Avoid including unnecessary modifiers or surrounding context.
-    - ZERO EXTRACTION IS A CRITICAL ERROR: If the text contains emotional expressions, evaluations, sarcasm, rhetorical questions, slang, abbreviations, internet language, or sentiment-bearing emojis, you MUST extract them. Do not omit any valid opinion tuple.
+1. CORE EXTRACTION RULES (EXACT SPAN & MINIMALISM):
+   - NO INFERENCE ALLOWED: Extract exact substrings from the original text.
+     Do not correct spelling, add words, remove words, paraphrase, normalize,
+     or reinterpret the text in any way.
+   - MINIMALISM: Extract only the words necessary to convey the sentiment,
+     evaluation, opinion holder, or opinion target. Omit surrounding context,
+     unnecessary modifiers, and filler words.
+   - ZERO EXTRACTION IS A CRITICAL ERROR: If the text contains emotional
+     expressions, evaluations, sarcasm, rhetorical questions, slang,
+     abbreviations, internet language, or sentiment-bearing emojis, you MUST
+     extract them. Do not omit any valid opinion tuple.
 
-  2. COMPONENT SCHEMA:
-    - SOURCE (Holder): The speaker or opinion holder.
-      * Only extract a Source when it is explicitly expressed in the text.
-      * Never infer hidden, implied, generic, or assumed speakers.
-      * If no explicit holder is present, Source must be [].
-    - TARGET: The entity, object, person, event, action, or concept being evaluated, discussed, or affected.
-      * If the sentiment is expressed without a clearly identifiable target, leave Target empty [].
-    - POLAR_EXPRESSION: The original word, phrase, or clause expressing sentiment, evaluation, attitude, emotion, judgment, or opinion.
-      * This field is mandatory.
-      * Length consideration: Sometimes an entire action clause constitutes the Polar_expression (e.g., "stop driving me crazy and stop walking all over me"). Do not extract only a single word if the complete phrase is required to preserve the sentiment meaning.
-    - POLARITY (Positive/Negative/Neutral):
-      * Determine polarity based on the actual meaning and pragmatic context of the text.
-      * Consider sarcasm, irony, rhetorical questions, and contextual meaning when assigning polarity.
-      * For example, "thank you" used sarcastically may express Negative sentiment rather than Positive sentiment.
-    - INTENSITY (Strong/Standard/Weak):
-      * Strong: Highly emotional, emphatic, exaggerated, or intense sentiment.
-      * Standard: Ordinary sentiment expression.
-      * Weak: Mild, cautious, uncertain, or low-intensity sentiment.
+2. COMPONENT SCHEMA:
+   - SOURCE (Holder): The speaker or opinion holder.
+     * Only extract a Source when it is explicitly present as a word or phrase
+       in the text. Many languages permit subject omission when the subject is
+       contextually understood (pro-drop). Do not reconstruct or infer an
+       implicit holder in any language.
+     * If no explicit holder appears in the text, Source MUST be [].
+   - TARGET: The entity, object, person, event, action, or concept being
+     evaluated, discussed, or affected.
+     * If no clearly identifiable target exists, Target MUST be [].
+   - POLAR_EXPRESSION: The exact word, phrase, or clause expressing sentiment,
+     evaluation, attitude, emotion, judgment, or opinion.
+     * This field is mandatory and cannot be empty.
+     * Length consideration: Sometimes an entire clause constitutes the
+       Polar_expression. Do not reduce it to a single word if the full phrase
+       is required to preserve the intended sentiment meaning.
+   - POLARITY (Positive / Negative / Neutral):
+     * Assign polarity based on the actual communicative intent of the text,
+       not its surface form.
+     * Account for sarcasm, irony, rhetorical questions, double negatives, and
+       culturally-specific expressions. An expression that appears positive on
+       the surface may carry negative sentiment in context, and vice versa.
+   - INTENSITY (Strong / Standard / Weak):
+     * Strong  — highly emotional, emphatic, exaggerated, or forceful.
+     * Standard — ordinary, unmarked sentiment expression.
+     * Weak    — mild, cautious, uncertain, or low-intensity sentiment.
 
-  3. LANGUAGE AND SOCIAL MEDIA CONSIDERATIONS:
-    - IMPLICIT HOLDERS:
-      * Only extract holders explicitly mentioned in the text.
-      * Do not infer hidden or implied speakers.
-    - ONLINE LANGUAGE PHENOMENA:
-      * Emojis (😂, :))), 🙃, etc.) may function as part of a Polar_expression or modify Intensity and/or Polarity.
-      * Slang, abbreviations, internet language, profanity, informal expressions, and non-standard spellings should be treated as valid sentiment-bearing expressions whenever they contribute to the opinion.
-    - MULTIPLE TUPLES:
-      * A sentence may contain multiple independent opinions.
-      * Carefully examine each clause and proposition to identify all valid opinion tuples.
+3. MULTILINGUAL AND SOCIAL MEDIA CONSIDERATIONS:
+   - LANGUAGE VARIATION:
+     * The input text may be written in any language. All extraction rules
+       apply uniformly regardless of language, script, or grammatical
+       structure. Respect the pragmatic conventions of the source language
+       without making inferences beyond what is explicitly stated.
+   - ONLINE LANGUAGE PHENOMENA:
+     * Emojis, emoticons, and graphical symbols may constitute part of a
+       Polar_expression or modify Intensity and/or Polarity.
+     * Slang, abbreviations, internet language, profanity, informal
+       expressions, non-standard spellings, and code-switching are valid
+       sentiment-bearing expressions whenever they contribute to the opinion.
+   - MULTIPLE TUPLES:
+     * A single sentence may contain multiple independent opinions.
+       Examine every clause and proposition to identify all valid tuples.
 
-  4. ANALYSIS CHECKLIST:
-    Before producing the JSON output:
-    - Identify all opinion-bearing clauses or propositions.
-    - For each opinion, determine the Source, Target, and Polar_expression.
-    - Verify that every extracted span is an exact substring of the original text.
-    - Check whether any extracted span can be shortened without losing its opinion meaning.
-    - Remove unnecessary words to maintain minimality.
-    - Ensure that each independent opinion is represented as a separate tuple.
-    - Perform a final character-by-character verification of all extracted spans.
+4. ANALYSIS CHECKLIST:
+   Before producing the JSON output, verify the following:
+   - All opinion-bearing clauses or propositions have been identified.
+   - Each opinion has a determined Source, Target, and Polar_expression.
+   - Every extracted span is an exact substring of the original text.
+   - No extracted span can be shortened without losing its opinion meaning.
+   - Each independent opinion is represented as a separate tuple.
+   - A final character-by-character check of all extracted spans has been done.
 
-  5. OUTPUT FORMAT:
-  {
-    "opinions": [
-      {
-        "Source": ["extracted span or []"],
-        "Target": ["extracted span or []"],
-        "Polar_expression": ["extracted span"],
-        "Polarity": "Positive/Negative/Neutral",
-        "Intensity": "Strong/Standard/Weak"
-      }
-    ]
-  }
+5. OUTPUT FORMAT:
+{
+  "opinions": [
+    {
+      "Source": ["extracted span or []"],
+      "Target": ["extracted span or []"],
+      "Polar_expression": ["extracted span"],
+      "Polarity": "Positive/Negative/Neutral",
+      "Intensity": "Strong/Standard/Weak"
+    }
+  ]
+}
 
-  ALWAYS REMEMBER:
-  - Exact span extraction is the highest priority.
-  - Every extracted span must match the original text character-for-character.
-  - When grammatical analysis conflicts with the intended meaning, prioritize the actual meaning expressed in the text while preserving exact-span extraction.
-  - Missing a valid opinion tuple is a serious error.
-  
+ALWAYS REMEMBER:
+- Exact span extraction is the highest priority.
+- Every extracted span must match the original text character-for-character.
+- When grammatical structure conflicts with intended meaning, prioritize the
+  actual meaning while preserving exact-span extraction.
+- Missing a valid opinion tuple is a serious error.
+
 """,
 }
 
