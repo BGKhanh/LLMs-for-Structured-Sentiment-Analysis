@@ -125,13 +125,13 @@ def base_question_block(text: str, sent_id: str, language: str = "vi") -> str:
     """Base question block used in most single-stage techniques."""
     if language == "en":
         return (
-            f"""Analyze the sentiment for the following text (sent_id: {sent_id}):
+            f"""Analyze the sentiment for the following text:
 "{text}"
 
 Return the EXACT RESULT according to the requested JSON structure."""
         )
     return (
-        f"""Phân tích cảm xúc cho văn bản sau (sent_id: {sent_id}):
+        f"""Phân tích cảm xúc cho văn bản sau):
 "{text}"
 
 Trả về KẾT QUẢ CHÍNH XÁC theo cấu trúc JSON đã yêu cầu."""
@@ -142,13 +142,13 @@ def few_shot_question_block(text: str, sent_id: str, language: str = "vi") -> st
     """Question block used by legacy FewShotPrompt when examples exist."""
     if language == "en":
         return (
-            f"""Now, analyze the sentiment for the following text (sent_id: {sent_id}):
+            f"""Now, analyze the sentiment for the following text):
 Input: "{text}"
 Output:
 """
         )
     return (
-        f"""Bây giờ, phân tích cảm xúc cho văn bản sau (sent_id: {sent_id}):
+        f"""Bây giờ, phân tích cảm xúc cho văn bản sau:
 Input: "{text}"
 Output:
 """
@@ -161,21 +161,19 @@ Output:
 def rereading_block(text: str, sent_id: str, language: str = "vi") -> str:
     """Wrap base question with Re-reading instruction."""
     if language == "en":
-        base_q = f"""Analyze the sentiment for the following text (sent_id: {sent_id}):
+        base_q = f"""Analyze the sentiment for the following text:
 "{text}"
 """
         reread = (
-            f"""Read the question again: {base_q}
-Return the EXACT RESULT according to the requested JSON structure."""
+            f"""Read the question again: {base_q}"""
         )
         return f"{base_q}\n\n{reread}"
 
-    base_q = f"""Phân tích cảm xúc cho văn bản sau (sent_id: {sent_id}):
+    base_q = f"""Phân tích cảm xúc cho văn bản sau:
 "{text}"
 """
     reread = (
-        f"""Đọc lại câu hỏi: {base_q}
-Trả về KẾT QUẢ CHÍNH XÁC theo cấu trúc JSON đã yêu cầu."""
+        f"""Đọc lại câu hỏi: {base_q}"""
     )
     return f"{base_q}\n\n{reread}"
 

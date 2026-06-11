@@ -91,12 +91,12 @@ class FewShotCoTContent:
             )
         if self.language == "en":
             parts.append(
-                f"""Input: "{text}" (sent_id: {sent_id})
+                f"""Input: "{text}"
 
 Think step by step, then return the final JSON."""
             )
         else:
-            parts.append(f'Input: "{text}" (sent_id: {sent_id})')
+            parts.append(f'Input: "{text}"')
         return "".join(parts)
 
 
@@ -191,8 +191,8 @@ class PlanAndSolveContent:
         parts: list[str] = [pas_instruction_block(plus=self.plus, language=self.language)]
 
         if self.language == "en":
-            parts.append(f'Analyze the sentiment for the following text (sent_id: {sent_id}):\n"{text}"')
+            parts.append(f'Analyze the sentiment for the following text:\n"{text}"')
         else:
-            parts.append(f'Phân tích cảm xúc cho văn bản sau (sent_id: {sent_id}):\n"{text}"')
+            parts.append(f'Phân tích cảm xúc cho văn bản sau:\n"{text}"')
         return "\n".join(parts)
 
