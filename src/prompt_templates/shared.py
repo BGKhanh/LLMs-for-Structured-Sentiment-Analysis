@@ -167,7 +167,7 @@ def get_system_prompt(language: str) -> str:
             "Caution: Languages other than 'vi' use the same system prompt as 'en'"
         )
     else:
-        if language == "vi"
+        if language == "vi":
           return SYSTEM_PROMPTS[language]
         else:
           print("Caution: Languages other than vi use the same system prompt as en")
