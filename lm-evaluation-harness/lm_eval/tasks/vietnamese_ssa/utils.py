@@ -91,8 +91,22 @@ def load_dataset(**kwargs) -> datasets.DatasetDict:
         if not base.is_absolute():
             base = _PROJECT_ROOT / base
     else:
-        base = _PROJECT_ROOT / "data" / "vitoed_new"
-
+        dataset_map = {
+            "vi": "vitoed_new",
+            "en": "opener_en",
+            "es": "opener_es",
+            "nor": "norec",
+            "eu": "multibooked_eu",
+            "ca": "multibooked_ca",
+        }
+        try:
+            base = _PROJECT_ROOT / "data" / dataset_map[language]
+        except KeyError:
+            raise ValueError(
+                f"Unsupported language '{language}'. "
+                f"Supported: {list(dataset_map.keys())}"
+            )   
+            
     dataset_paths = {
         "train": base / "train.json",
         "dev": base / "dev.json",

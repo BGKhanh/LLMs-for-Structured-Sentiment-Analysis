@@ -163,10 +163,16 @@ def get_system_prompt(language: str) -> str:
     """
     if language not in SYSTEM_PROMPTS:
         raise ValueError(
-            f"Unsupported language: '{language}'. Available: {sorted(SYSTEM_PROMPTS.keys())}"
+            f"Unsupported language: '{language}'. Available: {sorted(SYSTEM_PROMPTS.keys())}. /
+            Caution: Languages other than vi use the same system prompt as en"
         )
-    return SYSTEM_PROMPTS[language]
-
+    else:
+        if language == "vi"
+          return SYSTEM_PROMPTS[language]
+        else:
+          print("Caution: Languages other than vi use the same system prompt as en")
+          return SYSTEM_PROMPTS["en"]
+          
 
 # ---------------------------------------------------------------------------
 # Hardcoded pools (fallback)
@@ -200,6 +206,10 @@ _HARDCODED_POOL: dict[str, list[dict[str, Any]]] = {
         }
     ],  
     "en": [],
+    "es": [],
+    "nor": [],
+    "ca": [],
+    "eu": [],  
 }
 
 
