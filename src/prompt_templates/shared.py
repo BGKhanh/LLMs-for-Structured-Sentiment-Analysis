@@ -163,8 +163,8 @@ def get_system_prompt(language: str) -> str:
     """
     if language not in SYSTEM_PROMPTS:
         raise ValueError(
-            f"Unsupported language: '{language}'. Available: {sorted(SYSTEM_PROMPTS.keys())}. /
-            Caution: Languages other than vi use the same system prompt as en"
+            f"Unsupported language: '{language}'. Available: {sorted(SYSTEM_PROMPTS.keys())}."
+            "Caution: Languages other than 'vi' use the same system prompt as 'en'"
         )
     else:
         if language == "vi"
