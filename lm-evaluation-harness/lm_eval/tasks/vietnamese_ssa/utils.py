@@ -100,7 +100,10 @@ def load_dataset(**kwargs) -> datasets.DatasetDict:
             "ca": "multibooked_ca",
         }
         try:
-            base = _PROJECT_ROOT / "data" / dataset_map[language]
+            if language == "vi":
+                base = _PROJECT_ROOT / "data" / dataset_map[language]
+            else:
+                base = _PROJECT_ROOT / "semeval22_structured_sentiment" / "data" / dataset_map[language]
         except KeyError:
             raise ValueError(
                 f"Unsupported language '{language}'. "
