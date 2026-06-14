@@ -16,9 +16,8 @@ from .creator import PromptCreator
 _REGISTRY: dict[str, type] = {
     "few_shot": FewShotContent,
     "few_shot_cot": FewShotCoTContent,
-    "rereading": ReReadingContent,
-    "plan_and_solve": PlanAndSolveContent,
-    "plan_solve": PlanAndSolveContent,
+    "re_reading": ReReadingContent,
+    "plan_and_solve": PlanAndSolveContent
 }
 
 
