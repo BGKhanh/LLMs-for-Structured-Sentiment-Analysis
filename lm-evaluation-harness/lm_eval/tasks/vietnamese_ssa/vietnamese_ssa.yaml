@@ -20,7 +20,7 @@ generation_kwargs:
     - "<|im_end|>"
     - "<|eot_id|>"
     - "<end_of_turn>"
-  max_gen_toks: 2048
+  max_gen_toks: 4096
   temperature: 0.0
   top_p: 0.95
   top_k: 50
