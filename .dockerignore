@@ -1,0 +1,41 @@
+# ---- Git ----
+.git
+.gitignore
+
+# ---- Model weights / cache (KHÔNG bake vào image, xem ghi chú ở Dockerfile) ----
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.ckpt
+.cache/
+**/.cache/huggingface/
+
+# ---- Output / log / kết quả eval ----
+results/
+*.log
+llama_server.log
+vllm_server.log
+
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ---- Repo con đã/clone (nếu image tự clone lại bên trong RUN thì không cần
+# copy các thư mục này từ host vào build context) ----
+lm-evaluation-harness/
+llama.cpp/
+
+# ---- Secrets — đề phòng lỡ tay COPY rộng (COPY . .) trong tương lai ----
+.env
+*.token
+**/HF_TOKEN
