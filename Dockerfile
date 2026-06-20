@@ -29,9 +29,14 @@ RUN pip install --upgrade pip
 WORKDIR /workspace
 
 # ---- 3. Build llama.cpp (CUDA) ----
+# GGML_CUDA_NO_VMM=ON: lúc `docker build` KHÔNG có GPU/driver thật được pass
+# vào container, nên libcuda.so.1 (driver thật) không tồn tại. Mặc định ggml-cuda
+# link vào CUDA::cuda_driver (libcuda.so) để dùng VMM allocator -> link fail
+# (undefined reference cuMemCreate...). Tắt VMM để chỉ dùng CUDA Runtime API
+# (libcudart, luôn có sẵn trong image *-devel*, không cần driver thật lúc build).
 RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git && \
     cd llama.cpp && \
-    cmake -B build -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release && \
+    cmake -B build -DGGML_CUDA=ON -DGGML_CUDA_NO_VMM=ON -DCMAKE_BUILD_TYPE=Release && \
     cmake --build build --config Release -j"$(nproc)" && \
     cp build/bin/llama-server /usr/local/bin/llama-server
 
