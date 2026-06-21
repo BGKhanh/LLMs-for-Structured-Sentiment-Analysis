@@ -133,8 +133,7 @@ Return the EXACT RESULT according to the requested JSON structure."""
     return (
         f"""Phân tích cảm xúc cho văn bản sau):
 "{text}"
-
-Trả về KẾT QUẢ CHÍNH XÁC theo cấu trúc JSON đã yêu cầu."""
+"""
     )
 
 
