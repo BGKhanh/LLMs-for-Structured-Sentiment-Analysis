@@ -61,11 +61,25 @@ def pas_instruction_block(*, plus: bool = False, language: str = "vi") -> str:
 def _simplify_opinions(opinions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     simplified: list[dict[str, Any]] = []
     for op in opinions:
+        def extract_text(field_name: str) -> list[str]:
+            val = op.get(field_name)
+            if not val:  # Xử lý các giá trị None hoặc [] rỗng
+                return []
+            if isinstance(val, list):
+                if len(val) > 0:
+                    first_el = val[0]
+                    # Nếu thuộc định dạng SemEval: [["văn bản"], [vị trí]]
+                    if isinstance(first_el, list):
+                        return first_el
+                    # Nếu đã ở định dạng danh sách phẳng: ["văn bản"]
+                    return val
+            return []
+
         simplified.append(
             {
-                "Source": op.get("Source", [[], []])[0],
-                "Target": op.get("Target", [[], []])[0],
-                "Polar_expression": op.get("Polar_expression", [[], []])[0],
+                "Source": extract_text("Source"),
+                "Target": extract_text("Target"),
+                "Polar_expression": extract_text("Polar_expression"),
                 "Polarity": op.get("Polarity", ""),
                 "Intensity": op.get("Intensity", ""),
             }
@@ -112,7 +126,12 @@ def cot_demo_block(examples: list[dict[str, Any]], language: str = "vi") -> str:
         section += f'Input: "{ex.get("text", "")}"\n\n'
         section += f"Reasoning:\n{ex.get('reasoning', '')}\n\n"
         section += "Output:\n"
-        section += json.dumps(ex.get("output", {}), ensure_ascii=False, indent=2)
+        
+        output_data = ex.get("output", {})
+        if isinstance(output_data, str):
+            section += output_data.strip()
+        else:
+            section += json.dumps(output_data, ensure_ascii=False, indent=2)
         section += "\n\n"
 
     return section.strip()
@@ -133,7 +152,8 @@ Return the EXACT RESULT according to the requested JSON structure."""
     return (
         f"""Phân tích cảm xúc cho văn bản sau):
 "{text}"
-"""
+
+Trả về KẾT QUẢ CHÍNH XÁC theo cấu trúc JSON đã yêu cầu."""
     )
 
 

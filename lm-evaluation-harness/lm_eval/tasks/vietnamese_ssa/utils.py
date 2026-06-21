@@ -119,7 +119,11 @@ def load_dataset(**kwargs) -> datasets.DatasetDict:
     # Resolve examples pool
     examples_pool_path = kwargs.get("examples_pool_path", None)
     if examples_pool_path is None and n_shot > 0:
-        examples_pool_path = str(dataset_paths["train"])
+        train_path = dataset_paths["train"]
+        if train_path.exists():
+            examples_pool_path = str(train_path)
+        else:
+            examples_pool_path = None
 
     # Build and prepare prompt creator (new prompt_templates refactor API)
     creator = build_prompt_creator(
