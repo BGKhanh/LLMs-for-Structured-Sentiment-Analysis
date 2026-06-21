@@ -98,8 +98,7 @@ def few_shot_block(examples: list[dict[str, Any]], language: str = "vi") -> str:
 
     for i, ex in enumerate(examples, 1):
         formatted_output = {
-            "text": ex.get("text", ""),
-            "opinions": _simplify_opinions(ex.get("opinions", [])),
+            "opinions": _simplify_opinions(ex.get("opinions", []))
         }
         section += f"{label} {i}:\n"
         section += f'Input: "{ex.get("text", "")}"\n'
@@ -146,14 +145,12 @@ def base_question_block(text: str, sent_id: str, language: str = "vi") -> str:
         return (
             f"""Analyze the sentiment for the following text:
 "{text}"
-
-Return the EXACT RESULT according to the requested JSON structure."""
+"""
         )
     return (
         f"""Phân tích cảm xúc cho văn bản sau):
 "{text}"
-
-Trả về KẾT QUẢ CHÍNH XÁC theo cấu trúc JSON đã yêu cầu."""
+"""
     )
 
 
