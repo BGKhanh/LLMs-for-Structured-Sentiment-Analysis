@@ -673,12 +673,6 @@ The only evaluative content in the sentence is the statement that the rates are 
 
 
 def load_examples_pool(path: Optional[str], language: str) -> list[dict[str, Any]]:
-    """Load examples pool from JSON path or fall back to hardcoded pool.
-
-    Args:
-        path: JSON file path (list of dict examples). If None, use hardcoded pool.
-        language: Language code ("vi", "en", ...).
-    """
     if path:
         p = Path(path)
         with p.open("r", encoding="utf-8") as f:
@@ -686,5 +680,12 @@ def load_examples_pool(path: Optional[str], language: str) -> list[dict[str, Any
         if not isinstance(data, list):
             raise ValueError(f"Examples pool JSON must be a list, got: {type(data)}")
         return data
-    return list(_HARDCODED_POOL.get(language, []))
+    
+    # Lấy dữ liệu tĩnh từ ngôn ngữ yêu cầu
+    pool = _HARDCODED_POOL.get(language, [])
+    if not pool and language != "en":
+        # Chuyển hướng sang tiếng Anh nếu ngôn ngữ mục tiêu không có dữ liệu tĩnh
+        print(f"Warning: Hardcoded pool for '{language}' is empty. Falling back to 'en'.")
+        pool = _HARDCODED_POOL.get("en", [])
+    return list(pool)
 

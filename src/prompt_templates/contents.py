@@ -73,11 +73,15 @@ class FewShotCoTContent:
     def setup(self, pool: list[dict[str, Any]]) -> None:
         if self.n_shot <= 0:
             return
+        
+        if pool and "reasoning" not in pool[0]:
+            from .shared import load_examples_pool
+            pool = load_examples_pool(None, self.language)
+
         if self.n_shot > len(pool):
             raise ValueError(
                 f"Requested n_shot={self.n_shot} but only {len(pool)} examples available in pool"
             )
-        # Keep legacy behavior: fixed first n examples.
         self._examples = pool[: self.n_shot]
 
     def user_prompt(self, text: str, sent_id: str) -> str:
