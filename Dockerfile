@@ -44,7 +44,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # cuda-nvcc-13-0: chỉ nvcc + ptxas, không có headers/static libs của devel.
     # Cần thiết vì FlashInfer/vLLM phải JIT compile cho GPU mới (Blackwell sm_120)
     # mà chưa có prebuilt cubin — nhỏ hơn nhiều so với full devel toolkit.
-    cuda-nvcc-13-0 \
+    cuda-nvcc-13-0 libcurand-dev-13-0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv $VENV_PATH
