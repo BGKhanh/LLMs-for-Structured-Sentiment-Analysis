@@ -1,10 +1,11 @@
 # =====================================================================
-# Dockerfile — môi trường lm-eval + vLLM + llama.cpp (multi-stage để giảm size)
+# Dockerfile — môi trường lm-eval + vLLM + llama.cpp
+# v5: thêm cuda-nvcc vào runtime để JIT compile được cho GPU mới
+#     (RTX 5060 Ti Blackwell sm_120f), fix editable install path issue
 # =====================================================================
 
 # =======================
-# STAGE 1: BUILDER — chỉ dùng để compile llama.cpp, bị loại bỏ hoàn toàn
-# khỏi image cuối, nên nặng bao nhiêu cũng không ảnh hưởng size push/pull.
+# STAGE 1: BUILDER — chỉ compile llama-server (cần nvcc/cmake)
 # =======================
 FROM nvidia/cuda:13.0.3-cudnn-devel-ubuntu24.04 AS llama-builder
 
@@ -14,10 +15,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-# GGML_CUDA_NO_VMM=ON: tránh lỗi link libcuda.so lúc build (không có driver
-# thật trong build container).
-# BUILD_SHARED_LIBS=OFF: gộp ggml/llama vào tĩnh trong executable, giảm số
-# lượng .so cần mang theo sang stage runtime.
 RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git && \
     cd llama.cpp && \
     cmake -B build -DGGML_CUDA=ON -DGGML_CUDA_NO_VMM=ON \
@@ -30,8 +27,7 @@ RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git && \
         -exec cp {} /out/ \;
 
 # =======================
-# STAGE 2: RUNTIME — image thật sự được push/pull, nhẹ hơn nhiều vì không
-# mang theo nvcc/headers/static-libs/cmake/build-essential.
+# STAGE 2: RUNTIME
 # =======================
 FROM nvidia/cuda:13.0.3-cudnn-runtime-ubuntu24.04 AS final
 
@@ -39,12 +35,16 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
     VENV_PATH=/opt/venv \
-    HF_HOME=/workspace/.cache/huggingface
+    HF_HOME=/workspace/.cache/huggingface \
+    # Include sm_120/12.0 cho Blackwell (RTX 5060 Ti) cùng các GPU phổ biến
+    TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0;12.0"
 
-# Chỉ cài những gì THẬT SỰ cần lúc chạy: python venv + git (cho pip install -e)
-# + curl/wget (debug/health-check). KHÔNG cài cmake/build-essential nữa.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl wget python3 python3-venv python3-dev ca-certificates libgomp1 \
+    # cuda-nvcc-13-0: chỉ nvcc + ptxas, không có headers/static libs của devel.
+    # Cần thiết vì FlashInfer/vLLM phải JIT compile cho GPU mới (Blackwell sm_120)
+    # mà chưa có prebuilt cubin — nhỏ hơn nhiều so với full devel toolkit.
+    cuda-nvcc-13-0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv $VENV_PATH
@@ -53,32 +53,32 @@ RUN pip install --upgrade pip
 
 WORKDIR /workspace
 
-# Copy toàn bộ thư mục /out từ builder — gồm binary + bất kỳ .so nào nó cần
-# (llama-server-impl khai báo add_library() không ghi rõ STATIC/SHARED, có
-# thể vẫn ra .so tuỳ phiên bản CMake/llama.cpp). Copy cả thư mục để chắc
-# chắn không bỏ sót, dù BUILD_SHARED_LIBS=OFF có loại bỏ hết .so hay không.
+# llama-server binary từ builder
 COPY --from=llama-builder /out/ /opt/llama.cpp/bin/
 RUN ln -s /opt/llama.cpp/bin/llama-server /usr/local/bin/llama-server
 ENV LD_LIBRARY_PATH="/opt/llama.cpp/bin:${LD_LIBRARY_PATH}"
 
-# ---- Torch khớp đúng CUDA 13.0 ----
+# ---- Torch (cu130 index) ----
 RUN pip install torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0 \
     --index-url https://download.pytorch.org/whl/cu130
 
-# ---- requirements.txt còn lại ----
+# ---- requirements.txt ----
 COPY requirements.txt /workspace/requirements.txt
 RUN pip install -r /workspace/requirements.txt
 
-# ---- flash-attn từ wheel dựng sẵn (không cần compiler) ----
+# ---- flash-attn từ wheel dựng sẵn ----
 RUN pip install \
     https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.9.4/flash_attn-2.8.3+cu130torch2.11-cp312-cp312-linux_x86_64.whl
 
-# ---- lm-evaluation-harness editable + extras ----
+# ---- lm-evaluation-harness — NON-editable để tránh path issue ----
+# Bản trước dùng `pip install -e .` (editable): venv lưu đường dẫn tuyệt đối
+# của source code. Khi copy venv sang stage khác hoặc thay đổi thư mục,
+# đường dẫn đó sẽ không còn đúng → import lỗi.
+# Non-editable install thì mọi file được copy thẳng vào site-packages,
+# không phụ thuộc vào vị trí source code.
 RUN git clone --depth 1 https://github.com/EleutherAI/lm-evaluation-harness.git && \
     cd lm-evaluation-harness && \
-    pip install -qe ."[hf,api,vllm]"
-# ⚠️ Check sau build: docker run --rm <image> pip show vllm
-# (extras có thể tự đổi version vllm khác 0.21.0 đã pin)
+    pip install -q ."[hf,api,vllm]"
 
 WORKDIR /workspace
 CMD ["/bin/bash"]
