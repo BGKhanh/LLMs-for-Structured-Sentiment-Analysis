@@ -57,12 +57,10 @@ def _extract_by_fields(text: str) -> str:
                             result["opinions"].append(json.loads(obj_text))
                         except Exception:
                             pol_m = re.search(r'"Polarity"\s*:\s*"(\w+)"', obj_text)
-                            int_m = re.search(r'"Intensity"\s*:\s*"(\w+)"', obj_text)
                             if pol_m:
                                 result["opinions"].append({
                                     "Source": [], "Target": [], "Polar_expression": [],
-                                    "Polarity": pol_m.group(1),
-                                    "Intensity": int_m.group(1) if int_m else ""
+                                    "Polarity": pol_m.group(1)
                                 })
                         obj_start = None
     return json.dumps(result, ensure_ascii=False)
@@ -170,7 +168,7 @@ def postprocess_response(
         - Works with all models (model-agnostic)
         - Handles multiple opinion formats
         - Auto-extracts positions for all text spans
-        - Validates Polarity and Intensity values
+        - Validates Polarity 
     
     Example:
         >>> json_str = model.extract_response(raw_response)
@@ -232,11 +230,6 @@ def postprocess_response(
                     opinion["Polarity"] not in valid_polarities):
                     opinion["Polarity"] = ""
                     
-                # Validate Intensity
-                valid_intensities = ["Strong", "Standard", "Weak"]
-                if ("Intensity" not in opinion or 
-                    opinion["Intensity"] not in valid_intensities):
-                    opinion["Intensity"] = ""
         else:
             result["opinions"] = []
             
@@ -289,9 +282,6 @@ def postprocess_response(response_text: str, original_text: str, sent_id: Any) -
                 if "Polarity" not in opinion or opinion["Polarity"] not in valid_polarities:
                     opinion["Polarity"] = ""
 
-                valid_intensities = ["Strong", "Standard", "Weak"]
-                if "Intensity" not in opinion or opinion["Intensity"] not in valid_intensities:
-                    opinion["Intensity"] = ""
         else:
             result["opinions"] = []
 

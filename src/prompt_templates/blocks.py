@@ -42,7 +42,7 @@ PAS_PLUS_INSTRUCTION_EN = """Perform a detailed analysis following these steps:
 1. **Preliminary Analysis & Signal Extraction:** Read the text carefully. Extract all keywords, personal pronouns, slang (teencode), and linguistic signals that might relate to sentiment.
 2. **Analysis Planning:** Based on the extracted signals, outline a plan to sequentially analyze each Opinion.
 3. **Plan Execution:**
-    - For each Opinion, determine the value for each component (Source, Target, Polar_expression, Polarity, Intensity).
+    - For each Opinion, determine the value for each component (Source, Target, Polar_expression, Polarity).
     - Briefly explain your reasoning, paying special attention to context, implicit meaning, and the defined rules.
 4. **Result Synthesis:** Construct the final JSON block based on the entire analysis above.
 """.strip()
@@ -81,7 +81,6 @@ def _simplify_opinions(opinions: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "Target": extract_text("Target"),
                 "Polar_expression": extract_text("Polar_expression"),
                 "Polarity": op.get("Polarity", ""),
-                "Intensity": op.get("Intensity", ""),
             }
         )
     return simplified
