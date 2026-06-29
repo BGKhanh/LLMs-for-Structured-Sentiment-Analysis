@@ -53,9 +53,6 @@ Xác định dựa trên ý nghĩa thực tế của ngữ cảnh:
 *   **Negative:** Thể hiện sự phê phán, chê bai, chửi tục, bất bình, lo lắng, hoặc kết quả có hại (ví dụ: "thiếu văn hóa quá", "đm", "xé con mẹ nó háng ra", "đau đầu", "nhẫn tâm lắm").
 *   **Neutral:** Các câu hỏi tu từ, câu hỏi nghi vấn, các phát biểu mang tính mô tả thực tế khách quan, các mệnh đề điều kiện hoặc trạng thái không mang sắc thái biểu cảm yêu/ghét rõ rệt (ví dụ: "lớn rồi cũng có tuổi rồi", "Dù trong phim hay ra sao", "bán không thu thuế luôn à", "sống nhanh vl", "khóa lại", "Lát try hard đi").
 
-#### E. INTENSITY (MỨC ĐỘ)
-*   **QUY TẮC ĐẶC BIỆT:** Nhằm đảm bảo độ chính xác tuyệt đối theo tiêu chuẩn khớp nhãn của hệ thống đánh giá, thuộc tính `Intensity` cho TẤT CẢ các tuple BẮT BUỘC phải luôn luôn là **"Standard"**. Không sử dụng "Strong" hay "Weak", bất kể văn bản có chứa từ ngữ mạnh hay viết hoa.
-
 ---
 
 ### 3. QUY TRÌNH PHÂN TÍCH (ANALYSIS CHECKLIST)
@@ -65,8 +62,7 @@ Xác định dựa trên ý nghĩa thực tế của ngữ cảnh:
 3.  **Bước 3:** Xác định xem có chủ ngữ thực hiện hành động cảm xúc đó không. Nếu không có hoặc bị lược bỏ $\rightarrow$ `Source` là `[]`.
 4.  **Bước 4:** Xác định đối tượng bị đánh giá (`Target`).
     *   *Kiểm tra:* Nếu toàn bộ mệnh đề là một hành động cảm xúc tự thân, đặt `Target` là `[]` và giữ mệnh đề đó trong `Polar_expression`. Nếu có thực thể rõ ràng bị đánh giá, trích xuất đầy đủ cụm danh từ làm `Target`.
-5.  **Bước 5:** Phân loại `Polarity` chính xác (chú ý phân biệt Neutral cho các phát biểu thực tế hoặc câu hỏi). Gán `Intensity` cố định là `"Standard"`.
-
+5.  **Bước 5:** Phân loại `Polarity` chính xác (chú ý phân biệt Neutral cho các phát biểu thực tế hoặc câu hỏi).
 ---
 
 ### 4. ĐỊNH DẠNG ĐẦU RA (OUTPUT JSON SCHEMA)
@@ -78,8 +74,7 @@ Xác định dựa trên ý nghĩa thực tế của ngữ cảnh:
       "Source": ["chuỗi con trích xuất chính xác hoặc []"],
       "Target": ["chuỗi con trích xuất chính xác hoặc []"],
       "Polar_expression": ["chuỗi con trích xuất chính xác"],
-      "Polarity": "Positive/Negative/Neutral",
-      "Intensity": "Standard"
+      "Polarity": "Positive/Negative/Neutral"
     }
   ]
 }
@@ -123,10 +118,6 @@ Hãy thực hiện phân tích thật kỹ lưỡng các biên độ từ ngữ 
      * Account for sarcasm, irony, rhetorical questions, double negatives, and
        culturally-specific expressions. An expression that appears positive on
        the surface may carry negative sentiment in context, and vice versa.
-   - INTENSITY (Strong / Standard / Weak):
-     * Strong  — highly emotional, emphatic, exaggerated, or forceful.
-     * Standard — ordinary, unmarked sentiment expression.
-     * Weak    — mild, cautious, uncertain, or low-intensity sentiment.
 
 3. MULTILINGUAL AND SOCIAL MEDIA CONSIDERATIONS:
    - LANGUAGE VARIATION:
@@ -136,7 +127,7 @@ Hãy thực hiện phân tích thật kỹ lưỡng các biên độ từ ngữ 
        without making inferences beyond what is explicitly stated.
    - ONLINE LANGUAGE PHENOMENA:
      * Emojis, emoticons, and graphical symbols may constitute part of a
-       Polar_expression or modify Intensity and/or Polarity.
+       Polar_expression and/or modify Polarity.
      * Slang, abbreviations, internet language, profanity, informal
        expressions, non-standard spellings, and code-switching are valid
        sentiment-bearing expressions whenever they contribute to the opinion.
@@ -160,8 +151,7 @@ Hãy thực hiện phân tích thật kỹ lưỡng các biên độ từ ngữ 
       "Source": ["extracted span or []"],
       "Target": ["extracted span or []"],
       "Polar_expression": ["extracted span"],
-      "Polarity": "Positive/Negative/Neutral",
-      "Intensity": "Strong/Standard/Weak"
+      "Polarity": "Positive/Negative/Neutral"
     }
   ]
 }
@@ -232,12 +222,11 @@ Theo quy tắc Biên độ Target đầy đủ (Mục B): Target phải trích �
 
 → Target = "bà thảo" cho cả 3 tuple.
 
-Bước 5: Phân loại Polarity và gán Intensity
+Bước 5: Phân loại Polarity
 Tuple A — "bộ óc sáng tạo cùng với sự lãnh đạo tài giỏi": từ ngữ "sáng tạo", "tài giỏi" mang tính khen ngợi năng lực → Positive.
 Tuple B — "lòng tham hơn người và trí tuệ ngắn hạn": "lòng tham", "ngắn hạn" mang tính phê phán phẩm chất xấu → Negative.
 Tuple C — "sẽ dẫn dắt trung nguyên xuống con mẹ nó giếng luôn": thành ngữ ẩn dụ chỉ kết cục tồi tệ/sụp đổ, kèm ngôn từ thô tục nhấn mạnh mức độ tiêu cực → Negative.
 
-Theo Mục E, Intensity cố định = "Standard" cho tất cả các tuple, bất kể mức độ ngôn từ mạnh hay nhẹ.
 """,
             "output": """
 {
@@ -246,22 +235,19 @@ Theo Mục E, Intensity cố định = "Standard" cho tất cả các tuple, b�
       "Source": [],
       "Target": ["bà thảo"],
       "Polar_expression": ["bộ óc sáng tạo cùng với sự lãnh đạo tài giỏi"],
-      "Polarity": "Positive",
-      "Intensity": "Standard"
+      "Polarity": "Positive"
     },
     {
       "Source": [],
       "Target": ["bà thảo"],
       "Polar_expression": ["lòng tham hơn người và trí tuệ ngắn hạn"],
-      "Polarity": "Negative",
-      "Intensity": "Standard"
+      "Polarity": "Negative"
     },
     {
       "Source": [],
       "Target": ["bà thảo"],
       "Polar_expression": ["sẽ dẫn dắt trung nguyên xuống con mẹ nó giếng luôn"],
-      "Polarity": "Negative",
-      "Intensity": "Standard"
+      "Polarity": "Negative"
     }
   ]
 }
@@ -290,11 +276,10 @@ Bước 4: Xác định Target cho từng tuple
 Tuple 1: Đối tượng được nhắc tới làm chủ đề của lời thuật lại — "Anh em" (vị trí 0:6) — là người/nhóm được "Tập Cận Bình bảo" và bị gán cho hành động "dạy cách chống tham nhũng rất rễ làm". Đây là cụm danh từ độc lập, tường minh, đứng ở đầu câu, đóng vai trò là đối tượng chính của toàn bộ phát biểu (người bị đánh giá/nhắc đến trong câu chuyện) → Target = "Anh em" (0:6). Lưu ý: khác với Source ("anh" — chủ ngữ cú pháp trong mệnh đề nhúng "anh dạy..."), Target ở đây là thực thể được nói đến trong toàn cảnh câu (người được Tập Cận Bình bảo).
 Tuple 2: "có dám làm không" là câu hỏi tu từ chung chung, không có thực thể cụ thể nào được nêu tên làm đối tượng đánh giá trong chính mệnh đề này → Target = [].
 
-Bước 5: Phân loại Polarity và gán Intensity
+Bước 5: Phân loại Polarity
 Tuple 1 — "dạy cách chống tham nhũng rất rễ làm": từ "rất rễ (dễ) làm" mang sắc thái khẳng định khả năng/sự dễ dàng, một đặc điểm được nêu ra theo hướng tích cực (dễ làm = có lợi, khả thi) → Positive.
 Tuple 2 — "có dám làm không": đây là câu hỏi nghi vấn/tu từ, không mang sắc thái yêu/ghét rõ rệt, chỉ chất vấn về việc có thực hiện hay không → theo Mục D (câu hỏi tu từ, câu hỏi nghi vấn → Neutral) → Neutral.
 
-Theo Mục E, Intensity cố định = "Standard" cho cả 2 tuple.
 """,
             "output": """
 {
@@ -303,15 +288,13 @@ Theo Mục E, Intensity cố định = "Standard" cho cả 2 tuple.
       "Source": ["anh"],
       "Target": ["Anh em"],
       "Polar_expression": ["dạy cách chống tham nhũng rất rễ làm"],
-      "Polarity": "Positive",
-      "Intensity": "Standard"
+      "Polarity": "Positive"
     },
     {
       "Source": [],
       "Target": [],
       "Polar_expression": ["có dám làm không"],
-      "Polarity": "Neutral",
-      "Intensity": "Standard"
+      "Polarity": "Neutral"
     }
   ]
 }
@@ -335,10 +318,9 @@ Bước 4: Xác định Target
 Cụm danh từ "bài viết" (vị trí 0:8) xuất hiện tường minh ở đầu câu, là đối tượng cụ thể đang bị đánh giá bởi Polar_expression "hay quá". Đây không phải trường hợp mệnh đề trọn vẹn không tách được Target — có một thực thể rõ ràng (bài viết) là chủ ngữ ngữ pháp được mô tả tính chất.
 → Target = "bài viết" (0:8).
 
-Bước 5: Phân loại Polarity và gán Intensity
+Bước 5: Phân loại Polarity 
 "hay quá": từ "hay" mang nghĩa khen ngợi, đánh giá tích cực về chất lượng nội dung, kết hợp "quá" nhấn mạnh mức độ khen → Positive.
 
-Theo Mục E, Intensity cố định = "Standard", bất kể từ "quá" tạo cảm giác nhấn mạnh.
 """,
             "output": """
 {
@@ -347,8 +329,7 @@ Theo Mục E, Intensity cố định = "Standard", bất kể từ "quá" tạo 
       "Source": [],
       "Target": ["bài viết"],
       "Polar_expression": ["hay quá"],
-      "Polarity": "Positive",
-      "Intensity": "Standard"
+      "Polarity": "Positive"
     }
   ]
 }
@@ -378,11 +359,10 @@ Bước 4: Xác định Target cho từng tuple
 Tuple 1: Hành động "chốg mắt lên xem" của "t" được hướng tới ai? Xét toàn câu, đối tượng bị thách thức/quan sát chính là "chúg mày" (19:27) — xuất hiện tường minh ngay sau đó, đóng vai trò là đối tượng nhận tác động của ánh nhìn thách thức này → Target = "chúg mày" (19:27).
 Tuple 2: "chúg mày" (19:27) chính là chủ thể bị mô tả "mặn nồng" trong câu hỏi mỉa mai → Target = "chúg mày" (19:27), đầy đủ cụm danh từ chỉ người được nhắc đến.
 
-Bước 5: Phân loại Polarity và gán Intensity
+Bước 5: Phân loại Polarity  
 Tuple 1 — "chốg mắt lên xem": hành động mang tính đe dọa, thách thức, quan sát dò xét với ý đồ tiêu cực (chờ xem đối phương thất bại/lộ bản chất) → Negative.
 Tuple 2 — "mặn nồg đến bao giờ": câu hỏi tu từ mang tính mỉa mai, châm biếm, ngầm ý nghi ngờ/chê bai tình cảm của đối tượng sẽ không bền lâu → Negative (không xếp Neutral vì có sắc thái châm biếm/khinh thường rõ rệt, khác với câu hỏi khách quan thuần túy).
 
-Theo Mục E, Intensity cố định = "Standard" cho cả 2 tuple.
 """,
             "output": """
 {
@@ -391,15 +371,13 @@ Theo Mục E, Intensity cố định = "Standard" cho cả 2 tuple.
       "Source": ["t"],
       "Target": ["chúg mày"],
       "Polar_expression": ["chốg mắt lên xem"],
-      "Polarity": "Negative",
-      "Intensity": "Standard"
+      "Polarity": "Negative"
     },
     {
       "Source": [],
       "Target": ["chúg mày"],
       "Polar_expression": ["mặn nồg đến bao giờ"],
-      "Polarity": "Negative",
-      "Intensity": "Standard"
+      "Polarity": "Negative"
     }
   ]
 }
@@ -427,10 +405,9 @@ Bước 4: Xác định Target
 Xét nguyên nhân gây ra cảm giác "chóng mặt" — đó là hành động "nhìn từ trên cao xuống" (14:36). Đây là một hành động/sự việc cụ thể, tách biệt rõ ràng khỏi phần mô tả cảm giác kết quả ("đã thấy chóng mặt rồi"), nên được trích xuất làm Target (đối tượng/sự việc gây ra trạng thái), thay vì gộp chung toàn bộ câu vào một Polar_expression duy nhất.
 → Target = "nhìn từ trên cao xuống" (14:36).
 
-Bước 5: Phân loại Polarity và gán Intensity
+Bước 5: Phân loại Polarity  
 "đã thấy chóng mặt rồi" là một mô tả mang tính thực tế khách quan về phản ứng sinh lý khi nhìn xuống từ độ cao (hiện tượng chóng mặt do độ cao), không phải một lời khen/chê hay biểu lộ cảm xúc yêu/ghét rõ rệt đối với đối tượng nào. Theo Mục D, các phát biểu mô tả trạng thái thực tế khách quan thuộc nhóm Neutral.
 → Polarity = Neutral.
-Theo Mục E, Intensity cố định = "Standard".
 """,
             "output": """
 {
@@ -439,8 +416,7 @@ Theo Mục E, Intensity cố định = "Standard".
       "Source": ["mình"],
       "Target": ["nhìn từ trên cao xuống"],
       "Polar_expression": ["đã thấy chóng mặt rồi"],
-      "Polarity": "Neutral",
-      "Intensity": "Standard"
+      "Polarity": "Neutral"
     }
   ]
 }
@@ -466,10 +442,7 @@ The part expressing attitude toward "Looks" is the negated clause "don 't mean a
 Step 5 — Determine Polarity
 The phrase "don't mean anything" negates the value or significance of the Target ("Looks"). In a hotel-review context, saying the appearance "means nothing" typically implies disappointment — the looks may be fine but don't compensate for something else, or the attribute is simply being dismissed as unimportant. This is a critical, dismissive negation rather than a neutral or positive statement, so Polarity = Negative.
 
-Step 6 — Determine Intensity
-Strong intensity requires highly emotional, exaggerated, or forceful language; Standard is an ordinary, unmarked expression; Weak is mild or hedged. Although "definitely" adds emphasis on certainty, the core expression "don't mean anything" is a plain, matter-of-fact statement — it doesn't use extreme or exaggerated wording (e.g., "absolutely worthless," "completely useless"). The emotional weight stays at an ordinary level, so Intensity = Standard.
-
-Step 7 — Verify against the checklist
+Step 6 — Verify against the checklist
 All opinion-bearing clauses have been identified — there is only one clause in this sentence. Source, Target, and Polar_expression have each been determined for it. Every extracted span is an exact substring of the original text: "Looks" matches characters 0 to 5, and "don 't mean anything" matches characters 17 to 37. Neither span can be shortened further without losing the intended meaning. Since there is only one independent opinion, it is represented as a single tuple. A final character-by-character check confirms both spans align correctly with the source text.
 """,
             "output": """
@@ -479,8 +452,7 @@ All opinion-bearing clauses have been identified — there is only one clause in
       "Source": [],
       "Target": ["Looks"],
       "Polar_expression": ["don 't mean anything"],
-      "Polarity": "Negative",
-      "Intensity": "Standard"
+      "Polarity": "Negative"
     }
   ]
 }
@@ -506,11 +478,8 @@ Checking the exact-span offset: "backing" starts right after "2nd floor , " — 
 Step 5 — Determine Polarity
 Backing onto a delivery alley and a bar is generally an undesirable trait for a hotel room — it implies disruption (delivery trucks, noise from a bar) rather than a pleasant outlook. There is no positive or neutral framing in the wording; the implication is clearly unfavorable. So Polarity = Negative.
 
-Step 6 — Determine Intensity
-The clause is phrased as a plain factual description ("backing on to a delivery alley and bar") with no intensifiers, exclamations, or emotionally charged words. The negativity comes from the implied undesirability of the situation rather than from forceful or exaggerated language. This places it at an ordinary, unmarked level rather than an emphatic one, so Intensity = Standard.
-
-Step 7 — Verify against the checklist
-All opinion-bearing content in the sentence has been considered — the only evaluative clause is "backing on to a delivery alley and bar," and it has been assigned a Polar_expression with a clear Polarity and Intensity. Source and Target are both empty because neither an explicit holder nor an explicit named entity appears anywhere in this text segment, consistent with the no-inference rule. The extracted span is an exact substring of the original text, matching characters 12 through 50, and it cannot be shortened further without losing the specific negative implication. Since there is only one independent opinion here, it is represented as a single tuple. A final character-by-character check confirms the span boundaries align correctly with the source text.
+Step 6 — Verify against the checklist
+All opinion-bearing content in the sentence has been considered — the only evaluative clause is "backing on to a delivery alley and bar," and it has been assigned a Polar_expression with a clear Polarity. Source and Target are both empty because neither an explicit holder nor an explicit named entity appears anywhere in this text segment, consistent with the no-inference rule. The extracted span is an exact substring of the original text, matching characters 12 through 50, and it cannot be shortened further without losing the specific negative implication. Since there is only one independent opinion here, it is represented as a single tuple. A final character-by-character check confirms the span boundaries align correctly with the source text.
 """,
             "output": """
 {
@@ -519,8 +488,7 @@ All opinion-bearing content in the sentence has been considered — the only eva
       "Source": [],
       "Target": [],
       "Polar_expression": ["backing on to a delivery alley and bar"],
-      "Polarity": "Negative",
-      "Intensity": "Standard"
+      "Polarity": "Negative"
     }
   ]
 }
@@ -548,10 +516,7 @@ Checking the exact-span offset: counting characters, "no" begins at index 18 (n)
 Step 5 — Determine Polarity
 The absence of eggs at breakfast is an undesirable outcome for a hotel guest — it is explicitly framed as "the only glitch," confirming the negative reading. So Polarity = Negative.
 
-Step 6 — Determine Intensity
-"No" is a simple, unmarked negator with no exaggeration, emphasis, or emotionally charged wording attached to it (no words like "absolutely," "completely," "never ever"). The tone throughout is matter-of-fact, describing a minor logistical issue rather than an intense complaint. So Intensity = Standard.
-
-Step 7 — Verify against the checklist
+Step 6 — Verify against the checklist
 The sentence's negative content has been fully accounted for as a single opinion, since "glitch" and "no eggs" both describe the same fact rather than two distinct ones. Source and Target and Polar_expression have each been determined: Source is empty because no explicit holder appears in the text, Target is "eggs" because that is the concrete entity affected, and Polar_expression is "no" because that is the minimal word carrying the negative evaluation. Both extracted spans are exact substrings of the original text, matching characters 21 to 25 for "eggs" and characters 18 to 20 for "no," and neither span can be shortened further without losing its meaning. Since there is only one independent opinion here, it is represented as a single tuple. A final character-by-character check confirms both span boundaries align correctly with the source text.
 """,
             "output": """
@@ -561,8 +526,7 @@ The sentence's negative content has been fully accounted for as a single opinion
       "Source": [],
       "Target": ["eggs"],
       "Polar_expression": ["no"],
-      "Polarity": "Negative",
-      "Intensity": "Standard"
+      "Polarity": "Negative"
     }
   ]
 }
@@ -595,10 +559,7 @@ Checking the exact-span offset: "renewed" begins at index 8 (r) and ends at inde
 Step 6 — Determine Polarity for both opinions
 "Clean" describes a desirable hygienic quality of a hotel room, and "renewed" describes a desirable, freshly-updated quality — both are favorable attributes a hotel guest would welcome. So Polarity = Positive for both tuples.
 
-Step 7 — Determine Intensity for both opinions
-Neither "Clean" nor "renewed" is accompanied by an intensifier (no "very," "extremely," "incredibly") or exclamatory punctuation. Both are plain, unmarked positive descriptors stated as simple facts about the room. So Intensity = Standard for both tuples.
-
-Step 8 — Verify against the checklist
+Step 9 — Verify against the checklist
 All opinion-bearing words in the sentence have been identified: "Clean" and "renewed," both modifying "rooms." Each has its own Source, Target, and Polar_expression. Each extracted span is an exact substring of the original text — "rooms" matches characters 16 to 21, "Clean" matches characters 0 to 5, and "renewed" matches characters 8 to 15. None of these single-word spans can be shortened further without losing their meaning. Since "Clean" and "renewed" represent two independent evaluative judgments sharing the same target, they are correctly represented as two separate tuples rather than one. A final character-by-character check confirms all span boundaries align correctly with the source text.
 """,
             "output": """
@@ -608,15 +569,13 @@ All opinion-bearing words in the sentence have been identified: "Clean" and "ren
       "Source": [],
       "Target": ["rooms"],
       "Polar_expression": ["Clean"],
-      "Polarity": "Positive",
-      "Intensity": "Standard"
+      "Polarity": "Positive"
     },
     {
       "Source": [],
       "Target": ["rooms"],
       "Polar_expression": ["renewed"],
-      "Polarity": "Positive",
-      "Intensity": "Standard"
+      "Polarity": "Positive"
     }
   ]
 }
@@ -644,10 +603,7 @@ Checking the exact-span offset: counting characters, "low" begins at index 19 (l
 Step 5 — Determine Polarity
 Although "low" can sound negative in isolation, here it modifies "rates" — and low rates/prices represent good value for a hotel guest. Per the instruction to assign polarity based on actual communicative intent rather than surface form, "low rates" is a desirable, favorable attribute from the customer's perspective. So Polarity = Positive.
 
-Step 6 — Determine Intensity
-Even though "rock" precedes "low" as a colloquial intensifier, the overall statement is phrased as a plain, matter-of-fact observation rather than with clearly emphatic or exaggerated language (no words like "incredibly," "ridiculously," or exclamatory punctuation). The sentence simply states a fact about pricing in an ordinary register, and the second clause ("you pay for what you get for") frames it as a neutral, even-handed observation rather than an intense complaint or enthusiastic praise. So Intensity = Standard.
-
-Step 7 — Verify against the checklist
+Step 6 — Verify against the checklist
 The only evaluative content in the sentence is the statement that the rates are low, and it has been captured as a single opinion. Source, Target, and Polar_expression have each been determined: Source is empty since no explicit holder appears in the text, Target is "The rates" as the complete noun phrase referring to the evaluated entity, and Polar_expression is "low" as the minimal word carrying the evaluation. Both extracted spans are exact substrings of the original text, matching characters 0 to 9 for "The rates" and characters 19 to 22 for "low," and neither span can be shortened further without losing its meaning. The consequence clause "so you pay for what you get for" does not introduce a separate explicit target or evaluation, so it is correctly left unextracted rather than forced into a second tuple. A final character-by-character check confirms both span boundaries align correctly with the source text.
 """,
             "output": """
@@ -657,8 +613,7 @@ The only evaluative content in the sentence is the statement that the rates are 
       "Source": [],
       "Target": ["The rates"],
       "Polar_expression": ["low"],
-      "Polarity": "Positive",
-      "Intensity": "Standard"
+      "Polarity": "Positive"
     }
   ]
 }
