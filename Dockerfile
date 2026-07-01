@@ -2,6 +2,8 @@
 # Dockerfile — môi trường lm-eval + vLLM + llama.cpp
 # v5: thêm cuda-nvcc vào runtime để JIT compile được cho GPU mới
 #     (RTX 5060 Ti Blackwell sm_120f), fix editable install path issue
+# v6: bỏ cài sẵn flash-attn và lm-evaluation-harness ở build-time
+#     → giảm dung lượng image và thời gian build; cài tại runtime khi cần
 # =====================================================================
 
 # =======================
@@ -66,19 +68,6 @@ RUN pip install torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0 \
 COPY requirements.txt /workspace/requirements.txt
 RUN pip install -r /workspace/requirements.txt
 
-# ---- flash-attn từ wheel dựng sẵn ----
-RUN pip install \
-    https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.9.4/flash_attn-2.8.3+cu130torch2.11-cp312-cp312-linux_x86_64.whl
-
-# ---- lm-evaluation-harness — NON-editable để tránh path issue ----
-# Bản trước dùng `pip install -e .` (editable): venv lưu đường dẫn tuyệt đối
-# của source code. Khi copy venv sang stage khác hoặc thay đổi thư mục,
-# đường dẫn đó sẽ không còn đúng → import lỗi.
-# Non-editable install thì mọi file được copy thẳng vào site-packages,
-# không phụ thuộc vào vị trí source code.
-RUN git clone --depth 1 https://github.com/EleutherAI/lm-evaluation-harness.git && \
-    cd lm-evaluation-harness && \
-    pip install -q ."[hf,api,vllm]"
 
 WORKDIR /workspace
 CMD ["/bin/bash"]
