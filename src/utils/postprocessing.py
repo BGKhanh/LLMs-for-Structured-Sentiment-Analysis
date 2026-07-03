@@ -6,29 +6,23 @@ from typing import Any
 from copy import deepcopy as _deepcopy
 
 
-def extract_position(text: str, expression: str) -> str:
-    """
-    Extract start and end positions of expression in text.
-    
-    Args:
-        text: Original text
-        expression: Expression to find position for
-        
-    Returns:
-        Position string in format "start:end" (0-indexed)
-        
-    Example:
-        >>> extract_position("Tôi rất vui", "rất vui")
-        "4:12"
-    
-    Note:
-        Model-agnostic utility for SemEval format compliance.
-    """
-    start = text.find(expression)
-    if start == -1:
+def extract_position(text: str, expression: str, exclude_ranges: list[tuple[int,int]] | None = None) -> str:
+    exclude_ranges = exclude_ranges or []
+    pattern = re.escape(expression)
+    candidates = [(m.start(), m.start() + len(expression))
+                  for m in re.finditer(rf'(?<!\w){pattern}(?!\w)', text)]
+    if not candidates:
+        start = 0
+        while (idx := text.find(expression, start)) != -1:
+            candidates.append((idx, idx + len(expression)))
+            start = idx + 1
+    if not candidates:
         return "0:0"
-    end = start + len(expression)
-    return f"{start}:{end}"
+    for s, e in candidates:
+        if not any(s < ue and e > us for us, ue in exclude_ranges):
+            return f"{s}:{e}"
+    s, e = candidates[0]           # tất cả đều trùng -> đành chấp nhận cái đầu
+    return f"{s}:{e}"
 
 def _extract_by_fields(text: str) -> str:
     """Last resort: build JSON bằng regex extraction từng field."""
@@ -147,110 +141,15 @@ def extract_json_from_response(raw_response: str) -> str:
 
     # Bước 4: Last resort - field-by-field extraction
     return _extract_by_fields(candidate)
-
-def postprocess_response(
-    response_text: str,
-    original_text: str,
-    sent_id: Any
-) -> str:
-    """
-    Normalize model response to SemEval format.
     
-    Args:
-        response_text: JSON response from model (after extract_response())
-        original_text: Original input text
-        sent_id: Sentence identifier
-        
-    Returns:
-        Formatted JSON string with validated structure and positions
-        
-    Note:
-        - Works with all models (model-agnostic)
-        - Handles multiple opinion formats
-        - Auto-extracts positions for all text spans
-        - Validates Polarity 
-    
-    Example:
-        >>> json_str = model.extract_response(raw_response)
-        >>> final = postprocess_response(json_str, original_text, sent_id)
-    """
-    try:
-        result = json.loads(response_text)
-        result["sent_id"] = sent_id
-        result["text"] = original_text
-        
-        if "opinions" in result and isinstance(result["opinions"], list):
-            for opinion in result["opinions"]:
-                if not isinstance(opinion, dict):
-                    continue
-                
-                # Process each component: Source, Target, Polar_expression
-                for component in ["Source", "Target", "Polar_expression"]:
-                    if component not in opinion:
-                        opinion[component] = [[], []]
-                        continue
-                    
-                    component_data = opinion[component]
-                    
-                    # Handle different formats
-                    if isinstance(component_data, list):
-                        # Check if already in [texts, positions] format
-                        if (len(component_data) == 2 and 
-                            isinstance(component_data[0], list) and 
-                            isinstance(component_data[1], list)):
-                            # Old format - re-extract positions for accuracy
-                            texts = component_data[0]
-                        else:
-                            # New format - just array of text spans
-                            texts = component_data
-                        
-                        # Clean and extract positions
-                        valid_texts = [
-                            text for text in texts 
-                            if isinstance(text, str) and text.strip()
-                        ]
-                        positions = [
-                            extract_position(original_text, text) 
-                            for text in valid_texts
-                        ]
-                        opinion[component] = [valid_texts, positions]
-                        
-                    elif isinstance(component_data, str) and component_data.strip():
-                        # Single string
-                        text = component_data.strip()
-                        position = extract_position(original_text, text)
-                        opinion[component] = [[text], [position]]
-                    else:
-                        # Empty or invalid
-                        opinion[component] = [[], []]
-                
-                # Validate Polarity
-                valid_polarities = ["Positive", "Negative", "Neutral"]
-                if ("Polarity" not in opinion or 
-                    opinion["Polarity"] not in valid_polarities):
-                    opinion["Polarity"] = ""
-                    
-        else:
-            result["opinions"] = []
-            
-        return json.dumps(result, ensure_ascii=False, indent=2)
-        
-    except json.JSONDecodeError:
-        # Fallback: return empty structure
-        default_result = {
-            "sent_id": sent_id,
-            "text": original_text,
-            "opinions": []
-        }
-        return json.dumps(default_result, ensure_ascii=False, indent=2)
- 
     
 def postprocess_response(response_text: str, original_text: str, sent_id: Any) -> str:
-    """Normalize model response to SemEval format."""
     try:
         result = json.loads(response_text)
         result["sent_id"] = sent_id
         result["text"] = original_text
+
+        used_ranges: list[tuple[int, int]] = []   # <-- MỚI: state toàn câu
 
         if "opinions" in result and isinstance(result["opinions"], list):
             for opinion in result["opinions"]:
@@ -262,6 +161,7 @@ def postprocess_response(response_text: str, original_text: str, sent_id: Any) -
                         opinion[component] = [[], []]
                         continue
                     component_data = opinion[component]
+
                     if isinstance(component_data, list):
                         if (len(component_data) == 2 and
                                 isinstance(component_data[0], list) and
@@ -270,18 +170,28 @@ def postprocess_response(response_text: str, original_text: str, sent_id: Any) -
                         else:
                             texts = component_data
                         valid_texts = [t for t in texts if isinstance(t, str) and t.strip()]
-                        positions = [extract_position(original_text, t) for t in valid_texts]
+
+                        positions = []                                   # <-- đổi từ comprehension
+                        for t in valid_texts:
+                            pos = extract_position(original_text, t, exclude_ranges=used_ranges)
+                            positions.append(pos)
+                            b, e = map(int, pos.split(":"))
+                            used_ranges.append((b, e))                   # <-- cập nhật state
+
                         opinion[component] = [valid_texts, positions]
+
                     elif isinstance(component_data, str) and component_data.strip():
                         t = component_data.strip()
-                        opinion[component] = [[t], [extract_position(original_text, t)]]
+                        pos = extract_position(original_text, t, exclude_ranges=used_ranges)
+                        b, e = map(int, pos.split(":"))
+                        used_ranges.append((b, e))
+                        opinion[component] = [[t], [pos]]
                     else:
                         opinion[component] = [[], []]
 
                 valid_polarities = ["Positive", "Negative", "Neutral"]
                 if "Polarity" not in opinion or opinion["Polarity"] not in valid_polarities:
                     opinion["Polarity"] = ""
-
         else:
             result["opinions"] = []
 
@@ -290,7 +200,6 @@ def postprocess_response(response_text: str, original_text: str, sent_id: Any) -
     except json.JSONDecodeError:
         return json.dumps({"sent_id": sent_id, "text": original_text, "opinions": []},
                           ensure_ascii=False, indent=2)
-        
         
         
 def _char_offsets_to_tokens_safe(char_offsets, token_offsets, sent_id, error_set):

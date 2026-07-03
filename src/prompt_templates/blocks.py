@@ -147,7 +147,7 @@ def base_question_block(text: str, sent_id: str, language: str = "vi") -> str:
 """
         )
     return (
-        f"""Phân tích cảm xúc cho văn bản sau):
+        f"""Phân tích cảm xúc cho văn bản sau:
 "{text}"
 """
     )
