@@ -51,7 +51,11 @@ The repository is organized as follows:
 │   └── vastai_notebook_lm_eval.ipynb
 │
 ├── src/
-│   └── tasks/                          # SSA task definitions for LM Evaluation Harness
+│   ├── tasks/                          # SSA task definitions for LM Evaluation Harness
+│   ├── prompt_templates/               # Prompt construction (blocks, content providers, factory)
+│   └── utils/                          # Response postprocessing / structured-output extraction
+│
+├── results/                            # lm_eval output (results_*.json, samples_*.jsonl)
 │
 ├── Dockerfile                          # Docker environment for reproducible experiments
 ├── requirements.txt                    # Python dependencies
@@ -66,7 +70,10 @@ The repository is organized as follows:
 | `divided_data/`                   | Dataset partitions for parallel or distributed inference.                                             |
 | `semeval22_structured_sentiment/` | Multilingual SSA benchmark datasets and preprocessing utilities based on SemEval-2022.                |
 | `notebook/`                       | Example notebooks for model inference, prompt optimization, and experiment workflows.                 |
-| `src/tasks/`                      | Task definitions, prompt templates, parsers, and evaluation configurations for LM Evaluation Harness. |
+| `src/tasks/`                      | Task definitions and evaluation configurations for LM Evaluation Harness.                             |
+| `src/prompt_templates/`           | Prompt construction logic (system/user prompt blocks, technique-specific content providers).          |
+| `src/utils/`                      | Postprocessing utilities for parsing and validating structured model outputs.                         |
+| `results/`                        | Evaluation outputs (`results_*.json` summaries, `samples_*.jsonl` per-sample logs).                    |
 | `Dockerfile`                      | Docker configuration for creating reproducible execution environments.                                |
 | `requirements.txt`                | Python package dependencies required by the repository.                                               |
 
@@ -74,7 +81,7 @@ The repository is organized as follows:
 
 This repository supports two installation methods:
 
-* **Docker (Recommended):** A pre-built Docker image with all required dependencies pre-installed for reproducible experiments.
+* **Docker (Recommended):** A pre-built Docker image with the core runtime (CUDA, PyTorch, `llama-server`) ready to use. `lm-eval` is installed at container **runtime** (not baked into the image) so its version can be pinned per experiment — see [Reproducibility Notes](#-reproducibility-notes-reasoningthinking-mode) below.
 * **Local Environment:** Install the required dependencies manually on your system.
 
 ---
@@ -95,7 +102,11 @@ docker run --gpus all -it --rm \
     kgb0630/lm-eval-vastai:v6
 ```
 
-The Docker image includes the runtime environment required for running experiments in this repository and is the recommended option for reproducible benchmarking.
+The Docker image includes the base runtime environment (CUDA, PyTorch, `llama-server` binary) required for running experiments in this repository. After launching the container, install a **pinned** version of LM Evaluation Harness before running any experiment, e.g.:
+
+```bash
+pip install lm_eval==0.4.12
+```
 
 ---
 
@@ -239,6 +250,10 @@ llama-server \
 >
 > The provided Docker image (`kgb0630/lm-eval-vastai:v6`) includes `llama-server`, allowing GGUF models to be served through an OpenAI-compatible API without additional installation.
 
+> **Note — Gated models**
+>
+> If the model you are downloading (HF repo) is gated, set one of `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`, or `HUGGINGFACE_API_KEY` as an environment variable before starting the server, e.g. `export HF_TOKEN=<your_token>`.
+
 ---
 
 ### Option 1. Notebook Workflow (Recommended)
@@ -297,6 +312,32 @@ lm_eval \
 
 Replace `<TASK_NAME>` with any benchmark task provided by this repository (e.g., `vietnamese_ssa`).
 
+## ⚠️ Reproducibility Notes: Reasoning/Thinking Mode
+
+For reasoning-capable models (e.g. the Gemma-4 family), whether **"thinking" mode is
+enabled** has a **major impact on SF1** — in our own experiments we observed swings of
+roughly 2–3x on the same prompt purely from this setting. Always set it **explicitly**
+and record the value used alongside your reported numbers:
+
+| Backend | Flag |
+|---|---|
+| Native vLLM / vLLM OpenAI server | `--default-chat-template-kwargs '{"enable_thinking": true\|false}'` (+ `--reasoning-parser <name>` for the OpenAI server) |
+| `llama.cpp` (`llama-server`) | `--reasoning on\|off` (optionally `--reasoning-budget N` to cap thinking length, `--reasoning-format deepseek` to separate `reasoning_content` from `content`) |
+
+**Do not rely on library defaults** — the default value of `enable_thinking` in
+`lm-eval-harness`'s vLLM backend has changed across versions without a corresponding
+release note, silently changing results for anyone who does not set it explicitly.
+To keep experiments reproducible:
+
+- Pin the `lm_eval` version (`pip install lm_eval==<version>`) rather than always
+  installing from the tip of the default branch.
+- Pin the model `revision` (commit SHA) when downloading from the Hugging Face Hub,
+  so the chat template embedded in `tokenizer_config.json` cannot silently change
+  between runs.
+- When using `--log_samples`, the resulting `results_*.json` includes a
+  `chat_template_sha` field — save it alongside your results and compare it across
+  runs if scores look inconsistent.
+
 ## Supported Datasets
 
 This repository currently supports benchmark datasets from both public Structured Sentiment Analysis benchmarks and custom datasets. Most multilingual datasets are adapted from the official **SemEval-2022 Task 10** benchmark, while additional datasets can be integrated through the task definitions provided in this repository.
@@ -320,18 +361,21 @@ Model predictions are evaluated following the official **SemEval-2022 Task 10** 
 
 Each predicted opinion is represented as a structured tuple consisting of:
 
-- **Holder**
+- **Holder** (Source)
 - **Target**
-- **Sentiment Expression**
+- **Sentiment Expression** (Polar expression)
 - **Polarity**
 
-The evaluation compares the predicted opinion structures against the gold annotations and reports the following metrics:
+Predicted and gold tuples are matched using weighted span overlap, following the official SemEval-2022 Task 10 protocol. The following metrics are computed and reported for every run:
 
 | Metric | Description |
 |---------|-------------|
-| **Precision** | Fraction of predicted opinion structures that are correct. |
-| **Recall** | Fraction of gold opinion structures successfully recovered by the model. |
-| **Sentiment Graph F1** | Official SemEval evaluation metric measuring the overall quality of structured sentiment prediction. |
+| **SF1** | Sentiment Graph F1 — the official metric. Requires overlap on Holder, Target, and Expression *and* an exact Polarity match. |
+| **NSF1** | Same as SF1 but polarity-agnostic (Holder/Target/Expression overlap only). |
+| **Holder F1** | Span F1 on the opinion Holder only. |
+| **Target F1** | Span F1 on the opinion Target only. |
+| **Exp F1** | Span F1 on the Polar Expression only. |
+| **Targeted F1** | Requires an *exact* (non-weighted) Target span match, plus Polarity match. |
 
 Unlike traditional sentiment classification, Structured Sentiment Analysis requires correctly predicting both the sentiment polarity and the relationships among opinion components. Consequently, the official evaluation is performed on complete opinion graphs rather than isolated spans.
 
@@ -353,3 +397,108 @@ Official SemEval Evaluation Script
 ```
 
 The evaluation implementation follows the official **SemEval-2022 Task 10** benchmark to ensure fair and reproducible comparison with previously published methods.
+
+---
+
+## Results
+
+This repository is part of ongoing research. Benchmark results will be added to this
+section as experiments are completed.
+
+---
+
+## License
+
+TBD. A license has not yet been selected for this repository — until one is added,
+all rights are reserved by the authors and the code should not be reused or
+redistributed without permission. Note that the bundled datasets
+(`semeval22_structured_sentiment/`, `data/`) are governed by their own original
+licenses/terms, independent of whatever license is eventually chosen for the code
+in this repository; please refer to the SemEval-2022 Task 10 organizers for dataset
+terms.
+
+---
+
+## Citation
+
+If you use this repository, please cite the following:
+
+```bibtex
+@inproceedings{barnes-etal-2022-semeval,
+    title = "{S}em{E}val-2022 Task 10: Structured Sentiment Analysis",
+    author = "Barnes, Jeremy and
+              Oberl{\"a}nder, Laura Ana Maria and
+              Troiano, Enrica and
+              Kutuzov, Andrey and
+              Buchmann, Jan and
+              Agerri, Rodrigo and
+              {\O}vrelid, Lilja  and
+              Velldal, Erik",
+    booktitle = "Proceedings of the 16th International Workshop on Semantic Evaluation (SemEval-2022)",
+    month = july,
+    year = "2022",
+    address = "Seattle",
+    publisher = "Association for Computational Linguistics"
+}
+
+@misc{barnes2021structuredsentimentanalysisdependency,
+      title={Structured Sentiment Analysis as Dependency Graph Parsing}, 
+      author={Jeremy Barnes and Robin Kurtz and Stephan Oepen and Lilja Øvrelid and Erik Velldal},
+      year={2021},
+      eprint={2105.14504},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2105.14504}, 
+}
+
+@misc{eval-harness,
+  author       = {Gao, Leo and Tow, Jonathan and Abbasi, Baber and Biderman, Stella and Black, Sid and DiPofi, Anthony and Foster, Charles and Golding, Laurence and Hsu, Jeffrey and Le Noac'h, Alain and Li, Haonan and McDonell, Kyle and Muennighoff, Niklas and Ociepa, Chris and Phang, Jason and Reynolds, Laria and Schoelkopf, Hailey and Skowron, Aviya and Sutawika, Lintang and Tang, Eric and Thite, Anish and Wang, Ben and Wang, Kevin and Zou, Andy},
+  title        = {The Language Model Evaluation Harness},
+  month        = 07,
+  year         = 2024,
+  publisher    = {Zenodo},
+  version      = {v0.4.3},
+  doi          = {10.5281/zenodo.12608602},
+  url          = {https://zenodo.org/records/12608602}
+}
+
+@inproceedings{ovrelid-etal-2020-fine,
+    title = "A Fine-grained Sentiment Dataset for {N}orwegian",
+    author = "{\O}vrelid, Lilja  and
+      M{\ae}hlum, Petter  and
+      Barnes, Jeremy  and
+      Velldal, Erik",
+    booktitle = "Proceedings of the 12th Language Resources and Evaluation Conference",
+    month = may,
+    year = "2020",
+    address = "Marseille, France",
+    publisher = "European Language Resources Association",
+    url = "https://aclanthology.org/2020.lrec-1.618",
+    pages = "5025--5033",
+    abstract = "We here introduce NoReC{\_}fine, a dataset for fine-grained sentiment analysis in Norwegian, annotated with respect to polar expressions, targets and holders of opinion. The underlying texts are taken from a corpus of professionally authored reviews from multiple news-sources and across a wide variety of domains, including literature, games, music, products, movies and more. We here present a detailed description of this annotation effort. We provide an overview of the developed annotation guidelines, illustrated with examples and present an analysis of inter-annotator agreement. We also report the first experimental results on the dataset, intended as a preliminary benchmark for further experiments.",
+    language = "English",
+    ISBN = "979-10-95546-34-4",
+}
+
+@inproceedings{barnes-etal-2018-multibooked,
+    title = "{M}ulti{B}ooked: A Corpus of {B}asque and {C}atalan Hotel Reviews Annotated for Aspect-level Sentiment Classification",
+    author = "Barnes, Jeremy  and
+      Badia, Toni  and
+      Lambert, Patrik",
+    booktitle = "Proceedings of the Eleventh International Conference on Language Resources and Evaluation ({LREC} 2018)",
+    month = may,
+    year = "2018",
+    address = "Miyazaki, Japan",
+    publisher = "European Language Resources Association (ELRA)",
+    url = "https://aclanthology.org/L18-1104",
+}
+
+@inproceedings{Agerri2013,
+    author = {Agerri, Rodrigo and Cuadros, Montse and Gaines, Sean and Rigau, German},
+    booktitle = {Sociedad Espa{\~{n}}ola para el Procesamiento del Lenguaje Natural},
+    pages = {215--218},
+    title = {{OpeNER: Open polarity enhanced named entity recognition.}},
+    volume = {51},
+    year = {2013}
+}
+```
