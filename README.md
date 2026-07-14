@@ -81,7 +81,7 @@ The repository is organized as follows:
 
 This repository supports two installation methods:
 
-* **Docker (Recommended):** A pre-built Docker image with the core runtime (CUDA, PyTorch, `llama-server`) ready to use. `lm-eval` is installed at container **runtime** (not baked into the image) so its version can be pinned per experiment — see [Reproducibility Notes](#-reproducibility-notes-reasoningthinking-mode) below.
+* **Docker (Recommended):** A pre-built Docker image with the core runtime (CUDA, PyTorch, `llama-server`) ready to use. `lm-eval` is installed at container **runtime** (not baked into the image) so its version can be pinned per experiment 
 * **Local Environment:** Install the required dependencies manually on your system.
 
 ---
@@ -102,12 +102,7 @@ docker run --gpus all -it --rm \
     kgb0630/lm-eval-vastai:v6
 ```
 
-The Docker image includes the base runtime environment (CUDA, PyTorch, `llama-server` binary) required for running experiments in this repository. After launching the container, install a **pinned** version of LM Evaluation Harness before running any experiment, e.g.:
-
-```bash
-pip install lm_eval==0.4.12
-```
-
+The Docker image includes the base runtime environment (CUDA, PyTorch, `llama-server` binary) required for running experiments in this repository. 
 ---
 
 ### Option 2. Local Environment
@@ -324,20 +319,6 @@ and record the value used alongside your reported numbers:
 | Native vLLM / vLLM OpenAI server | `--default-chat-template-kwargs '{"enable_thinking": true\|false}'` (+ `--reasoning-parser <name>` for the OpenAI server) |
 | `llama.cpp` (`llama-server`) | `--reasoning on\|off` (optionally `--reasoning-budget N` to cap thinking length, `--reasoning-format deepseek` to separate `reasoning_content` from `content`) |
 
-**Do not rely on library defaults** — the default value of `enable_thinking` in
-`lm-eval-harness`'s vLLM backend has changed across versions without a corresponding
-release note, silently changing results for anyone who does not set it explicitly.
-To keep experiments reproducible:
-
-- Pin the `lm_eval` version (`pip install lm_eval==<version>`) rather than always
-  installing from the tip of the default branch.
-- Pin the model `revision` (commit SHA) when downloading from the Hugging Face Hub,
-  so the chat template embedded in `tokenizer_config.json` cannot silently change
-  between runs.
-- When using `--log_samples`, the resulting `results_*.json` includes a
-  `chat_template_sha` field — save it alongside your results and compare it across
-  runs if scores look inconsistent.
-
 ## Supported Datasets
 
 This repository currently supports benchmark datasets from both public Structured Sentiment Analysis benchmarks and custom datasets. Most multilingual datasets are adapted from the official **SemEval-2022 Task 10** benchmark, while additional datasets can be integrated through the task definitions provided in this repository.
@@ -348,6 +329,8 @@ This repository currently supports benchmark datasets from both public Structure
 | NoReC Fine | Norwegian | SemEval-2022 | Review domain | ✅ |
 | OpeNER | English, Spanish | SemEval-2022 | Hotel reviews | ✅ |
 | MultiBooked | Catalan, Basque | SemEval-2022 | Hotel reviews | ✅ |
+| Darmstadt_unis | English | SemEval-2022 | University-related user reviews annotated for structured sentiment analysis | ✅ |
+| MPQA | English | MPQA Corpus | News articles annotated with private states, opinions, sentiment expressions, and opinion holders/targets | ✅ |
 
 > **Note**
 >
@@ -378,25 +361,6 @@ Predicted and gold tuples are matched using weighted span overlap, following the
 | **Targeted F1** | Requires an *exact* (non-weighted) Target span match, plus Polarity match. |
 
 Unlike traditional sentiment classification, Structured Sentiment Analysis requires correctly predicting both the sentiment polarity and the relationships among opinion components. Consequently, the official evaluation is performed on complete opinion graphs rather than isolated spans.
-
-### Evaluation Pipeline
-
-```text
-Gold Opinion Graphs
-          │
-          ▼
-Model Predictions
-          │
-          ▼
-Official SemEval Evaluation Script
-          │
-          ▼
- Precision
- Recall
- Sentiment Graph F1
-```
-
-The evaluation implementation follows the official **SemEval-2022 Task 10** benchmark to ensure fair and reproducible comparison with previously published methods.
 
 ---
 
@@ -500,5 +464,31 @@ If you use this repository, please cite the following:
     title = {{OpeNER: Open polarity enhanced named entity recognition.}},
     volume = {51},
     year = {2013}
+}
+
+@article{Wiebe2005b,
+author = {Wiebe, Janyce
+        and Wilson, Theresa
+        and Cardie, Claire},
+journal = {Language Resources and Evaluation},
+number = {2-3},
+pages = {165--210},
+title = {{Annotating expressions of opinions and emotions in language}},
+volume = {39},
+year = {2005}
+}
+
+@inproceedings{toprak-etal-2010-sentence,
+    title = "Sentence and Expression Level Annotation of Opinions in User-Generated Discourse",
+    author = "Toprak, Cigdem  and
+      Jakob, Niklas  and
+      Gurevych, Iryna",
+    booktitle = "Proceedings of the 48th Annual Meeting of the Association for Computational Linguistics",
+    month = jul,
+    year = "2010",
+    address = "Uppsala, Sweden",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/P10-1059",
+    pages = "575--584",
 }
 ```
