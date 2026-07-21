@@ -1,0 +1,42 @@
+output_type: generate_until
+process_results: !function utils.process_results
+
+generation_kwargs:
+  until:
+    - "\n\n\n"
+    - "</s>"
+    - "<|im_end|>"
+    - "<|eot_id|>"
+    - "<end_of_turn>"
+  max_gen_toks: 2048
+  temperature: 0.0
+  top_p: 0.95
+  top_k: 50
+  do_sample: false
+
+filter_list:
+  - name: "json_extract"
+    filter:
+      - function: "custom"
+        filter_fn: !function utils.extract_and_postprocess
+      - function: "take_first"
+
+metric_list:
+  - metric: SF1
+    aggregation: !function utils.sf1_agg
+    higher_is_better: true
+  - metric: NSF1
+    aggregation: !function utils.nsf1_agg
+    higher_is_better: true
+  - metric: Holder_F1
+    aggregation: !function utils.holder_f1_agg
+    higher_is_better: true
+  - metric: Target_F1
+    aggregation: !function utils.target_f1_agg
+    higher_is_better: true
+  - metric: Exp_F1
+    aggregation: !function utils.exp_f1_agg
+    higher_is_better: true
+  - metric: Targeted_F1
+    aggregation: !function utils.targeted_f1_agg
+    higher_is_better: true

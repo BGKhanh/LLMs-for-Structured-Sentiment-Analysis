@@ -1,0 +1,36 @@
+include: _common_yaml
+task: vietnamese_ssa_few_shot
+tag: vietnamese_ssa
+
+custom_dataset: !function utils.load_dataset
+test_split: test
+training_split: train
+validation_split: dev
+
+description: "{{system_prompt}}"
+doc_to_text: !function utils.doc_to_text
+doc_to_target: "{{opinions_json}}"
+
+# Default: zero-shot. Override at the CLI with --num_fewshot N to turn on
+# native few-shot sampling (was previously `n_shot` inside --metadata).
+num_fewshot: 0
+
+fewshot_config:
+  sampler: default          # random sample w/ seeding via --fewshot_random_seed;
+                             # automatically excludes the eval doc from the pool
+  split: train               # pool = real train.json docs (via custom_dataset), not a separate examples_pool file
+  doc_to_text: !function utils.fewshot_doc_to_text
+  doc_to_target: !function utils.fewshot_doc_to_target
+  target_delimiter: " "      # joins "Output:" + " " + json
+  fewshot_delimiter: "\n\n"  # blank line between examples, and before the eval question
+
+metadata:
+  version: 2.0
+  technique: few_shot
+  description: >
+    Vietnamese Structured Sentiment Analysis — Few-shot technique.
+    Fewshot examples are now sampled natively by lm-eval-harness
+    (fewshot_config.split: train) instead of via a hardcoded
+    random.sample() inside PromptCreator/contents.py.
+  # Optional overrides passed the same way as before, e.g.:
+  #   --metadata '{"language":"en","dataset_dir":"custom/path"}'

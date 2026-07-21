@@ -58,7 +58,7 @@ def pas_instruction_block(*, plus: bool = False, language: str = "vi") -> str:
 # ---------------------------------------------------------------------------
 # Few-shot formatting (copied from legacy FewShotPrompt)
 # ---------------------------------------------------------------------------
-def _simplify_opinions(opinions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def simplify_opinions(opinions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     simplified: list[dict[str, Any]] = []
     for op in opinions:
         def extract_text(field_name: str) -> list[str]:
@@ -97,7 +97,7 @@ def few_shot_block(examples: list[dict[str, Any]], language: str = "vi") -> str:
 
     for i, ex in enumerate(examples, 1):
         formatted_output = {
-            "opinions": _simplify_opinions(ex.get("opinions", []))
+            "opinions": simplify_opinions(ex.get("opinions", []))
         }
         section += f"{label} {i}:\n"
         section += f'Input: "{ex.get("text", "")}"\n'
@@ -217,7 +217,7 @@ def re2_examples_block(
             if include_reasoning:
                 output_data = ex.get("output", {})
             else:
-                output_data = {"text": text, "opinions": _simplify_opinions(ex.get("opinions", []))}
+                output_data = {"text": text, "opinions": simplify_opinions(ex.get("opinions", []))}
             section += f"Output:\n{json.dumps(output_data, ensure_ascii=False, indent=2)}\n\n"
         return section.strip()
 
@@ -234,7 +234,6 @@ def re2_examples_block(
         if include_reasoning:
             output_data = ex.get("output", {})
         else:
-            output_data = {"text": text, "opinions": _simplify_opinions(ex.get("opinions", []))}
+            output_data = {"text": text, "opinions": simplify_opinions(ex.get("opinions", []))}
         section += f"Output:\n{json.dumps(output_data, ensure_ascii=False, indent=2)}\n\n"
     return section.strip()
-

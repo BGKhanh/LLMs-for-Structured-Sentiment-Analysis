@@ -1,0 +1,24 @@
+include: _common_yaml
+task: vietnamese_ssa_plan_and_solve
+tag: vietnamese_ssa
+
+custom_dataset: !function utils.load_dataset
+test_split: test
+training_split: train
+validation_split: dev
+
+description: "{{system_prompt}}"
+doc_to_text: !function utils.plan_and_solve_doc_to_text
+doc_to_target: "{{opinions_json}}"
+
+# Plan-and-Solve is instruction-only — matches legacy PlanAndSolveContent,
+# which always discards the examples pool. No `fewshot_config` here on
+# purpose; don't pass --num_fewshot > 0 for this task.
+num_fewshot: 0
+
+metadata:
+  version: 2.0
+  technique: plan_and_solve
+  description: >
+    Vietnamese SSA — Plan-and-Solve (chỉ instruction, không ví dụ).
+    Dùng --metadata '{"plus_mode": true}' để bật biến thể PS+.
