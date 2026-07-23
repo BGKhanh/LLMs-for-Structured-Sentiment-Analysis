@@ -286,7 +286,7 @@ lm_eval \
   --tasks <TASK_NAME> \
   --include_path ./src/tasks \
   --num_fewshot 3 \
-  --fewshot_random_seed 42 \
+  --seed 0,1234,1234,42 \
   --apply_chat_template \
   --log_samples \
   --batch_size 32 \
@@ -308,7 +308,7 @@ lm_eval \
   --tasks <TASK_NAME> \
   --include_path ./src/tasks \
   --num_fewshot 3 \
-  --fewshot_random_seed 42 \
+  --seed 0,1234,1234,42 \
   --apply_chat_template \
   --log_samples \
   --output_path results/lm_eval/<experiment_name> \
