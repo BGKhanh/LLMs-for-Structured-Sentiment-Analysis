@@ -45,9 +45,6 @@ The repository is organized as follows:
 │   └── process_*.py
 │
 ├── notebook/                           # Example notebooks and experimental workflows
-│   ├── Gemma3_(4B).ipynb
-│   ├── dspy_GEPA.ipynb
-│   ├── dspy_GEPA_local_host_api.ipynb
 │   └── vastai_notebook_lm_eval.ipynb
 │
 ├── src/
@@ -62,7 +59,6 @@ The repository is organized as follows:
 │   ├── prompt_templates/               # Reusable prompt-building blocks (system prompts, example pools)
 │   └── utils/                          # Response postprocessing / structured-output extraction
 │
-├── results/                            # lm_eval output (results_*.json, samples_*.jsonl)
 │
 ├── Dockerfile                          # Docker environment for reproducible experiments
 ├── requirements.txt                    # Python dependencies
@@ -76,11 +72,10 @@ The repository is organized as follows:
 | `data/`                           | Original and processed Structured Sentiment Analysis datasets.                                        |
 | `divided_data/`                   | Dataset partitions for parallel or distributed inference.                                             |
 | `semeval22_structured_sentiment/` | Multilingual SSA benchmark datasets and preprocessing utilities based on SemEval-2022.                |
-| `notebook/`                       | Example notebooks for model inference, prompt optimization, and experiment workflows.                 |
+| `notebook/`                       | Example notebooks for model inference and experiment workflows.                 |
 | `src/tasks/`                      | Per-technique task configs for LM Evaluation Harness — one `.yaml` per prompting technique, grouped under `tag: vietnamese_ssa`; sample selection for few-shot is handled natively by the harness (`fewshot_config`), not hardcoded in Python. |
 | `src/prompt_templates/`           | Stateless, reusable prompt-building blocks (system prompts per language, hand-written CoT example pools) shared across techniques.                    |
 | `src/utils/`                      | Postprocessing utilities for parsing and validating structured model outputs.                         |
-| `results/`                        | Evaluation outputs (`results_*.json` summaries, `samples_*.jsonl` per-sample logs).                    |
 | `Dockerfile`                      | Docker configuration for creating reproducible execution environments.                                |
 | `requirements.txt`                | Python package dependencies required by the repository.                                               |
 
@@ -140,10 +135,10 @@ git clone --depth 1 https://github.com/EleutherAI/lm-evaluation-harness.git
 
 cd lm-evaluation-harness
 
-pip install -e ".[api,vllm]"
+pip install -e ".[api,vllm,hf]"
 ```
 
-> Additional installation options (e.g., `hf`, `multimodal`, `dev`) are available in the official LM Evaluation Harness documentation.
+> Additional installation options (e.g., `multimodal`, `dev`) are available in the official LM Evaluation Harness documentation.
 
 ---
 
