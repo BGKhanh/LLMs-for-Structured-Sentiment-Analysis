@@ -1,27 +1,44 @@
 """
 Bridge module between lm-evaluation-harness and the project's existing code.
 
-Reorg note (v2): this file now backs MULTIPLE per-technique yaml configs
-(one file per technique, e.g. `few_shot.yaml`), all sharing this same
-`utils.py` + `_common_yaml`. Only `few_shot` is migrated to lm-eval's
-*native* few-shot mechanism so far — `re_reading` / `few_shot_cot` /
-`plan_and_solve` still live on the legacy `PromptCreator` pipeline
-(`src/prompt_templates/`) and haven't been touched.
+Reorg note (v2): this file backs ALL FOUR per-technique yaml configs
+(`few_shot.yaml`, `re_reading.yaml`, `few_shot_cot.yaml`,
+`plan_and_solve.yaml`), each sharing this same `utils.py` + `_common_yaml`.
+All four are on lm-eval's *native* few-shot mechanism now (or, for
+`plan_and_solve`, deliberately have none). `src/prompt_templates/contents.py`,
+`creator.py`, and `factory.py` (the old generic `PromptCreator` /
+`ContentProvider` pipeline) have been REMOVED — nothing in this pipeline
+imports them anymore, and their responsibilities are now split between
+per-doc callables here and the trimmed-down `blocks.py`. `blocks.py` and
+`shared.py` are still used directly (see imports below) — pure, reusable
+string-building helpers with no lm-eval-specific coupling.
 
 Key change vs the legacy single-file version: `load_dataset()` no longer
 pre-computes the full `user_prompt` string. It now returns RAW fields only
-(`text`, `opinions_json`, `sent_id`, `language`, `system_prompt`). Prompt
-rendering is done lazily, per-doc, by `doc_to_text()` / `fewshot_doc_to_text()`
-/ `fewshot_doc_to_target()` — these are plain functions of a single `doc`
-dict, with no reliance on any global "current technique/language" variable.
-That's what lets multiple technique yamls (grouped under one `tag`) run
-safely in the same process without leaking state into each other.
+(`text`, `opinions_json`, `sent_id`, `language`, `system_prompt`,
+`plus_mode`). Prompt rendering is done lazily, per-doc, by the
+`*_doc_to_text()` / `*_fewshot_doc_to_text()` / `*_fewshot_doc_to_target()`
+functions below — each a plain function of a single `doc` dict, no
+reliance on a global "current technique" variable. That's what lets all 4
+technique yamls (grouped under one `tag`) run safely in the same process
+without leaking state into each other. The ONE exception is
+`get_cot_pool()` (see its docstring), which needs a tiny bit of
+module-level state due to an lm-eval API constraint, not a design choice.
 
-Few-shot sampling itself (which train-split examples to pick, with what
-seed, excluding the eval doc) is now handled natively by lm-eval-harness
-via `fewshot_config` in the yaml — not by `PromptCreator`/`contents.py`.
+Few-shot sampling itself (which examples to pick, with what seed, whether
+to exclude the eval doc) is handled natively by lm-eval-harness via
+`fewshot_config` in each yaml — never by hand-rolled `random.sample()`.
 
-YAML references (see few_shot.yaml):
+Per-technique function map (see each yaml for the exact wiring):
+    few_shot        -> doc_to_text                / fewshot_doc_to_text            / fewshot_doc_to_target
+    re_reading      -> re_reading_doc_to_text      / re_reading_fewshot_doc_to_text / re_reading_fewshot_doc_to_target
+    few_shot_cot    -> cot_doc_to_text             / cot_fewshot_doc_to_text        / cot_fewshot_doc_to_target (+ get_cot_pool)
+    plan_and_solve  -> plan_and_solve_doc_to_text  (no fewshot_config)
+
+Shared across all 4: load_dataset, extract_and_postprocess, process_results,
+<metric>_agg.
+
+YAML references (see few_shot.yaml for the canonical example):
     custom_dataset: !function utils.load_dataset
     description: "{{system_prompt}}"                    (Jinja, per-doc field)
     doc_to_text: !function utils.doc_to_text             (eval question)
@@ -106,16 +123,14 @@ def _resolve_dataset_paths(language: str, dataset_dir: Optional[str]) -> Dict[st
         base = Path(dataset_dir)
         if not base.is_absolute():
             base = _PROJECT_ROOT / base
+    elif language not in _DATASET_MAP:
+        raise ValueError(
+            f"Unsupported language '{language}'. Supported: {list(_DATASET_MAP.keys())}"
+        )
+    elif language == "vi":
+        base = _PROJECT_ROOT / "data" / _DATASET_MAP[language]
     else:
-        try:
-            if language == "vi":
-                base = _PROJECT_ROOT / "data" / _DATASET_MAP[language]
-            else:
-                base = _PROJECT_ROOT / "semeval22_structured_sentiment" / "data" / _DATASET_MAP[language]
-        except KeyError:
-            raise ValueError(
-                f"Unsupported language '{language}'. Supported: {list(_DATASET_MAP.keys())}"
-            )
+        base = _PROJECT_ROOT / "semeval22_structured_sentiment" / "data" / _DATASET_MAP[language]
     return {
         "train": base / "train.json",
         "dev": base / "dev.json",

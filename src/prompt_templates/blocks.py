@@ -3,13 +3,23 @@
 These functions are intentionally stateless and deterministic: they accept
 data and return strings. They should not read files or maintain global state.
 
-The block formats are copied from the legacy templates to ensure the new
-refactor path remains compatible with lm-eval runs.
+Post-reorg note: this module used to back a generic `PromptCreator` /
+`ContentProvider` pipeline (`contents.py`, `creator.py`, `factory.py`) that
+built entire multi-example prompt blocks in one call (e.g. `few_shot_block`
+rendering N examples at once). That pipeline has been removed — every
+technique (`few_shot`, `re_reading`, `few_shot_cot`, `plan_and_solve`) now
+goes through lm-eval-harness's native per-technique yaml + `fewshot_config`,
+which renders ONE example at a time via `doc_to_text`/`doc_to_target`
+callables in `../tasks/vietnamese_ssa/utils.py`. Only the functions still
+called from there remain here:
+    - pas_instruction_block   -> plan_and_solve
+    - base_question_block     -> few_shot (eval question) / cot (base, via cot_doc_to_text)
+    - rereading_block         -> re_reading
+    - simplify_opinions       -> few_shot / re_reading fewshot target formatting
 """
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 
@@ -56,7 +66,7 @@ def pas_instruction_block(*, plus: bool = False, language: str = "vi") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Few-shot formatting (copied from legacy FewShotPrompt)
+# Shared opinion-JSON simplification (used by fewshot target rendering)
 # ---------------------------------------------------------------------------
 def simplify_opinions(opinions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     simplified: list[dict[str, Any]] = []
@@ -86,57 +96,8 @@ def simplify_opinions(opinions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return simplified
 
 
-def few_shot_block(examples: list[dict[str, Any]], language: str = "vi") -> str:
-    """Build few-shot examples block (no reasoning)."""
-    if language == "en":
-        section = "Here are some examples:\n\n"
-        label = "Example"
-    else:
-        section = "Dưới đây là một số ví dụ:\n\n"
-        label = "Ví dụ"
-
-    for i, ex in enumerate(examples, 1):
-        formatted_output = {
-            "opinions": simplify_opinions(ex.get("opinions", []))
-        }
-        section += f"{label} {i}:\n"
-        section += f'Input: "{ex.get("text", "")}"\n'
-        section += f"Output: {json.dumps(formatted_output, ensure_ascii=False, indent=2)}"
-        section += "\n\n"
-
-    return section.strip()
-
-
 # ---------------------------------------------------------------------------
-# CoT demonstration formatting (copied from legacy FewShotCoTPrompt)
-# ---------------------------------------------------------------------------
-def cot_demo_block(examples: list[dict[str, Any]], language: str = "vi") -> str:
-    """Build demonstration block with reasoning + output JSON."""
-    if language == "en":
-        section = "HERE ARE SOME DEMONSTRATION EXAMPLES:\n\n"
-        ex_label = "EXAMPLE"
-    else:
-        section = "DƯỚI ĐÂY LÀ MỘT SỐ VÍ DỤ MINH HỌA:\n\n"
-        ex_label = "VÍ DỤ"
-
-    for i, ex in enumerate(examples, 1):
-        section += f"=== {ex_label} {i} ===\n"
-        section += f'Input: "{ex.get("text", "")}"\n\n'
-        section += f"Reasoning:\n{ex.get('reasoning', '')}\n\n"
-        section += "Output:\n"
-        
-        output_data = ex.get("output", {})
-        if isinstance(output_data, str):
-            section += output_data.strip()
-        else:
-            section += json.dumps(output_data, ensure_ascii=False, indent=2)
-        section += "\n\n"
-
-    return section.strip()
-
-
-# ---------------------------------------------------------------------------
-# Base question blocks (copied from legacy user prompts)
+# Base question block (copied from legacy user prompts)
 # ---------------------------------------------------------------------------
 def base_question_block(text: str, sent_id: str, language: str = "vi") -> str:
     """Base question block used in most single-stage techniques."""
@@ -149,23 +110,6 @@ def base_question_block(text: str, sent_id: str, language: str = "vi") -> str:
     return (
         f"""Phân tích cảm xúc cho văn bản sau:
 "{text}"
-"""
-    )
-
-
-def few_shot_question_block(text: str, sent_id: str, language: str = "vi") -> str:
-    """Question block used by legacy FewShotPrompt when examples exist."""
-    if language == "en":
-        return (
-            f"""Now, analyze the sentiment for the following text):
-Input: "{text}"
-Output:
-"""
-        )
-    return (
-        f"""Bây giờ, phân tích cảm xúc cho văn bản sau:
-Input: "{text}"
-Output:
 """
     )
 
@@ -191,49 +135,3 @@ def rereading_block(text: str, sent_id: str, language: str = "vi") -> str:
         f"""Đọc lại câu hỏi: {base_q}"""
     )
     return f"{base_q}\n\n{reread}"
-
-
-# ---------------------------------------------------------------------------
-# Re-reading example formatting (copied from legacy ReReadingPrompt)
-# ---------------------------------------------------------------------------
-def re2_examples_block(
-    examples: list[dict[str, Any]],
-    *,
-    include_reasoning: bool = False,
-    language: str = "vi",
-) -> str:
-    """Build RE2-style examples section where each example includes re-reading."""
-    if language == "en":
-        section = "HERE ARE SOME DEMONSTRATION EXAMPLES:\n\n"
-        header = "=== EXAMPLE"
-        for i, ex in enumerate(examples, 1):
-            text = ex.get("text", "")
-            q1 = f'Analyze the sentiment for the following text: "{text}"'
-            q2 = f"Read the question again: {q1}"
-            section += f"{header} {i} ===\n"
-            section += f"{q1}\n\n{q2}\n\n"
-            if include_reasoning and "reasoning" in ex:
-                section += f"Reasoning:\n{ex.get('reasoning','')}\n\n"
-            if include_reasoning:
-                output_data = ex.get("output", {})
-            else:
-                output_data = {"text": text, "opinions": simplify_opinions(ex.get("opinions", []))}
-            section += f"Output:\n{json.dumps(output_data, ensure_ascii=False, indent=2)}\n\n"
-        return section.strip()
-
-    section = "DƯỚI ĐÂY LÀ MỘT SỐ VÍ DỤ MINH HỌA:\n\n"
-    header = "=== VÍ DỤ"
-    for i, ex in enumerate(examples, 1):
-        text = ex.get("text", "")
-        q1 = f'Phân tích cảm xúc cho văn bản sau: "{text}"'
-        q2 = f"Đọc lại câu hỏi: {q1}"
-        section += f"{header} {i} ===\n"
-        section += f"{q1}\n\n{q2}\n\n"
-        if include_reasoning and "reasoning" in ex:
-            section += f"Reasoning:\n{ex.get('reasoning','')}\n\n"
-        if include_reasoning:
-            output_data = ex.get("output", {})
-        else:
-            output_data = {"text": text, "opinions": simplify_opinions(ex.get("opinions", []))}
-        section += f"Output:\n{json.dumps(output_data, ensure_ascii=False, indent=2)}\n\n"
-    return section.strip()
