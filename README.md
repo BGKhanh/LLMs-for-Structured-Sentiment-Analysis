@@ -51,8 +51,15 @@ The repository is organized as follows:
 │   └── vastai_notebook_lm_eval.ipynb
 │
 ├── src/
-│   ├── tasks/                          # SSA task definitions for LM Evaluation Harness
-│   ├── prompt_templates/               # Prompt construction (blocks, content providers, factory)
+│   ├── tasks/
+│   │   └── vietnamese_ssa/             # SSA task definitions for LM Evaluation Harness
+│   │       ├── _common_yaml            # Shared config (metrics, filters, generation_kwargs)
+│   │       ├── few_shot.yaml           # tag: vietnamese_ssa
+│   │       ├── re_reading.yaml         # tag: vietnamese_ssa
+│   │       ├── few_shot_cot.yaml       # tag: vietnamese_ssa
+│   │       ├── plan_and_solve.yaml     # tag: vietnamese_ssa
+│   │       └── utils.py                # load_dataset, doc_to_text, process_results, metric aggregation
+│   ├── prompt_templates/               # Reusable prompt-building blocks (system prompts, example pools)
 │   └── utils/                          # Response postprocessing / structured-output extraction
 │
 ├── results/                            # lm_eval output (results_*.json, samples_*.jsonl)
@@ -70,8 +77,8 @@ The repository is organized as follows:
 | `divided_data/`                   | Dataset partitions for parallel or distributed inference.                                             |
 | `semeval22_structured_sentiment/` | Multilingual SSA benchmark datasets and preprocessing utilities based on SemEval-2022.                |
 | `notebook/`                       | Example notebooks for model inference, prompt optimization, and experiment workflows.                 |
-| `src/tasks/`                      | Task definitions and evaluation configurations for LM Evaluation Harness.                             |
-| `src/prompt_templates/`           | Prompt construction logic (system/user prompt blocks, technique-specific content providers).          |
+| `src/tasks/`                      | Per-technique task configs for LM Evaluation Harness — one `.yaml` per prompting technique, grouped under `tag: vietnamese_ssa`; sample selection for few-shot is handled natively by the harness (`fewshot_config`), not hardcoded in Python. |
+| `src/prompt_templates/`           | Stateless, reusable prompt-building blocks (system prompts per language, hand-written CoT example pools) shared across techniques.                    |
 | `src/utils/`                      | Postprocessing utilities for parsing and validating structured model outputs.                         |
 | `results/`                        | Evaluation outputs (`results_*.json` summaries, `samples_*.jsonl` per-sample logs).                    |
 | `Dockerfile`                      | Docker configuration for creating reproducible execution environments.                                |
@@ -278,11 +285,13 @@ lm_eval \
   --model_args pretrained=<MODEL_NAME>,max_model_len=16384,gpu_memory_utilization=0.95 \
   --tasks <TASK_NAME> \
   --include_path ./src/tasks \
+  --num_fewshot 3 \
+  --fewshot_random_seed 42 \
   --apply_chat_template \
   --log_samples \
   --batch_size 32 \
   --output_path results/lm_eval/<experiment_name> \
-  --metadata '{"technique":"few_shot","language":"vi","n_shot":3}' \
+  --metadata '{"language":"vi"}' \
   --confirm_run_unsafe_code
 ```
 
@@ -298,14 +307,61 @@ lm_eval \
   --model_args model=<MODEL_NAME>,base_url=http://127.0.0.1:8000/v1/chat/completions,num_concurrent=32,max_length=16384 \
   --tasks <TASK_NAME> \
   --include_path ./src/tasks \
+  --num_fewshot 3 \
+  --fewshot_random_seed 42 \
   --apply_chat_template \
   --log_samples \
   --output_path results/lm_eval/<experiment_name> \
-  --metadata '{"technique":"few_shot","language":"vi","n_shot":3}' \
+  --metadata '{"language":"vi"}' \
   --confirm_run_unsafe_code
 ```
 
-Replace `<TASK_NAME>` with any benchmark task provided by this repository (e.g., `vietnamese_ssa`).
+Replace `<TASK_NAME>` with either `vietnamese_ssa` (runs all four techniques below in one call, each scored separately) or one specific technique task:
+
+| `<TASK_NAME>` | Technique | Notes |
+|---|---|---|
+| `vietnamese_ssa_few_shot` | Plain few-shot | `--num_fewshot` sampled live from `train` split (seeded) |
+| `vietnamese_ssa_re_reading` | Re-reading | Question repeated twice; same live sampling as above |
+| `vietnamese_ssa_few_shot_cot` | Few-shot Chain-of-Thought | Examples come from a small hand-written pool (`src/prompt_templates/shared.py`), not `train` — max `--num_fewshot` is bounded by that pool's size |
+| `vietnamese_ssa_plan_and_solve` | Plan-and-Solve | Instruction-only, no examples — leave `--num_fewshot 0` (default); pass `--metadata '{"language":"vi","plus_mode":true}'` for the PS+ variant |
+
+## ⚠️ Troubleshooting: `ValueError: Tasks not found: <task_name>`
+
+If `lm_eval` reports a task as "not found" even though its `.yaml` clearly
+exists under `--include_path`, the cause is almost always a **silently
+skipped file**, not a missing task. When lm-eval-harness scans
+`--include_path` to build its task index, any YAML file that fails to parse
+(missing `include:` target, malformed key, etc.) is dropped **without a
+visible error** — it only logs at `DEBUG` level, which isn't shown by
+default. To reveal the real reason, run:
+
+```bash
+python3 -c "
+import logging
+logging.basicConfig(level=logging.DEBUG)
+from lm_eval.tasks import TaskManager
+tm = TaskManager(include_path='./src/tasks')
+print('found:', 'vietnamese_ssa_few_shot' in tm.all_tasks)
+" 2>&1 | grep -i "skip.*vietnamese_ssa"
+```
+
+The most common root cause for this repo specifically: `_common_yaml`
+(shared config included by every technique `.yaml` via `include:
+_common_yaml`) is deliberately named **without** a `.yaml` extension, so it
+isn't picked up as a standalone task by the file scanner. Some tools (file
+browsers, certain upload/download flows) silently append an extension when
+saving a dot-less filename — if that happens, every technique task in
+`src/tasks/vietnamese_ssa/` will fail to index. Verify with:
+
+```bash
+ls -la src/tasks/vietnamese_ssa/
+# must show a file literally named `_common_yaml` (no extension),
+# in the same directory as few_shot.yaml / re_reading.yaml / etc.
+```
+
+Other things to check if the task is still not found:
+- `--include_path` must point to the **parent** `tasks` directory (`./src/tasks`), not `./src/tasks/vietnamese_ssa`.
+- Task `.yaml` files must literally end in `.yaml` (not `.yml`).
 
 ## ⚠️ Reproducibility Notes: Reasoning/Thinking Mode
 
