@@ -12,8 +12,16 @@ doc_to_text: !function utils.plan_and_solve_doc_to_text
 doc_to_target: "{{opinions_json}}"
 
 # Plan-and-Solve is instruction-only — matches legacy PlanAndSolveContent,
-# which always discards the examples pool. No `fewshot_config` here on
-# purpose; don't pass --num_fewshot > 0 for this task.
+# which always discards the examples pool. Unlike the other 3 technique
+# yamls, `num_fewshot: 0` IS set here on purpose: with no `fewshot_config`
+# at all, forcing --num_fewshot > 0 via CLI would otherwise crash with
+# "no documents available for sampling" (ContextSampler has nothing to draw
+# from). Locking it to 0 makes the harness print a clear one-line notice
+# ("num_fewshot has been set to 0 ... Manual configuration will be
+# ignored.") instead of a stack trace if someone passes --num_fewshot > 0
+# by mistake.
+num_fewshot: 0
+ 
 num_fewshot: 0
 
 metadata:

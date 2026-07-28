@@ -11,8 +11,6 @@ description: "{{system_prompt}}"
 doc_to_text: !function utils.re_reading_doc_to_text
 doc_to_target: "{{opinions_json}}"
 
-num_fewshot: 0
-
 fewshot_config:
   sampler: default
   split: train

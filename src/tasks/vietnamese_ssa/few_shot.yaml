@@ -11,10 +11,6 @@ description: "{{system_prompt}}"
 doc_to_text: !function utils.doc_to_text
 doc_to_target: "{{opinions_json}}"
 
-# Default: zero-shot. Override at the CLI with --num_fewshot N to turn on
-# native few-shot sampling (was previously `n_shot` inside --metadata).
-num_fewshot: 0
-
 fewshot_config:
   sampler: default          # random sample w/ seeding via --fewshot_random_seed;
                              # automatically excludes the eval doc from the pool

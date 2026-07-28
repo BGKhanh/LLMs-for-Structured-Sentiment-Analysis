@@ -25,8 +25,6 @@ generation_kwargs:
   top_k: 50
   do_sample: false
 
-num_fewshot: 0
-
 fewshot_config:
   sampler: default
   # NOTE: no `split:` here — the pool is a hand-written static list with a
