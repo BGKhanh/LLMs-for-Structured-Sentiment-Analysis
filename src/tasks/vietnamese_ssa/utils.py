@@ -66,7 +66,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from src.prompt_templates.shared import get_system_prompt, load_examples_pool
+from src.prompt_templates.shared import get_system_prompt, load_examples_pool, get_language, DATASET_LANGUAGES
 from src.prompt_templates.blocks import (
     base_question_block,
     simplify_opinions,
@@ -87,50 +87,47 @@ from semeval22_structured_sentiment.evaluation.evaluate import (
 
 _EPSILON = 1e-16
 
-_DATASET_MAP = {
-    "vi": "vitoed_new",
-    "en": "opener_en",
-    "es": "opener_es",
-    "nor": "norec",
-    "eu": "multibooked_eu",
-    "ca": "multibooked_ca",
+_DATASET_ROOTS = {
+    "vitoed": "data",  # special-cased top-level folder, not under semeval22_structured_sentiment/
+    "opener_en": "semeval22_structured_sentiment/data",
+    "mpqa": "semeval22_structured_sentiment/data",
+    "darmstadt_unis": "semeval22_structured_sentiment/data",
+    "opener_es": "semeval22_structured_sentiment/data",
+    "norec": "semeval22_structured_sentiment/data",
+    "multibooked_eu": "semeval22_structured_sentiment/data",
+    "multibooked_ca": "semeval22_structured_sentiment/data",
 }
-
+assert set(_DATASET_ROOTS) == set(DATASET_LANGUAGES), (
+    "utils._DATASET_ROOTS and shared.DATASET_LANGUAGES have drifted apart — "
+    "every dataset must be registered in BOTH (dataset->root here, "
+    "dataset->language there)."
+)
+ 
 # Cache system prompts per language (cheap, static strings; safe to share
 # across techniques/tasks running in the same process).
 _SYS_PROMPT_CACHE: Dict[str, str] = {}
-
-
+ 
+ 
 def _get_system_prompt(language: str) -> str:
     if language not in _SYS_PROMPT_CACHE:
         _SYS_PROMPT_CACHE[language] = get_system_prompt(language)
     return _SYS_PROMPT_CACHE[language]
+ 
+ 
+_CURRENT_DATASET = {"value": "vitoed"}
 
 
-# `fewshot_config.samples` (used by few_shot_cot, see below) MUST be a
-# zero-arg callable per lm-eval's API (`case fsamples if callable(samples):
-# return fsamples()` in task.py) — it cannot receive `doc` or `--metadata`
-# directly. This is the one spot where we genuinely need a tiny bit of
-# module-level state to carry `language` into it. It's safe in practice
-# because a single `lm-eval run` invocation uses ONE `--metadata` value
-# shared by every task in the `tag` group (that's how the CLI works), so
-# there's no cross-task/cross-language interference within one process.
-_CURRENT_LANGUAGE = {"value": "vi"}
-
-
-def _resolve_dataset_paths(language: str, dataset_dir: Optional[str]) -> Dict[str, Path]:
+def _resolve_dataset_paths(dataset: str, dataset_dir: Optional[str]) -> Dict[str, Path]:
     if dataset_dir:
         base = Path(dataset_dir)
         if not base.is_absolute():
             base = _PROJECT_ROOT / base
-    elif language not in _DATASET_MAP:
+    elif dataset not in _DATASET_ROOTS:
         raise ValueError(
-            f"Unsupported language '{language}'. Supported: {list(_DATASET_MAP.keys())}"
+            f"Unsupported dataset '{dataset}'. Supported: {sorted(_DATASET_ROOTS.keys())}"
         )
-    elif language == "vi":
-        base = _PROJECT_ROOT / "data" / _DATASET_MAP[language]
     else:
-        base = _PROJECT_ROOT / "semeval22_structured_sentiment" / "data" / _DATASET_MAP[language]
+        base = _PROJECT_ROOT / _DATASET_ROOTS[dataset] / dataset
     return {
         "train": base / "train.json",
         "dev": base / "dev.json",
@@ -167,42 +164,51 @@ def load_dataset(**kwargs) -> datasets.DatasetDict:
     if not technique:
         raise ValueError(
             "Missing 'technique' in --metadata (or in the yaml's metadata: block). "
-            "Example: --metadata '{\"technique\":\"few_shot\",\"language\":\"vi\"}'"
+            "Example: --metadata '{\"technique\":\"few_shot\",\"dataset\":\"vitoed_new\"}'"
         )
-
-    language = kwargs.get("language", "vi")
+ 
+    dataset = kwargs.get("dataset")
+    if not dataset:
+        raise ValueError(
+            "Missing 'dataset' in --metadata. Example: "
+            "--metadata '{\"technique\":\"few_shot\",\"dataset\":\"mpqa\"}'. "
+            f"Available datasets: {sorted(DATASET_LANGUAGES.keys())}"
+        )
+    language = get_language(dataset)  # raises ValueError if `dataset` is unregistered
+ 
     dataset_dir = kwargs.get("dataset_dir", None)
     clean_data = bool(kwargs.get("clean_data", True))
     plus_mode = bool(kwargs.get("plus_mode", False))  # only meaningful for plan_and_solve
-
-    _CURRENT_LANGUAGE["value"] = language
+ 
+    _CURRENT_DATASET["value"] = dataset
     set_tokenizer(language)
-
-    dataset_paths = _resolve_dataset_paths(language, dataset_dir)
+ 
+    dataset_paths = _resolve_dataset_paths(dataset, dataset_dir)
     system_prompt = _get_system_prompt(language)
-
+ 
     splits = {}
     for split_name, path in dataset_paths.items():
         if not path.exists():
             continue
         with open(path, "r", encoding="utf-8") as f:
             raw = json.load(f)
-
+ 
         if clean_data:
             raw, removed_ids, _ = clean_gold_data(raw, language=language, verbose=True)
-
+ 
         records = []
         for sample in raw:
             records.append({
                 "sent_id": sample["sent_id"],
                 "text": sample["text"],
                 "opinions_json": json.dumps(sample.get("opinions", []), ensure_ascii=False),
+                "dataset": dataset,
                 "language": language,
                 "system_prompt": system_prompt,
                 "plus_mode": plus_mode,
             })
         splits[split_name] = datasets.Dataset.from_list(records)
-
+ 
     return datasets.DatasetDict(splits)
 
 
@@ -261,8 +267,12 @@ def re_reading_fewshot_doc_to_target(doc: Dict[str, Any]) -> str:
 # =========================================================================
 def get_cot_pool() -> List[Dict[str, Any]]:
     """Zero-arg callable required by `fewshot_config.samples` — see the
-    `_CURRENT_LANGUAGE` note above for why this needs module-level state."""
-    return load_examples_pool(None, _CURRENT_LANGUAGE["value"])
+    `_CURRENT_DATASET` note above for why this needs module-level state.
+    Looked up by DATASET, not language, so e.g. `mpqa` and `opener_en`
+    (both "en") can have independent pools (`load_examples_pool` falls
+    back to a same-language sibling dataset if the requested one is
+    empty — see shared.py)."""
+    return load_examples_pool(None, _CURRENT_DATASET["value"])
 
 
 def cot_doc_to_text(doc: Dict[str, Any]) -> str:

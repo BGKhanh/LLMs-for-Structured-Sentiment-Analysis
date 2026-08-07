@@ -176,24 +176,50 @@ def get_system_prompt(language: str) -> str:
     Raises:
         ValueError: If language is not supported.
     """
-    if language not in _HARDCODED_POOL:
+    if language not in _SUPPORTED_LANGUAGES:
         raise ValueError(
-            f"Unsupported language: '{language}'. Available: {sorted(_HARDCODED_POOL.keys())}."
+            f"Unsupported language: '{language}'. Available: {sorted(_SUPPORTED_LANGUAGES)}. "
             "Caution: Languages other than 'vi' use the same system prompt as 'en'"
         )
-    else:
-        if language == "vi":
-          return SYSTEM_PROMPTS[language]
-        else:
-          print("Caution: Languages other than vi use the same system prompt as en")
-          return SYSTEM_PROMPTS["en"]
+    if language == "vi":
+        return SYSTEM_PROMPTS["vi"]
+    print("Caution: Languages other than vi use the same system prompt as en")
+    return SYSTEM_PROMPTS["en"]
+    
           
+DATASET_LANGUAGES: dict[str, str] = {
+    "vitoed": "vi",
+    "opener_en": "en",
+    "mpqa": "en",
+    "darmstadt_unis": "en",
+    "opener_es": "es",
+    "norec": "nor",
+    "multibooked_eu": "eu",
+    "multibooked_ca": "ca",
+}
 
+
+_SUPPORTED_LANGUAGES = set(DATASET_LANGUAGES.values())
+
+
+def get_language(dataset: str) -> str:
+    """Resolve the language code for a given dataset name.
+
+    Raises:
+        ValueError: If the dataset isn't registered in `DATASET_LANGUAGES`.
+    """
+    try:
+        return DATASET_LANGUAGES[dataset]
+    except KeyError:
+        raise ValueError(
+            f"Unsupported dataset: '{dataset}'. Available: {sorted(DATASET_LANGUAGES.keys())}"
+        ) from None
+        
 # ---------------------------------------------------------------------------
 # Hardcoded pools (fallback)
 # ---------------------------------------------------------------------------
 _HARDCODED_POOL: dict[str, list[dict[str, Any]]] = {
-    "vi": [
+    "vitoed": [
         {
             "text": "bởi nói để trung nguyên cho bà thảo thì chắc chắn 100 % với cái bộ óc sáng tạo cùng với sự lãnh đạo tài giỏi và lòng tham hơn người và trí tuệ ngắn hạn sẽ dẫn dắt trung nguyên xuống con mẹ nó giếng luôn .",
             "reasoning": """
@@ -423,7 +449,7 @@ Bước 5: Phân loại Polarity
 """
         }
     ],  
-    "en": [
+    "opener_en": [
         {
             "text": "Looks definitely don 't mean anything",
             "reasoning": """
@@ -620,14 +646,16 @@ The only evaluative content in the sentence is the statement that the rates are 
 """
         }
     ],
-    "es": [],
-    "nor": [],
-    "ca": [],
-    "eu": [],  
+    "opener_es": [],
+    "norec": [],
+    "multibooked_ca": [],
+    "multibooked_eu": [],
+    "mpqa": [],
+    "darmstadt_unis": [],
 }
 
 
-def load_examples_pool(path: Optional[str], language: str) -> list[dict[str, Any]]:
+def load_examples_pool(path: Optional[str], dataset: str) -> list[dict[str, Any]]:
     if path:
         p = Path(path)
         with p.open("r", encoding="utf-8") as f:
@@ -635,12 +663,31 @@ def load_examples_pool(path: Optional[str], language: str) -> list[dict[str, Any
         if not isinstance(data, list):
             raise ValueError(f"Examples pool JSON must be a list, got: {type(data)}")
         return data
-    
-    # Lấy dữ liệu tĩnh từ ngôn ngữ yêu cầu
-    pool = _HARDCODED_POOL.get(language, [])
-    if not pool and language != "en":
-        # Chuyển hướng sang tiếng Anh nếu ngôn ngữ mục tiêu không có dữ liệu tĩnh
-        print(f"Warning: Hardcoded pool for '{language}' is empty. Falling back to 'en'.")
-        pool = _HARDCODED_POOL.get("en", [])
-    return list(pool)
+
+    # Lấy dữ liệu tĩnh từ dataset yêu cầu
+    pool = _HARDCODED_POOL.get(dataset, [])
+    if pool:
+        return list(pool)
+
+    # Fallback 1: dataset khác cùng ngôn ngữ (nếu có pool không rỗng).
+    language = DATASET_LANGUAGES.get(dataset)
+    if language is not None:
+        for other_dataset, other_language in DATASET_LANGUAGES.items():
+            if other_language == language and _HARDCODED_POOL.get(other_dataset):
+                print(
+                    f"Warning: Hardcoded CoT pool for dataset '{dataset}' is empty. "
+                    f"Falling back to sibling dataset '{other_dataset}' (same language: '{language}')."
+                )
+                return list(_HARDCODED_POOL[other_dataset])
+
+    # Fallback 2: cuối cùng mới dùng opener_en (giữ đúng tinh thần fallback cũ
+    # "khác 'en' thì fallback về 'en'", chỉ khác là giờ trỏ đích danh 1 dataset).
+    if dataset != "opener_en" and _HARDCODED_POOL.get("opener_en"):
+        print(
+            f"Warning: No CoT pool found for dataset '{dataset}' or any sibling "
+            f"dataset in the same language. Falling back to 'opener_en'."
+        )
+        return list(_HARDCODED_POOL["opener_en"])
+
+    return []
 

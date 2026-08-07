@@ -29,4 +29,4 @@ metadata:
     (fewshot_config.split: train) instead of via a hardcoded
     random.sample() inside PromptCreator/contents.py.
   # Optional overrides passed the same way as before, e.g.:
-  #   --metadata '{"language":"en","dataset_dir":"custom/path"}'
+  #   --metadata '{"dataset":"vitoed","dataset_dir":"custom/path"}'
