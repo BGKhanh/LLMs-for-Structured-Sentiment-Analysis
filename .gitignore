@@ -233,3 +233,5 @@ refactor_plan_prompt_templates.md
 notebook/dspy_GEPA_local_host_api.ipynb
 notebook/dspy_GEPA.ipynb
 notebook/Gemma3_(4B).ipynb
+
+example for CoT reasoning generated/
