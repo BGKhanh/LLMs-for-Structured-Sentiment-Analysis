@@ -220,235 +220,299 @@ def get_language(dataset: str) -> str:
 # ---------------------------------------------------------------------------
 _HARDCODED_POOL: dict[str, list[dict[str, Any]]] = {
     "vitoed": [
-        {
-            "text": "bởi nói để trung nguyên cho bà thảo thì chắc chắn 100 % với cái bộ óc sáng tạo cùng với sự lãnh đạo tài giỏi và lòng tham hơn người và trí tuệ ngắn hạn sẽ dẫn dắt trung nguyên xuống con mẹ nó giếng luôn .",
-            "reasoning": """
-Bước 1: Xác định số mệnh đề/ý kiến độc lập
-Câu này là một câu phức, gồm nhiều cụm đánh giá nối với nhau bằng "cùng với", "và":
-
-Cụm 1: "bộ óc sáng tạo cùng với sự lãnh đạo tài giỏi" → mang sắc thái khen (năng lực tốt)
-Cụm 2: "lòng tham hơn người và trí tuệ ngắn hạn" → mang sắc thái chê (phẩm chất xấu)
-Cụm 3: "sẽ dẫn dắt trung nguyên xuống con mẹ nó giếng luôn" → mệnh đề kết quả/hệ quả tiêu cực
-
-→ Vì các cụm này có cực tính (polarity) khác nhau và đánh giá các khía cạnh khác nhau (năng lực tốt vs. phẩm chất xấu vs. hậu quả), theo quy tắc Mục C ("tách các mệnh đề độc lập thành các tuple riêng nếu chúng đánh giá các khía cạnh khác nhau hoặc có cực tính khác nhau"), ta tách thành 3 tuple riêng biệt.
-
-Bước 2: Xác định Polar_expression cho từng ý kiến (loại bỏ dấu câu cuối)
-Tuple A: "bộ óc sáng tạo cùng với sự lãnh đạo tài giỏi" — trích nguyên văn cụm danh từ ghép thể hiện năng lực.
-Tuple B: "lòng tham hơn người và trí tuệ ngắn hạn" — trích nguyên văn cụm danh từ ghép thể hiện phẩm chất tiêu cực.
-Tuple C: "sẽ dẫn dắt trung nguyên xuống con mẹ nó giếng luôn" — đây là mệnh đề kết quả mang tính hành động ẩn dụ ("xuống giếng" = thành ngữ chỉ sự sụp đổ/diệt vong), cần giữ nguyên cả mệnh đề chứ không tách nhỏ. Bỏ dấu chấm . ở cuối câu gốc.
-
-Bước 3: Xác định Source cho từng tuple
-Toàn câu không có đại từ nhân xưng hay danh từ nào đóng vai trò chủ ngữ phát ngôn độc lập (không có "tao nghĩ", "tôi thấy"...). Cấu trúc "bởi nói để... thì chắc chắn 100%..." là lối nói phiếm chỉ, không có chủ thể tường minh.
-→ Theo quy tắc Pro-drop (Mục A): Source = [] cho cả 3 tuple.
-
-Bước 4: Xác định Target cho từng tuple
-Xét cụm "với cái bộ óc sáng tạo... và trí tuệ ngắn hạn sẽ dẫn dắt trung nguyên...": về mặt cú pháp, các phẩm chất (bộ óc, lòng tham, trí tuệ...) là phẩm chất thuộc về "bà thảo" — người được giao Trung Nguyên ("để trung nguyên cho bà thảo"). Đây không phải trường hợp "mệnh đề trọn vẹn không có target cụ thể" vì có một thực thể rõ ràng đang được bàn tới: bà thảo.
-Theo quy tắc Biên độ Target đầy đủ (Mục B): Target phải trích đủ cụm danh từ chỉ người — ở đây là "bà thảo".
-Áp dụng cho cả 3 tuple, vì cả 3 phẩm chất/hành động (bộ óc sáng tạo, lòng tham, hành động dẫn dắt Trung Nguyên xuống giếng) đều quy về cùng một chủ thể bị đánh giá là bà thảo — kể cả tuple C, vì "dẫn dắt trung nguyên xuống giếng" là hệ quả do chính các phẩm chất của bà Thảo gây ra, nên Target vẫn là người tạo ra hệ quả đó ("bà thảo"), không phải "trung nguyên" (Trung Nguyên ở đây là đối tượng bị tác động, không phải đối tượng bị đánh giá trực tiếp trong mệnh đề này).
-
-→ Target = "bà thảo" cho cả 3 tuple.
-
-Bước 5: Phân loại Polarity
-Tuple A — "bộ óc sáng tạo cùng với sự lãnh đạo tài giỏi": từ ngữ "sáng tạo", "tài giỏi" mang tính khen ngợi năng lực → Positive.
-Tuple B — "lòng tham hơn người và trí tuệ ngắn hạn": "lòng tham", "ngắn hạn" mang tính phê phán phẩm chất xấu → Negative.
-Tuple C — "sẽ dẫn dắt trung nguyên xuống con mẹ nó giếng luôn": thành ngữ ẩn dụ chỉ kết cục tồi tệ/sụp đổ, kèm ngôn từ thô tục nhấn mạnh mức độ tiêu cực → Negative.
-
-""",
-            "output": """
-{
-  "opinions": [
     {
-      "Source": [],
-      "Target": ["bà thảo"],
-      "Polar_expression": ["bộ óc sáng tạo cùng với sự lãnh đạo tài giỏi"],
-      "Polarity": "Positive"
+        "text": """bởi nói để trung nguyên cho bà thảo thì chắc chắn 100 % với cái bộ óc sáng tạo cùng với sự lãnh đạo tài giỏi và lòng tham hơn người và trí tuệ ngắn hạn sẽ dẫn dắt trung nguyên xuống con mẹ nó giếng luôn .""",
+        "reasoning": """Bước 1: Câu đưa ra một giả định về việc giao Trung Nguyên cho bà Thảo, rồi liệt kê một chuỗi phẩm chất được gán cho bà và kết thúc bằng hệ quả được dự đoán. Phần liệt kê chứa hai nhóm phẩm chất trái chiều nhau, cộng với mệnh đề hệ quả ở cuối, nên có ba ý kiến độc lập cần tách riêng.
+
+Bước 2: Nhóm thứ nhất là "bộ óc sáng tạo cùng với sự lãnh đạo tài giỏi" — hai phẩm chất được nối bằng "cùng với" nên đi liền thành một khối đánh giá; từ "cái" phía trước chỉ là từ chỉ loại gắn với giới từ "với", không thuộc nội dung đánh giá. Nhóm thứ hai là "lòng tham hơn người và trí tuệ ngắn hạn", cũng là một khối liệt kê hai phẩm chất cùng hướng. Mệnh đề cuối "sẽ dẫn dắt trung nguyên xuống con mẹ nó giếng luôn" là dự đoán hệ quả, dấu chấm cuối câu không lấy vào span.
+
+Bước 3: Cả ba nhận định đều không có đại từ hay danh từ nào đứng làm chủ ngữ của một động từ phát ngôn cảm xúc; người đưa ra đánh giá bị ẩn hoàn toàn ngay từ cụm mở đầu "bởi nói". Vì vậy cả ba tuple đều không có Source tường minh.
+
+Bước 4: "bà thảo" là người được nêu tên trong câu và là chủ thể mà cả ba nhận định nói về: hai nhóm phẩm chất đều là thuộc tính của bà, còn mệnh đề cuối mô tả hành động do bà thực hiện. Do đó Target của cả ba tuple đều là ["bà thảo"].
+
+Bước 5: "bộ óc sáng tạo cùng với sự lãnh đạo tài giỏi" là những từ khen ngợi năng lực nên mang cực tính Positive. "lòng tham hơn người và trí tuệ ngắn hạn" chỉ thẳng hai khuyết điểm về đạo đức và tầm nhìn nên là Negative. Mệnh đề cuối dự báo kết cục sụp đổ kèm chửi tục "con mẹ nó", là một kết quả có hại rõ rệt, nên cũng là Negative.""",
+        "output": {
+            "opinions": [
+                {
+                    "Source": [],
+                    "Target": ["bà thảo"],
+                    "Polar_expression": ["bộ óc sáng tạo cùng với sự lãnh đạo tài giỏi"],
+                    "Polarity": "Positive",
+                },
+                {
+                    "Source": [],
+                    "Target": ["bà thảo"],
+                    "Polar_expression": ["lòng tham hơn người và trí tuệ ngắn hạn"],
+                    "Polarity": "Negative",
+                },
+                {
+                    "Source": [],
+                    "Target": ["bà thảo"],
+                    "Polar_expression": ["sẽ dẫn dắt trung nguyên xuống con mẹ nó giếng luôn"],
+                    "Polarity": "Negative",
+                },
+            ]
+        },
     },
     {
-      "Source": [],
-      "Target": ["bà thảo"],
-      "Polar_expression": ["lòng tham hơn người và trí tuệ ngắn hạn"],
-      "Polarity": "Negative"
+        "text": """Anh em với tập cận bình bảo anh dạy cách chống tham nhũng rất rễ làm và có dám làm không""",
+        "reasoning": """Bước 1: Câu thuật lại một lời phát biểu rồi nối thêm một câu hỏi bỏ lửng bằng liên từ "và". Phần thuật lại chứa một nhận định về việc chỉ dạy chống tham nhũng, phần sau là câu hỏi chất vấn về việc có thực hiện hay không, nên có hai ý kiến độc lập.
+
+Bước 2: Nhận định thứ nhất là "dạy cách chống tham nhũng rất rễ làm", trong đó "rất rễ làm" là phần định giá gắn liền với việc chỉ dạy nên giữ chung một span. Ý thứ hai là "có dám làm không", một câu hỏi trực tiếp về mức độ dám hành động; câu không có emoji hay dấu câu cuối cần loại bỏ.
+
+Bước 3: Ở ý thứ nhất, "anh" đứng ngay trước "dạy" và là chủ ngữ trực tiếp của hành động chỉ dạy được thuật lại, nên đây là chủ thể đưa ra nội dung đánh giá. Ở ý thứ hai, "có dám làm không" là câu hỏi bỏ lửng, không có đại từ nào đảm nhiệm vai chủ ngữ tường minh, nên không có Source.
+
+Bước 4: Cụm "Anh em" mở đầu câu là nhóm người mà toàn bộ phát biểu nói tới và đặt trong tương quan với Tập Cận Bình, tức là thực thể mà nhận định về việc chỉ dạy chống tham nhũng hướng vào, nên Target = ["Anh em"]. Câu hỏi "có dám làm không" lại nhắm vào chính hành động "làm" chứ không vào một thực thể danh từ nào tách rời được, nên Target để trống.
+
+Bước 5: "rất rễ làm" (rất dễ làm) khẳng định phương cách được chỉ ra là khả thi, thuận lợi — một kết quả có lợi nên là Positive. Câu "có dám làm không" chỉ nêu nghi vấn, không chứa từ ngữ khen hay chê nào, sắc thái chất vấn để mở nên xếp Neutral.""",
+        "output": {
+            "opinions": [
+                {
+                    "Source": ["anh"],
+                    "Target": ["Anh em"],
+                    "Polar_expression": ["dạy cách chống tham nhũng rất rễ làm"],
+                    "Polarity": "Positive",
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": ["có dám làm không"],
+                    "Polarity": "Neutral",
+                },
+            ]
+        },
     },
     {
-      "Source": [],
-      "Target": ["bà thảo"],
-      "Polar_expression": ["sẽ dẫn dắt trung nguyên xuống con mẹ nó giếng luôn"],
-      "Polarity": "Negative"
-    }
-  ]
-}
-"""
+        "text": """bài viết hay quá !""",
+        "reasoning": """Bước 1: Câu rất ngắn, chỉ gồm một cụm danh từ và một lời nhận xét đi kèm. Có đúng một ý kiến duy nhất.
+
+Bước 2: "hay quá" là phần mang nội dung đánh giá, với "quá" làm từ tăng cường mức độ nên đi liền trong span. Dấu "!" ở cuối là dấu kết thúc câu nên không lấy vào, Polar_expression = ["hay quá"].
+
+Bước 3: Câu không có đại từ hay danh từ nào chỉ người đưa ra nhận xét; chủ thể khen bị ẩn hoàn toàn, chỉ còn lại đối tượng và lời khen. Vì vậy Source = [].
+
+Bước 4: "bài viết" là danh từ đứng đầu câu và là thứ được nhận xét trực tiếp bởi "hay quá", một thực thể rõ ràng nên tách làm Target = ["bài viết"].
+
+Bước 5: "hay quá" là lời khen ngợi trực tiếp về chất lượng, không có yếu tố phản đề hay nghi vấn nào. Polarity = Positive.""",
+        "output": {
+            "opinions": [
+                {
+                    "Source": [],
+                    "Target": ["bài viết"],
+                    "Polar_expression": ["hay quá"],
+                    "Polarity": "Positive",
+                }
+            ]
         },
-        {
-            "text": "Anh em với tập cận bình bảo anh dạy cách chống tham nhũng rất rễ làm và có dám làm không",
-            "reasoning": """
-Bước 1: Xác định số mệnh đề/ý kiến độc lập
-Phân tích cấu trúc câu, ta thấy có 2 mệnh đề được nối bằng "và":
-
-Mệnh đề 1: "Anh em với tập cận bình bảo anh dạy cách chống tham nhũng rất rễ làm" → một phát biểu/tuyên bố (claim) rằng việc dạy chống tham nhũng "rất dễ làm".
-Mệnh đề 2: "có dám làm không" → một câu hỏi tu từ chất vấn lại liệu có dám thực hiện hay không.
-
-Hai mệnh đề này có cực tính khác nhau (một mang tính khẳng định tích cực về độ dễ, một là câu hỏi nghi vấn trung tính) → tách thành 2 tuple riêng biệt.
-
-Bước 2: Xác định Polar_expression cho từng mệnh đề
-Tuple 1: "dạy cách chống tham nhũng rất rễ làm" (vị trí 32:68) — trích nguyên văn, giữ teencode "rễ" (không chuẩn hóa thành "dễ") theo quy tắc trích xuất nguyên văn (exact span).
-Tuple 2: "có dám làm không" (vị trí 72:88) — văn bản gốc không có dấu ? ở cuối nên giữ nguyên toàn bộ cụm từ, không cần cắt bớt ký tự nào.
-
-Bước 3: Xác định Source cho từng tuple
-Tuple 1: Xét động từ "dạy" trong cụm "anh dạy cách chống tham nhũng..." — đại từ "anh" (xuất hiện lần thứ 2, sau "bảo", tại vị trí 28:31) đứng ngay trước động từ "dạy" và đóng vai trò chủ ngữ trực tiếp của hành động/biểu thức cảm xúc này. Đây là trường hợp đại từ xuất hiện tường minh, độc lập về cú pháp (không nằm trong cụm danh từ khác, không phải tân ngữ) → theo Mục A, được trích xuất làm Source = "anh" (28:31).
-Tuple 2: Mệnh đề "có dám làm không" bị lược chủ ngữ hoàn toàn (không có "anh", "ai" hay đại từ nào xuất hiện tường minh ngay trong cụm này) → áp dụng quy tắc Pro-drop, Source = [].
-
-Bước 4: Xác định Target cho từng tuple
-Tuple 1: Đối tượng được nhắc tới làm chủ đề của lời thuật lại — "Anh em" (vị trí 0:6) — là người/nhóm được "Tập Cận Bình bảo" và bị gán cho hành động "dạy cách chống tham nhũng rất rễ làm". Đây là cụm danh từ độc lập, tường minh, đứng ở đầu câu, đóng vai trò là đối tượng chính của toàn bộ phát biểu (người bị đánh giá/nhắc đến trong câu chuyện) → Target = "Anh em" (0:6). Lưu ý: khác với Source ("anh" — chủ ngữ cú pháp trong mệnh đề nhúng "anh dạy..."), Target ở đây là thực thể được nói đến trong toàn cảnh câu (người được Tập Cận Bình bảo).
-Tuple 2: "có dám làm không" là câu hỏi tu từ chung chung, không có thực thể cụ thể nào được nêu tên làm đối tượng đánh giá trong chính mệnh đề này → Target = [].
-
-Bước 5: Phân loại Polarity
-Tuple 1 — "dạy cách chống tham nhũng rất rễ làm": từ "rất rễ (dễ) làm" mang sắc thái khẳng định khả năng/sự dễ dàng, một đặc điểm được nêu ra theo hướng tích cực (dễ làm = có lợi, khả thi) → Positive.
-Tuple 2 — "có dám làm không": đây là câu hỏi nghi vấn/tu từ, không mang sắc thái yêu/ghét rõ rệt, chỉ chất vấn về việc có thực hiện hay không → theo Mục D (câu hỏi tu từ, câu hỏi nghi vấn → Neutral) → Neutral.
-
-""",
-            "output": """
-{
-  "opinions": [
-    {
-      "Source": ["anh"],
-      "Target": ["Anh em"],
-      "Polar_expression": ["dạy cách chống tham nhũng rất rễ làm"],
-      "Polarity": "Positive"
     },
     {
-      "Source": [],
-      "Target": [],
-      "Polar_expression": ["có dám làm không"],
-      "Polarity": "Neutral"
-    }
-  ]
-}
-"""
+        "text": """t chốg mắt lên xem chúg mày mặn nồg đến bao giờ 🙃""",
+        "reasoning": """Bước 1: Câu gồm một mệnh đề chính nêu hành động của người nói và một mệnh đề phụ làm nội dung của việc "xem", nói về độ bền của quan hệ giữa những người được nhắc tới. Hai mệnh đề mang hai nội dung thái độ khác nhau nên tách thành hai ý kiến.
+
+Bước 2: "chốg mắt lên xem" là thành ngữ khẩu ngữ thể hiện thái độ chờ đợi để chứng kiến, và là biểu thức thái độ của mệnh đề thứ nhất. Mệnh đề thứ hai có biểu thức "mặn nồg đến bao giờ" — một câu hỏi hàm ý sự mặn nồng sẽ không kéo dài. Emoji 🙃 ở cuối câu bị loại khỏi span.
+
+Bước 3: Ở ý thứ nhất, "t" (viết tắt của "tao") đứng đầu câu và là chủ ngữ trực tiếp của "chốg mắt lên xem", nên đây là chủ thể thái độ tường minh. Ở ý thứ hai, chủ ngữ ngữ pháp của "mặn nồg" chính là "chúg mày" — nhưng đó là bên bị đem ra đánh giá, không phải người phát ra thái độ, và người nói ở mệnh đề này bị lược bỏ, nên Source = [].
+
+Bước 4: "chúg mày" là đối tượng mà hành động chờ-xem nhắm vào, đồng thời cũng là bên bị chất vấn về độ bền của quan hệ, nên cả hai tuple đều lấy Target = ["chúg mày"].
+
+Bước 5: "chốg mắt lên xem" ở đây không phải sự tò mò trung tính mà là lời thách thức, hàm ý chờ đối phương đổ vỡ, nên là Negative. "mặn nồg đến bao giờ" tuy có hình thức câu hỏi nhưng không hỏi để lấy thông tin: nó khẳng định ngầm rằng sự mặn nồng sẽ chấm dứt sớm, tức một dự đoán xấu về đối phương, nên cũng là Negative.""",
+        "output": {
+            "opinions": [
+                {
+                    "Source": ["t"],
+                    "Target": ["chúg mày"],
+                    "Polar_expression": ["chốg mắt lên xem"],
+                    "Polarity": "Negative",
+                },
+                {
+                    "Source": [],
+                    "Target": ["chúg mày"],
+                    "Polar_expression": ["mặn nồg đến bao giờ"],
+                    "Polarity": "Negative",
+                },
+            ]
         },
-        {
-            "text": "bài viết hay quá !",
-            "reasoning": """
-Bước 1: Xác định số mệnh đề/ý kiến độc lập
-Đây là một câu đơn, ngắn gọn, chỉ chứa một mệnh đề đánh giá duy nhất: nhận xét về "bài viết" là "hay quá". Không có sự phân tách thành nhiều khía cạnh hay nhiều cực tính khác nhau → chỉ tạo 1 tuple.
-
-Bước 2: Xác định Polar_expression
-Cụm từ thể hiện đánh giá là "hay quá" (vị trí 9:16). Theo quy tắc loại bỏ dấu câu cuối câu (Mục 1), dấu ! ở cuối văn bản không được đưa vào span của Polar_expression.
-→ Polar_expression = "hay quá" (9:16), không lấy !.
-
-Bước 3: Xác định Source
-Toàn câu không có đại từ nhân xưng hay danh từ nào đóng vai trò chủ thể phát ngôn tường minh (không có "tôi thấy", "mình nghĩ"...). Đây là một nhận xét trực tiếp, chủ ngữ phát biểu hoàn toàn bị ẩn/lược bỏ.
-→ Theo quy tắc Pro-drop (Mục A): Source = [].
-
-Bước 4: Xác định Target
-Cụm danh từ "bài viết" (vị trí 0:8) xuất hiện tường minh ở đầu câu, là đối tượng cụ thể đang bị đánh giá bởi Polar_expression "hay quá". Đây không phải trường hợp mệnh đề trọn vẹn không tách được Target — có một thực thể rõ ràng (bài viết) là chủ ngữ ngữ pháp được mô tả tính chất.
-→ Target = "bài viết" (0:8).
-
-Bước 5: Phân loại Polarity 
-"hay quá": từ "hay" mang nghĩa khen ngợi, đánh giá tích cực về chất lượng nội dung, kết hợp "quá" nhấn mạnh mức độ khen → Positive.
-
-""",
-            "output": """
-{
-  "opinions": [
-    {
-      "Source": [],
-      "Target": ["bài viết"],
-      "Polar_expression": ["hay quá"],
-      "Polarity": "Positive"
-    }
-  ]
-}
-"""
-        },
-        {
-            "text": "t chốg mắt lên xem chúg mày mặn nồg đến bao giờ 🙃",
-            "reasoning": """
-Bước 1: Xác định số mệnh đề/ý kiến độc lập
-Phân tách câu thành các phần:
-
-"t chốg mắt lên xem" — hành động thách thức/khiêu khích do "t" thực hiện (chủ ngữ rõ ràng).
-"chúg mày mặn nồg đến bao giờ" — câu hỏi mỉa mai, châm biếm hướng tới "chúg mày" về việc "mặn nồng" (tình cảm thắm thiết) sẽ kéo dài đến khi nào.
-
-Hai cụm này có cấu trúc chủ ngữ khác nhau (một có Source tường minh, một không) và là hai hành vi/đánh giá riêng biệt → tách thành 2 tuple.
-Lưu ý theo quy tắc loại bỏ ký tự cảm xúc mạng: emoji 🙃 ở cuối câu không được đưa vào bất kỳ span nào.
-
-Bước 2: Xác định Polar_expression cho từng mệnh đề
-Tuple 1: "chốg mắt lên xem" (2:18) — giữ nguyên teencode "chốg" (không chuẩn hóa thành "trừng"/"chong"), trích nguyên văn theo exact span.
-Tuple 2: "mặn nồg đến bao giờ" (28:47) — giữ nguyên teencode "nồg" (không chuẩn hóa thành "nồng").
-
-Bước 3: Xác định Source cho từng tuple
-Tuple 1: "t" (0:1) đứng ở đầu câu, là chủ ngữ trực tiếp của động từ "chốg mắt lên xem" — đại từ xuất hiện tường minh, độc lập về cú pháp, không nằm trong cụm danh từ khác → theo Mục A, trích xuất làm Source = "t" (0:1).
-Tuple 2: Trong mệnh đề "chúg mày mặn nồg đến bao giờ", "chúg mày" tuy đứng ở vị trí chủ ngữ ngữ pháp của tính từ "mặn nồng", nhưng đây là đối tượng bị mô tả/đánh giá trạng thái (bị châm biếm là "mặn nồng"), không phải người phát biểu ý kiến. Không có chủ thể nào khác đứng ra nhận định/phát ngôn tường minh trong mệnh đề này → Source = [].
-
-Bước 4: Xác định Target cho từng tuple
-Tuple 1: Hành động "chốg mắt lên xem" của "t" được hướng tới ai? Xét toàn câu, đối tượng bị thách thức/quan sát chính là "chúg mày" (19:27) — xuất hiện tường minh ngay sau đó, đóng vai trò là đối tượng nhận tác động của ánh nhìn thách thức này → Target = "chúg mày" (19:27).
-Tuple 2: "chúg mày" (19:27) chính là chủ thể bị mô tả "mặn nồng" trong câu hỏi mỉa mai → Target = "chúg mày" (19:27), đầy đủ cụm danh từ chỉ người được nhắc đến.
-
-Bước 5: Phân loại Polarity  
-Tuple 1 — "chốg mắt lên xem": hành động mang tính đe dọa, thách thức, quan sát dò xét với ý đồ tiêu cực (chờ xem đối phương thất bại/lộ bản chất) → Negative.
-Tuple 2 — "mặn nồg đến bao giờ": câu hỏi tu từ mang tính mỉa mai, châm biếm, ngầm ý nghi ngờ/chê bai tình cảm của đối tượng sẽ không bền lâu → Negative (không xếp Neutral vì có sắc thái châm biếm/khinh thường rõ rệt, khác với câu hỏi khách quan thuần túy).
-
-""",
-            "output": """
-{
-  "opinions": [
-    {
-      "Source": ["t"],
-      "Target": ["chúg mày"],
-      "Polar_expression": ["chốg mắt lên xem"],
-      "Polarity": "Negative"
     },
     {
-      "Source": [],
-      "Target": ["chúg mày"],
-      "Polar_expression": ["mặn nồg đến bao giờ"],
-      "Polarity": "Negative"
-    }
-  ]
-}
-"""
+        "text": """mình nói thật nhìn từ trên cao xuống đã thấy chóng mặt rồi , vãi""",
+        "reasoning": """Bước 1: Toàn câu chỉ thuật lại một trải nghiệm cảm giác duy nhất khi nhìn xuống từ độ cao. Cụm "nói thật" là từ đưa đẩy nhấn mạnh tính chân thực, còn "vãi" ở cuối là thán từ khẩu ngữ, cả hai không tạo thành ý kiến riêng, nên chỉ có một opinion.
+
+Bước 2: Biểu thức mang nội dung trạng thái là "đã thấy chóng mặt rồi", với "đã... rồi" đánh dấu trạng thái đã xảy ra nên giữ trọn trong span. Đây là phần nội dung cảm giác chính của câu.
+
+Bước 3: "mình" đứng đầu câu và là chủ ngữ trực tiếp của chuỗi hành động "nói thật... nhìn... thấy chóng mặt", tức người trực tiếp trải nghiệm và phát ngôn. Source = ["mình"].
+
+Bước 4: "nhìn từ trên cao xuống" là hành động cụ thể gây ra cảm giác được nêu ở biểu thức, tức nguyên nhân trực tiếp của trạng thái chóng mặt và cũng là cái đang được nói tới, nên giữ làm Target thay vì để trống.
+
+Bước 5: "chóng mặt" là từ chỉ cảm giác khó chịu, nhưng câu chỉ tường thuật một phản ứng sinh lý xảy ra khách quan, không kèm lời phàn nàn, chê trách hay đòi hỏi thay đổi điều gì. Vì đây là mô tả sự việc chứ không phải hành vi đánh giá, Polarity = Neutral.""",
+        "output": {
+            "opinions": [
+                {
+                    "Source": ["mình"],
+                    "Target": ["nhìn từ trên cao xuống"],
+                    "Polar_expression": ["đã thấy chóng mặt rồi"],
+                    "Polarity": "Neutral",
+                }
+            ]
         },
-        {
-            "text": "mình nói thật nhìn từ trên cao xuống đã thấy chóng mặt rồi , vãi",
-            "reasoning": """
-Bước 1: Xác định số mệnh đề/ý kiến độc lập
-Câu gồm các phần:
-
-"mình nói thật" — cụm mở đầu mang tính khẳng định tính chân thật của phát biểu (discourse marker), không tự thân là một đánh giá cảm xúc.
-"nhìn từ trên cao xuống đã thấy chóng mặt rồi" — mệnh đề chính: mô tả nguyên nhân (nhìn từ trên cao xuống) và kết quả/trạng thái (thấy chóng mặt).
-", vãi" — phần đứng sau dấu phẩy, tách rời khỏi mệnh đề chính, không có động từ/vị ngữ đi kèm để tạo thành một mệnh đề hoàn chỉnh và có thể đánh giá được độc lập.
-
-→ Chỉ có 1 ý kiến/mệnh đề trọn vẹn đáng trích xuất là phần mô tả nguyên nhân–kết quả của việc nhìn xuống từ trên cao. Cụm ", vãi" đứng tách biệt sau dấu phẩy, không gắn liền cú pháp với một vị ngữ cụ thể trong cùng câu nên không tạo thành một biểu thức cảm xúc độc lập, có thể trích xuất được → không tách thành tuple riêng và cũng không được gộp vào Polar_expression đã có (vì Polar_expression phải là chuỗi liên tục).
-
-Bước 2: Xác định Polar_expression
-"đã thấy chóng mặt rồi" (37:58) — mô tả trạng thái cơ thể (cảm giác chóng mặt) là kết quả trực tiếp của hành động nhìn xuống từ trên cao. Đây là biểu thức trọn vẹn, trích nguyên văn, không kèm dấu câu/emoji.
-
-Bước 3: Xác định Source
-"mình" (0:4) đứng ở đầu câu, là chủ ngữ tường minh, độc lập về cú pháp. Mặc dù về mặt câu chữ "mình" trực tiếp đứng trước "nói thật", nhưng toàn câu là một chuỗi mệnh đề cùng chủ ngữ (đặc trưng lược chủ ngữ liên tiếp trong tiếng Việt): "mình (nói thật) [mình] nhìn... [mình] đã thấy chóng mặt..." — chủ ngữ "mình" được hiểu xuyên suốt cho cả hành động "thấy". Vì "mình" xuất hiện tường minh, không nằm trong cụm danh từ khác và không phải tân ngữ → trích xuất làm Source = "mình" (0:4).
-
-Bước 4: Xác định Target
-Xét nguyên nhân gây ra cảm giác "chóng mặt" — đó là hành động "nhìn từ trên cao xuống" (14:36). Đây là một hành động/sự việc cụ thể, tách biệt rõ ràng khỏi phần mô tả cảm giác kết quả ("đã thấy chóng mặt rồi"), nên được trích xuất làm Target (đối tượng/sự việc gây ra trạng thái), thay vì gộp chung toàn bộ câu vào một Polar_expression duy nhất.
-→ Target = "nhìn từ trên cao xuống" (14:36).
-
-Bước 5: Phân loại Polarity  
-"đã thấy chóng mặt rồi" là một mô tả mang tính thực tế khách quan về phản ứng sinh lý khi nhìn xuống từ độ cao (hiện tượng chóng mặt do độ cao), không phải một lời khen/chê hay biểu lộ cảm xúc yêu/ghét rõ rệt đối với đối tượng nào. Theo Mục D, các phát biểu mô tả trạng thái thực tế khách quan thuộc nhóm Neutral.
-→ Polarity = Neutral.
-""",
-            "output": """
-{
-  "opinions": [
+    },
     {
-      "Source": ["mình"],
-      "Target": ["nhìn từ trên cao xuống"],
-      "Polar_expression": ["đã thấy chóng mặt rồi"],
-      "Polarity": "Neutral"
-    }
-  ]
-}
-"""
-        }
-    ],  
+        "text": """quay quay cái lồn , thấy bị bắt nạt thì ra nói một câu bảo vệ người ta , có khi tối về lại có người nằm ôm . cứ cầm điện thoại pin với chả không pin""",
+        "reasoning": """Bước 1: Đây là một lời mắng chạy dài, nối nhiều mệnh đề bằng dấu phẩy: mở đầu bằng câu chửi thẳng vào việc quay phim, rồi nêu tình huống chứng kiến, hành động nên làm, phần thưởng có thể nhận được, và cuối cùng là thói quen bị phê phán. Mỗi mệnh đề đánh giá một khía cạnh khác nhau nên tách thành năm ý kiến.
+
+Bước 2: Các biểu thức lần lượt là "tối về lại có người nằm ôm" (kết quả nhận được), "thấy bị bắt nạt" (tình huống chứng kiến), "nói một câu bảo vệ người ta" (hành động nên làm), "cứ cầm điện thoại pin với chả không pin" (thói quen bị nhắc tới) và "quay quay cái lồn" (câu chửi mở đầu). Các từ nối như "thì ra", "có khi", "chứ" nằm ngoài span vì chỉ làm chức năng liên kết mệnh đề.
+
+Bước 3: Không mệnh đề nào có đại từ hay danh từ đứng làm chủ ngữ của chủ thể phát ngôn: "thấy", "ra nói", "cứ cầm" đều lược chủ ngữ theo lối nói trực diện, còn "có người nằm ôm" thì "người" là chủ thể của sự việc được kể chứ không phải người đưa ra đánh giá. Vì vậy cả năm tuple đều để Source trống.
+
+Bước 4: Mỗi biểu thức ở đây đều là một hành động hoặc một sự việc trọn vẹn được đem ra đánh giá, không có thực thể danh từ nào tách riêng ra làm đối tượng mà không phá vỡ nghĩa của mệnh đề. Do đó Target của cả năm tuple đều để trống và toàn bộ mệnh đề được giữ trong Polar_expression.
+
+Bước 5: "tối về lại có người nằm ôm" là phần thưởng tình cảm được nêu như điều đáng có nên là Positive, còn "nói một câu bảo vệ người ta" là hành động nghĩa hiệp được người nói cổ vũ nên cũng Positive. "thấy bị bắt nạt" mô tả một tình huống có hại cho nạn nhân nên Negative, và "quay quay cái lồn" là câu chửi tục phê phán trực diện nên Negative. Riêng "cứ cầm điện thoại pin với chả không pin" chỉ thuật lại thói quen bấm điện thoại mà không kèm từ ngữ khen chê nào, nên xếp Neutral.""",
+        "output": {
+            "opinions": [
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": ["tối về lại có người nằm ôm"],
+                    "Polarity": "Positive",
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": ["thấy bị bắt nạt"],
+                    "Polarity": "Negative",
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": ["nói một câu bảo vệ người ta"],
+                    "Polarity": "Positive",
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": ["cứ cầm điện thoại pin với chả không pin"],
+                    "Polarity": "Neutral",
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": ["quay quay cái lồn"],
+                    "Polarity": "Negative",
+                },
+            ]
+        },
+    },
+    {
+        "text": """yêu sắp 2 năm rồi mà không biết người yêu kể chuyện cho nghe là gì 😢 đòi mấy lần toàn kêu không bình thường xịu xịu""",
+        "reasoning": """Bước 1: Câu là lời tâm sự gồm ba phần: thời lượng của mối quan hệ, điều thiếu hụt trong mối quan hệ đó (nối bằng "mà" đối lập), và diễn biến khi đã thử đòi hỏi. Ba phần đánh giá ba khía cạnh khác nhau nên tách thành ba ý kiến.
+
+Bước 2: Các biểu thức là "đòi mấy lần toàn kêu không bình thường xịu xịu", "không biết người yêu kể chuyện cho nghe là gì" và "yêu sắp 2 năm rồi". Cụm phủ định "không biết... là gì" là một khối cố định diễn đạt việc chưa từng được trải nghiệm nên giữ nguyên, còn emoji 😢 nằm giữa câu bị loại khỏi mọi span.
+
+Bước 3: Người nói ẩn mình hoàn toàn: "yêu sắp 2 năm rồi", "không biết", "đòi mấy lần" đều lược chủ ngữ theo lối tự thuật. "người yêu" trong mệnh đề thứ hai nằm trong cụm bổ ngữ của "biết" chứ không phải chủ ngữ của biểu thức, nên cả ba tuple đều không có Source.
+
+Bước 4: Cả ba biểu thức đều là trạng thái hoặc chuỗi hành động tự thân của người nói, không hướng vào một thực thể danh từ nào bị đem ra đánh giá riêng. Vì vậy Target của cả ba đều để trống.
+
+Bước 5: "yêu sắp 2 năm rồi" nêu một mối quan hệ đã kéo dài, một tình trạng tốt về mặt gắn bó, nên là Positive. "không biết người yêu kể chuyện cho nghe là gì" là lời than về sự thiếu hụt và thiệt thòi trong tình cảm, nên là Negative. Phần cuối chỉ kể lại diễn biến đã xảy ra — đã đòi nhiều lần và bị đối phương gạt đi — mà không kèm từ ngữ chê trách hay đòi hỏi nào, nên đây là tường thuật thực tế và xếp Neutral.""",
+        "output": {
+            "opinions": [
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": ["đòi mấy lần toàn kêu không bình thường xịu xịu"],
+                    "Polarity": "Neutral",
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": ["không biết người yêu kể chuyện cho nghe là gì"],
+                    "Polarity": "Negative",
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": ["yêu sắp 2 năm rồi"],
+                    "Polarity": "Positive",
+                },
+            ]
+        },
+    },
+    {
+        "text": """hi vọng câu chuyện admin vừa bịa ra giúp các bạn có thêm niềm tin trong cuộc sống 😂.""",
+        "reasoning": """Bước 1: Câu chỉ có một mệnh đề mong ước duy nhất, nêu tác dụng mà một câu chuyện có thể mang lại cho người đọc. Chỉ có một ý kiến cần trích xuất.
+
+Bước 2: Biểu thức mang nội dung đánh giá là "giúp các bạn có thêm niềm tin trong cuộc sống" — phần nêu tác dụng tích cực của câu chuyện. Emoji 😂 và dấu "." liền sau nó ở cuối câu bị loại khỏi span.
+
+Bước 3: Động từ "hi vọng" mở đầu câu không có chủ ngữ đi kèm; người bày tỏ mong ước bị lược bỏ hoàn toàn. Vì vậy Source = [].
+
+Bước 4: Thứ được đánh giá là "câu chuyện admin vừa bịa ra" — một cụm danh từ rõ ràng, và phần "admin vừa bịa ra" là mệnh đề quan hệ xác định chính câu chuyện nào đang được nói tới, nên phải giữ trọn trong Target chứ không cắt còn "câu chuyện".
+
+Bước 5: Biểu thức nói về việc mang lại thêm niềm tin trong cuộc sống, một kết quả có lợi cho người đọc, dù cụm "vừa bịa ra" ở phần Target cho thấy giọng điệu trêu đùa. Bản thân nội dung được đánh giá vẫn là một tác động tốt, nên Polarity = Positive.""",
+        "output": {
+            "opinions": [
+                {
+                    "Source": [],
+                    "Target": ["câu chuyện admin vừa bịa ra"],
+                    "Polar_expression": ["giúp các bạn có thêm niềm tin trong cuộc sống"],
+                    "Polarity": "Positive",
+                }
+            ]
+        },
+    },
+    {
+        "text": """nhiều lúc buồn đến nỗi coi những vid thế này . đéo thể cười nỗi .""",
+        "reasoning": """Bước 1: Đoạn gồm hai câu tách nhau bằng dấu chấm: câu đầu nói về tâm trạng dẫn tới việc xem loại video này, câu sau nêu phản ứng khi xem. Hai nội dung khác nhau nên tách thành hai ý kiến.
+
+Bước 2: Biểu thức thứ nhất là "nhiều lúc buồn đến nỗi coi những vid thế này", giữ trọn mệnh đề vì "buồn đến nỗi..." là một cấu trúc mức độ - hệ quả không thể cắt rời. Biểu thức thứ hai là "đéo thể cười nỗi": "đéo thể" và "cười nỗi" hợp thành một ý duy nhất là không cười được, tách negator ra riêng sẽ làm mất chính nội dung thái độ. Dấu chấm cuối mỗi câu không lấy vào span.
+
+Bước 3: Cả hai câu đều lược chủ ngữ theo lối tự thuật; không có đại từ hay danh từ nào đóng vai chủ ngữ của "buồn" hay của "cười nỗi". Vì vậy cả hai tuple đều để Source trống.
+
+Bước 4: Câu đầu mô tả một trạng thái tâm lý cùng hệ quả hành vi của chính người nói, còn câu sau là một phản ứng tự thân; không có thực thể danh từ nào được tách ra làm đối tượng bị đánh giá riêng. Cụm "những vid thế này" nằm trong mệnh đề hệ quả nên được giữ trong biểu thức chứ không nâng lên làm Target, nên cả hai Target đều trống.
+
+Bước 5: "buồn đến nỗi coi những vid thế này" nói thẳng về tâm trạng buồn và mức độ buồn tới mức phải tìm tới loại video này, nên là Negative. "đéo thể cười nỗi" kèm từ tục thể hiện sự bế tắc, không thấy gì đáng cười, cũng là một phản ứng tiêu cực rõ rệt, nên Negative.""",
+        "output": {
+            "opinions": [
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": ["nhiều lúc buồn đến nỗi coi những vid thế này"],
+                    "Polarity": "Negative",
+                },
+                {
+                    "Source": [],
+                    "Target": [],
+                    "Polar_expression": ["đéo thể cười nỗi"],
+                    "Polarity": "Negative",
+                },
+            ]
+        },
+    },
+    {
+        "text": """đồng nghiệp tốt , chị em tốt đi làm như đi chơi :)) chứ làm cùng với mấy con mlz đáng sợ lắm :))""",
+        "reasoning": """Bước 1: Câu đặt hai hoàn cảnh làm việc đối lập nhau qua liên từ "chứ": một bên là môi trường có đồng nghiệp và chị em tốt, một bên là phải làm cùng những người bị gọi bằng từ tục. Hai vế đánh giá trái chiều nhau nên tách thành hai ý kiến.
+
+Bước 2: Vế sau có biểu thức "đáng sợ lắm" — lời đánh giá trực tiếp về hoàn cảnh làm việc đó. Vế trước có biểu thức "đi làm như đi chơi", một lối so sánh khẩu ngữ diễn tả việc đi làm nhẹ nhàng thoải mái. Hai emoticon ":))" nằm cuối từng vế đều bị loại khỏi span.
+
+Bước 3: Không vế nào có đại từ hay danh từ đứng làm chủ thể phát ngôn: người nói khái quát hoàn cảnh chung mà không tự nêu mình ra. Vì vậy cả hai tuple đều không có Source.
+
+Bước 4: Ở vế sau, cái gây ra cảm giác "đáng sợ lắm" là chính hoàn cảnh "làm cùng với mấy con mlz", nên cụm hành động này được lấy làm Target. Ở vế trước, "đồng nghiệp tốt , chị em tốt" là cụm liệt kê chỉ môi trường được nói tới; toàn bộ cụm kể cả các tính từ đi kèm tạo thành một khối định danh hoàn cảnh, còn phần đánh giá riêng chính là lối so sánh "đi làm như đi chơi".
+
+Bước 5: "đáng sợ lắm" là lời chê thẳng về hoàn cảnh phải làm việc cùng những người đó, nên Negative. "đi làm như đi chơi" diễn tả công việc nhẹ nhàng, dễ chịu — một tình trạng đáng mong muốn, nên Positive.""",
+        "output": {
+            "opinions": [
+                {
+                    "Source": [],
+                    "Target": ["làm cùng với mấy con mlz"],
+                    "Polar_expression": ["đáng sợ lắm"],
+                    "Polarity": "Negative",
+                },
+                {
+                    "Source": [],
+                    "Target": ["đồng nghiệp tốt , chị em tốt"],
+                    "Polar_expression": ["đi làm như đi chơi"],
+                    "Polarity": "Positive",
+                },
+            ]
+        },
+    },
+],  
     "opener_en": [
     {
         "text": """Yes , it really was a great experience and we visited various places but the most wonderful part of the trip was our stay at the Oberoi Udaivilas Luxury Hotel .""",
