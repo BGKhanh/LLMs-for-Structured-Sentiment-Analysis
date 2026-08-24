@@ -288,8 +288,18 @@ def cot_fewshot_doc_to_text(doc: Dict[str, Any]) -> str:
 
 
 def cot_fewshot_doc_to_target(doc: Dict[str, Any]) -> str:
-    reasoning = doc.get("reasoning", "").strip()
-    output = doc.get("output", "").strip()
+    reasoning = doc.get("reasoning", "")
+    if isinstance(reasoning, str):
+        reasoning = reasoning.strip()
+
+    output = doc.get("output", "")
+    if isinstance(output, dict):
+        output = json.dumps(output, ensure_ascii=False, indent=2)
+    elif isinstance(output, str):
+        output = output.strip()
+    else:
+        output = str(output)
+
     return f"Reasoning:\n{reasoning}\n\nOutput:\n{output}"
 
 
