@@ -201,7 +201,11 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 .cursor
-.cursor/rules/
+.cursor/agents/
+
+.continue
+.continue/agents/
+.continue/.env
 
 # Marimo
 marimo/_static/
@@ -235,3 +239,4 @@ notebook/dspy_GEPA.ipynb
 notebook/Gemma3_(4B).ipynb
 
 example for CoT reasoning generated/
+
