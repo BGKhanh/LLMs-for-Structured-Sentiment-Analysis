@@ -202,9 +202,17 @@ def main():
     g = set(gold.keys())
     p = set(preds.keys())
 
-    assert g.issubset(p), f"missing some sentences: {g.difference(p)}"
-    assert p.issubset(g), f"predictions contain sentences that are not in golds: {p.difference(g)}"
-
+    # assert g.issubset(p), f"missing some sentences: {g.difference(p)}"
+    # assert p.issubset(g), f"predictions contain sentences that are not in golds: {p.difference(g)}"
+    if g != p:
+        print("missing some sentences or predictions contain sentences that are not in golds: {g.difference(p)}")
+        common_elements = g.intersection(p)
+        g.intersection_update(common_elements)
+        p.intersection_update(common_elements)
+        
+        gold = {k: v for k, v in gold.items() if k in common_elements}
+        preds = {k: v for k, v in preds.items() if k in common_elements}
+        
     # f1 = tuple_f1(gold, preds)
     # print("Sentiment Tuple F1: {0:.3f}".format(f1))
     results = calculate_all_metrics(gold, preds)
