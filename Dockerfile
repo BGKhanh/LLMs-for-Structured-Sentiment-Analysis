@@ -17,7 +17,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git && \
+ARG LLAMA_CPP_REF=v0.4.0
+
+# Lưu ý: build number vẫn có thể hiển thị "1" dù pin tag, vì --depth 1 vẫn là shallow
+# clone (git rev-list --count HEAD luôn = 1 khi thiếu full history). Đây chỉ là vấn đề
+# hiển thị, không ảnh hưởng đến việc binary chạy đúng commit nào — commit hash trong
+# `--version` vẫn chính xác. Cái quan trọng được fix ở đây là PIN TAG, không phải build number.
+RUN git clone --branch ${LLAMA_CPP_REF} --depth 1 https://github.com/ggml-org/llama.cpp.git && \
     cd llama.cpp && \
     cmake -B build -DGGML_CUDA=ON -DGGML_CUDA_NO_VMM=ON \
                    -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release && \
