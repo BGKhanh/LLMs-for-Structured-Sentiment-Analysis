@@ -277,8 +277,8 @@ def get_cot_pool() -> List[Dict[str, Any]]:
 
 def cot_doc_to_text(doc: Dict[str, Any]) -> str:
     text = doc["text"]
-    if doc.get("language", "vi") == "en":
-        return f'Input: "{text}"\n\nThink step by step, then return the final JSON.'
+    # if doc.get("language", "vi") == "en":
+    #     return f'Input: "{text}"\n\nThink step by step, then return the final JSON.'
     return f'Input: "{text}"'
 
 
