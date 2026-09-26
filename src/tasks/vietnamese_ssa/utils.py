@@ -179,7 +179,8 @@ def load_dataset(**kwargs) -> datasets.DatasetDict:
     dataset_dir = kwargs.get("dataset_dir", None)
     clean_data = bool(kwargs.get("clean_data", True))
     plus_mode = bool(kwargs.get("plus_mode", False))  # only meaningful for plan_and_solve
- 
+    clean_data_verbose = bool(kwargs.get("clean_data_verbose", True))
+
     _CURRENT_DATASET["value"] = dataset
     set_tokenizer(language)
  
@@ -194,7 +195,7 @@ def load_dataset(**kwargs) -> datasets.DatasetDict:
             raw = json.load(f)
  
         if clean_data:
-            raw, removed_ids, _ = clean_gold_data(raw, language=language, verbose=True)
+            raw, removed_ids, _ = clean_gold_data(raw, language=language, verbose=clean_data_verbose)
  
         records = []
         for sample in raw:
