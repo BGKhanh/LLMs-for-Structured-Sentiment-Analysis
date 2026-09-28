@@ -49,10 +49,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl wget python3 python3-venv python3-dev ca-certificates libgomp1 \
-    # cuda-nvcc-13-0: chỉ nvcc + ptxas, không có headers/static libs của devel.
-    # Cần thiết vì FlashInfer/vLLM phải JIT compile cho GPU mới (Blackwell sm_120)
-    # mà chưa có prebuilt cubin — nhỏ hơn nhiều so với full devel toolkit.
-    cuda-nvcc-13-0 libcurand-dev-13-0 \
+    # cuda-nvcc-13-0: cung cấp nvcc/ptxas nhưng không cung cấp đầy đủ
+    # CUDA development headers/static libraries.
+    #
+    # FlashInfer/vLLM có thể JIT compile SM120 kernels tại runtime,
+    # nên ngoài nvcc cần các development packages tương ứng.
+    # libcublas-dev-13-0 cung cấp cublasLt.h cần cho FlashInfer CUTLASS MoE.
+    cuda-nvcc-13-0 libcurand-dev-13-0 libcublas-dev-13-0  \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv $VENV_PATH
