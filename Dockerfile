@@ -23,10 +23,16 @@ ARG LLAMA_CPP_REF=v0.4.0
 # clone (git rev-list --count HEAD luôn = 1 khi thiếu full history). Đây chỉ là vấn đề
 # hiển thị, không ảnh hưởng đến việc binary chạy đúng commit nào — commit hash trong
 # `--version` vẫn chính xác. Cái quan trọng được fix ở đây là PIN TAG, không phải build number.
+ARG CUDA_ARCHITECTURES="80;86;89;90;120"
+
 RUN git clone --branch ${LLAMA_CPP_REF} --depth 1 https://github.com/ggml-org/llama.cpp.git && \
     cd llama.cpp && \
-    cmake -B build -DGGML_CUDA=ON -DGGML_CUDA_NO_VMM=ON \
-                   -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release && \
+    cmake -B build \
+    -DGGML_CUDA=ON \
+    -DGGML_CUDA_NO_VMM=ON \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCHITECTURES}" && \
     cmake --build build --config Release -j"$(nproc)" --target llama-server && \
     find build/bin -maxdepth 1 -type f \( -name "llama-server" -o -name "*.so*" \) \
         -exec strip --strip-unneeded {} \; ; \
@@ -45,17 +51,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
     VENV_PATH=/opt/venv \
     HF_HOME=/workspace/.cache/huggingface \
     # Include sm_120/12.0 cho Blackwell (RTX 5060 Ti) cùng các GPU phổ biến
-    TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0;12.0"
+    TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;12.0"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl wget python3 python3-venv python3-dev ca-certificates libgomp1 \
-    # cuda-nvcc-13-0: cung cấp nvcc/ptxas nhưng không cung cấp đầy đủ
-    # CUDA development headers/static libraries.
-    #
-    # FlashInfer/vLLM có thể JIT compile SM120 kernels tại runtime,
-    # nên ngoài nvcc cần các development packages tương ứng.
-    # libcublas-dev-13-0 cung cấp cublasLt.h cần cho FlashInfer CUTLASS MoE.
-    cuda-nvcc-13-0 libcurand-dev-13-0 libcublas-dev-13-0  \
+    cuda-nvcc-13-0 \
+    cuda-nvrtc-dev-13-0 \
+    libcurand-dev-13-0 \
+    libcublas-dev-13-0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv $VENV_PATH
