@@ -1,0 +1,21 @@
+# Phương án 2 — api_server: model đã host sẵn (llama-server / vllm serve), run.py chỉ là HTTP client.
+# Cần: pip install "lm_eval[api]"
+model:
+  mode: api_server
+  batch_size: 1                   # chat request chỉ hỗ trợ 1; song song hoá qua num_concurrent
+  args:
+    model: google/gemma-4-E2B-it
+    base_url: http://127.0.0.1:8000/v1/chat/completions
+    num_concurrent: 32
+    max_length: 16384
+
+run:
+  datasets: [vitoed_new]
+  include_path: ./src/tasks
+  output_root: results/lm_eval
+  apply_chat_template: true
+  log_samples: true
+  confirm_run_unsafe_code: true
+  seeds: {random: 0, numpy: 1234, torch: 1234, fewshot: 42}
+
+scenarios: default_ssa

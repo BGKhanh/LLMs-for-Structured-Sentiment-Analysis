@@ -1,0 +1,14 @@
+# Tương đương 2 cell notebook "vllm" của bạn.
+# Chạy: python host.py --config configs/host_vllm_gemma.yaml
+backend: vllm
+model: nvidia/Gemma-4-26B-A4B-NVFP4
+port: 8000
+gpu_memory_utilization: 0.975
+max_model_len: 16384
+reasoning_parser: gemma4          # đổi theo đúng model đang dùng
+enable_thinking: true
+env:
+  MAX_JOBS: "1"                   # FlashInfer JIT OOM — xem issue #3634. Tăng "2"/"4" nếu RAM đủ.
+log_dir: results/lm_eval
+# tensor_parallel_size: 2         # bỏ comment nếu chạy đa GPU
+# extra_args: ["--enforce-eager"] # cờ tuỳ ý chưa có field riêng

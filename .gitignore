@@ -225,7 +225,6 @@ semeval22_structured_sentiment/evaluation/metadata
 # Results
 results/
 configs/
-src/config/
 src/training/
 train.py
 

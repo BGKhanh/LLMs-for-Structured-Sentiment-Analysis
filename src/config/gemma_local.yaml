@@ -1,0 +1,29 @@
+# Phương án 1 — local_load: vLLM nạp weight trực tiếp vào tiến trình chạy run.py.
+model:
+  mode: local_load
+  batch_size: 32
+  args:
+    pretrained: google/gemma-4-E2B-it
+    max_model_len: 16384
+    gpu_memory_utilization: 0.95
+
+run:
+  datasets: [vitoed_new]          # có thể nhiều dataset: [vitoed_new, opener_en, mpqa]
+  include_path: ./src/tasks
+  output_root: results/lm_eval    # -> <output_root>/<model_tag>/<dataset>/<scenario_label>/
+  apply_chat_template: true
+  log_samples: true
+  confirm_run_unsafe_code: true
+  seeds: {random: 0, numpy: 1234, torch: 1234, fewshot: 42}
+  # extra_metadata: {clean_data: true, plus_mode: false}
+  # gen_kwargs áp dụng cho CẢ 11 kịch bản (scenario nào tự khai gen_kwargs riêng thì đè lên phần này):
+  # gen_kwargs: {temperature: 0.7, do_sample: true}
+
+# Preset 11 kịch bản chuẩn (re2, pas, 0/1/3/5/7/10-shot, 1/3/5-shot-cot):
+scenarios: default_ssa
+# Hoặc tự liệt kê (gen_kwargs ở đây là tuỳ chọn, chỉ đè riêng cho scenario đó):
+# scenarios:
+#   - {label: re2,    task: vietnamese_ssa_re_reading, num_fewshot: 0}
+#   - {label: 3_shot, task: vietnamese_ssa_few_shot,   num_fewshot: 3}
+#   - {label: 5_shot_cot, task: vietnamese_ssa_few_shot_cot, num_fewshot: 5,
+#      gen_kwargs: {max_gen_toks: 8192}}   # model cần output CoT dài hơn mức mặc định

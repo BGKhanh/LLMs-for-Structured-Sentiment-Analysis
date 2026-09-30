@@ -1,0 +1,13 @@
+# Tương đương script "llama.cpp / llama-server" của bạn.
+# Chạy: python host.py --config configs/host_llama_qwen.yaml
+backend: llama_cpp
+binary: /usr/local/bin/llama-server
+hf_repo_id: unsloth/Qwen3.8-27B-GGUF
+hf_filename: Qwen3.8-27B-UD-Q4_K_XL.gguf
+port: 8000
+ctx_size: 65536
+n_gpu_layers: 99
+parallel: 16
+reasoning: "off"
+log_dir: .
+# model_path: ./Qwen3.8-27B-UD-Q4_K_XL.gguf   # dùng thay hf_repo_id/hf_filename nếu đã tải sẵn

@@ -1,9 +1,26 @@
 # =====================================================================
-# Dockerfile — môi trường lm-eval + vLLM + llama.cpp
-# v5: thêm cuda-nvcc vào runtime để JIT compile được cho GPU mới
-#     (RTX 5060 Ti Blackwell sm_120f), fix editable install path issue
-# v6: bỏ cài sẵn flash-attn và lm-evaluation-harness ở build-time
-#     → giảm dung lượng image và thời gian build; cài tại runtime khi cần
+# v5 → thêm cuda-nvcc vào runtime
+#        → cho phép JIT compile CUDA trên GPU mới (SM120)
+# v6 → thêm libcurand-dev-13-0
+# v7 → bỏ flash-attn và lm-evaluation-harness khỏi build-time
+#        → chuyển sang cài khi runtime khi cần
+# v8 → vllm 0.21.0 → 0.23.0
+#        → thêm support/compatibility tốt hơn cho Gemma 4
+# v9 → pin llama.cpp:
+#        ARG LLAMA_CPP_REF=v0.4.0
+#        git clone --branch ${LLAMA_CPP_REF} --depth 1 ...
+#        → đảm bảo build đúng revision thay vì lấy branch moving target
+# v10 → FlashInfer JIT:
+#        lỗi nvcc bị kill, exit code 137
+#        → giới hạn Ninja bằng MAX_JOBS
+# v11 → bổ sung:
+#        cuda-nvrtc-dev-13-0
+#        → sửa lỗi thiếu nvrtc.h
+#        và
+#        CMAKE_CUDA_ARCHITECTURES=...
+#        → sửa việc Docker builder không có GPU nên native không detect được architecture
+# v12: bật GGML_CUDA_FA_ALL_QUANTS và GGML_CUDA_GRAPHS cho llama.cpp
+#      để tăng cường CUDA Flash Attention kernels và CUDA Graph support
 # =====================================================================
 
 # =======================
@@ -32,7 +49,9 @@ RUN git clone --branch ${LLAMA_CPP_REF} --depth 1 https://github.com/ggml-org/ll
     -DGGML_CUDA_NO_VMM=ON \
     -DBUILD_SHARED_LIBS=OFF \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCHITECTURES}" && \
+    -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCHITECTURES}" \
+    -DGGML_CUDA_FA_ALL_QUANTS=ON \
+    -DGGML_CUDA_GRAPHS=ON && \
     cmake --build build --config Release -j"$(nproc)" --target llama-server && \
     find build/bin -maxdepth 1 -type f \( -name "llama-server" -o -name "*.so*" \) \
         -exec strip --strip-unneeded {} \; ; \
