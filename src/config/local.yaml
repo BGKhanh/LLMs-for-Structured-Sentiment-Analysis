@@ -8,7 +8,7 @@ model:
     gpu_memory_utilization: 0.95
 
 run:
-  datasets: [vitoed_new]          # có thể nhiều dataset: [vitoed_new, opener_en, mpqa]
+  datasets: [vitoed]          # có thể nhiều dataset: [vitoed_new, opener_en, mpqa]
   include_path: ./src/tasks
   output_root: results/lm_eval    # -> <output_root>/<model_tag>/<dataset>/<scenario_label>/
   apply_chat_template: true
