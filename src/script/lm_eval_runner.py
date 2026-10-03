@@ -99,15 +99,27 @@ class ModelConfig:
         return cls(backend, args, d.get("batch_size", 1))
 
 
-# Các khoá generation_kwargs hợp lệ (khớp _common_yaml/few_shot_cot.yaml hiện tại)
-# — dùng để validate sớm, tránh gõ sai key (vd "temprature") mà không ai báo,
-# vì bản thân lm-eval chỉ làm dict.update() nên key lạ sẽ bị nuốt im lặng.
-_GEN_KWARGS_KEYS = {"until", "max_gen_toks", "temperature", "top_p", "top_k", "do_sample"}
+# Các khoá generation_kwargs PHỔ BIẾN (khớp _common_yaml/few_shot_cot.yaml hiện
+# tại) — chỉ để CẢNH BÁO nếu gõ sai chính tả (vd "temprature"), KHÔNG chặn key
+# lạ: generation_kwargs được forward thẳng xuống backend (vllm SamplingParams,
+# OpenAI-style API, ...) qua dict.update(), nên bất kỳ key nào backend thật sự
+# hỗ trợ (vd repetition_penalty, min_p, seed, presence_penalty...) đều hợp lệ
+# dù không nằm trong danh sách dưới đây. Khác với `_check_keys` (dùng cho
+# khoá CẤU TRÚC của chính ExperimentConfig — những khoá đó luôn là danh sách
+# đóng, gõ sai phải chặn cứng).
+_KNOWN_GEN_KWARGS_KEYS = {"until", "max_gen_toks", "temperature", "top_p", "top_k", "do_sample"}
 
 
 def _check_gen_kwargs(source: str, gk: dict[str, Any] | None) -> None:
     if gk:
-        _check_keys(f"{source}.gen_kwargs", gk, _GEN_KWARGS_KEYS)
+        unknown = set(gk) - _KNOWN_GEN_KWARGS_KEYS
+        if unknown:
+            print(
+                f"[config] Lưu ý: '{source}.gen_kwargs' có khoá lạ {sorted(unknown)} "
+                f"— không nằm trong danh sách phổ biến {sorted(_KNOWN_GEN_KWARGS_KEYS)}. "
+                "Vẫn cho qua (có thể là tham số riêng của backend bạn dùng) — tự kiểm "
+                "tra lại nếu đây là gõ sai chính tả."
+            )
 
 
 @dataclass

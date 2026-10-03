@@ -129,6 +129,7 @@ class LlamaServerConfig:
     cont_batching: bool = True
     kv_unified: bool = True
     extra_args: list[str] = field(default_factory=list)
+    env: dict[str, str] = field(default_factory=dict)  # vd GGML_CUDA_*, CUDA_VISIBLE_DEVICES
     log_dir: str = "."
     start_timeout_s: float = 300.0
 
@@ -138,6 +139,11 @@ class LlamaServerConfig:
 
     def health_url(self) -> str:
         return self.base_url + "/health"
+
+    def build_env(self) -> dict[str, str]:
+        e = os.environ.copy()
+        e.update({k: str(v) for k, v in self.env.items()})
+        return e
 
     def resolve_model_path(self) -> Path:
         if self.model_path:
@@ -218,7 +224,31 @@ class ServerHandle:
         self._flog = None
 
     def start(self) -> None:
-        self.stop()  # dọn tiến trình cũ nếu gọi lại (an toàn khi chạy lại cell/script nhiều lần)
+        self.stop()  # dọn tiến trình CỦA CHÍNH OBJECT NÀY nếu gọi lại (self._proc) —
+        # KHÔNG dọn được process mồ côi (orphan) từ 1 tiến trình Python KHÁC đã thoát
+        # trước đó (vd kernel notebook bị restart cứng, atexit không kịp chạy). Vì vậy
+        # cần kiểm tra health_url TRƯỚC khi launch: nếu đã có server trả lời sẵn ở đó,
+        # launch tiếp sẽ rất dễ "trông như thành công" trong khi health-check vòng lặp
+        # bên dưới thực ra đang thấy server CŨ (cấu hình cũ, nhỏ hơn) chứ không phải
+        # tiến trình MỚI vừa Popen() với tham số trong config hiện tại — đây chính là
+        # kiểu lỗi "tăng batch_size/ubatch_size/ctx_size trong YAML nhưng VRAM dùng
+        # không đổi" vì so với lần trước. Chặn cứng ở đây để không bị lừa.
+        try:
+            with urllib.request.urlopen(self.health_url, timeout=3) as r:
+                if r.status == 200:
+                    raise RuntimeError(
+                        f"❌ Đã có server TRẢ LỜI SẴN tại {self.health_url} trước khi host.py kịp "
+                        "khởi chạy. Đây rất có thể là tiến trình CŨ còn sót lại từ lần chạy trước "
+                        "(orphan process — vd kernel notebook bị restart cứng, Ctrl+C không propagate "
+                        "kịp) — KHÔNG phải tiến trình mới với tham số trong config hiện tại. Nếu tiếp "
+                        "tục, bạn sẽ 'tưởng' server mới đã chạy (log vẫn in '✅ Server sẵn sàng') "
+                        "nhưng thực ra vẫn đang nói chuyện với config CŨ. Hãy tự tắt tiến trình đang "
+                        "chiếm cổng này trước (vd `pkill -f llama-server` hoặc `lsof -i :<port>` để tìm "
+                        "đúng PID), hoặc đổi sang `port` khác trong config, rồi chạy lại."
+                    )
+        except (urllib.error.URLError, TimeoutError, OSError):
+            pass  # không có gì đang chạy ở đó — đúng như kỳ vọng, tiếp tục launch bình thường
+
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         self._flog = open(self.log_path, "a", encoding="utf-8", buffering=1)
         self._flog.write(f"\n\n==== start {time.strftime('%Y-%m-%d %H:%M:%S')} ====\n{' '.join(self.cmd)}\n\n")
@@ -283,6 +313,6 @@ def host(config: ServerConfig) -> ServerHandle:
         return ServerHandle(
             cmd=config.build_command(model_path), health_url=config.health_url(),
             log_path=Path(config.log_dir) / "llama_server.log",
-            start_timeout_s=config.start_timeout_s, env=os.environ.copy(),
+            start_timeout_s=config.start_timeout_s, env=config.build_env(),
         )
     raise TypeError(f"Config không hợp lệ: {type(config)}")
