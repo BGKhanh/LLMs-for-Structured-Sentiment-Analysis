@@ -1,6 +1,6 @@
 # Phương án 1 — local_load: vLLM nạp weight trực tiếp vào tiến trình chạy run.py.
 model:
-  mode: local_load
+  mode: vllm
   batch_size: 32
   args:
     pretrained: google/gemma-4-E2B-it

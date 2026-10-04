@@ -67,7 +67,7 @@ class ModelConfig:
         return infer_model_tag(self.args) or self.backend  # args rỗng -> dùng tên backend
 
     @classmethod
-    def local_load(cls, pretrained: str, batch_size: int | str = 32, **extra: Any) -> "ModelConfig":
+    def vllm(cls, pretrained: str, batch_size: int | str = 32, **extra: Any) -> "ModelConfig":
         """vLLM nạp weight trực tiếp vào tiến trình này (build 1 lần có lợi rõ rệt)."""
         return cls("vllm", {"pretrained": pretrained, **extra}, batch_size)
 
@@ -79,23 +79,41 @@ class ModelConfig:
         return cls("local-chat-completions", {"model": model, "base_url": base_url, **extra}, batch_size)
 
     @classmethod
+    def hf(cls, pretrained: str, batch_size: int | str = "auto", **extra: Any) -> "ModelConfig":
+        """Backend "hf" có sẵn trong lm_eval — nạp model `transformers` TRỰC
+        TIẾP vào tiến trình đang chạy LMEvalRunner. KHÔNG cần
+        host.py/server_host.py, không có server/HTTP nào cả — khác
+        'vllm' (cũng nạp trong tiến trình này nhưng qua vLLM
+        engine) và `api_server` (cần 1 server ngoài). `extra` ví dụ (đúng
+        tên tham số của `HFLM.__init__`, lm_eval/models/huggingface.py):
+        dtype="bfloat16", device="cuda:0", trust_remote_code=True,
+        parallelize=True (chia model qua nhiều GPU naively),
+        max_memory_per_gpu="20GiB", max_length=16384. `batch_size="auto"`
+        (mặc định) để HFLM tự dò batch size lớn nhất vừa VRAM."""
+        return cls("hf", {"pretrained": pretrained, **extra}, batch_size)
+
+    @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "ModelConfig":
         _check_keys("model", d, {"mode", "backend", "args", "batch_size"})
         mode, backend = d.get("mode"), d.get("backend")
         if (mode is None) == (backend is None):
-            raise ValueError("[config] 'model' cần ĐÚNG MỘT trong 2 khoá: `mode` (local_load | api_server) hoặc `backend` (tên backend lm-eval bất kỳ).")
+            raise ValueError("[config] 'model' cần ĐÚNG MỘT trong 2 hướng: `mode` api_server hoặc `backend` (tên backend lm-eval bất kỳ).")
         args = dict(d.get("args") or {})
-        if mode == "local_load":
+        if mode == "vllm":
             if "pretrained" not in args:
-                raise ValueError("[config] model.mode=local_load cần `args.pretrained`.")
-            return cls.local_load(batch_size=d.get("batch_size", 32), **args)
+                raise ValueError("[config] model.mode=vllm cần `args.pretrained`.")
+            return cls.vllm(batch_size=d.get("batch_size", 32), **args)
         if mode == "api_server":
             missing = {"model", "base_url"} - set(args)
             if missing:
                 raise ValueError(f"[config] model.mode=api_server thiếu trong `args`: {sorted(missing)}.")
             return cls.api_server(batch_size=d.get("batch_size", 1), **args)
+        if mode == "hf":
+            if "pretrained" not in args:
+                raise ValueError("[config] model.mode=hf cần `args.pretrained`.")
+            return cls.hf(batch_size=d.get("batch_size", "auto"), **args)
         if mode is not None:
-            raise ValueError(f"[config] model.mode={mode!r} không hợp lệ (chỉ nhận local_load | api_server).")
+            raise ValueError(f"[config] model.mode={mode!r} không hợp lệ (chỉ nhận vllm | api_server | hf).")
         return cls(backend, args, d.get("batch_size", 1))
 
 
