@@ -1,0 +1,25 @@
+# Backend "transformers serve" (FastAPI server tương thích OpenAI API, có sẵn
+# trong `transformers` từ CLI `transformers serve ...` — cần: pip install
+# "transformers[serving]"). Chạy: python host.py --config configs/host_transformers_gemma.yaml
+#
+# Lưu ý: đây là backend HOST RIÊNG (server sống, HTTP API) — nếu bạn chỉ cần
+# nạp model transformers TRỰC TIẾP vào tiến trình chạy eval (không cần server
+# riêng), dùng thẳng backend "hf" có sẵn trong lm_eval qua configs đánh giá:
+#   model: {backend: hf, args: {pretrained: google/gemma-4-26B-A4B-it, dtype: bfloat16}}
+# — không cần host.py/server_host.py gì cả trong trường hợp đó.
+backend: transformers
+model: google/gemma-4-26B-A4B-it
+host: 127.0.0.1
+port: 8000
+device: cuda:0
+dtype: bfloat16
+reasoning: "on"
+continuous_batching: true
+chat_template_kwargs: {enable_thinking: true}
+trust_remote_code: false
+log_dir: results/lm_eval
+# attn_implementation: flash_attention_2
+# quantization: bnb-4bit
+# cb_block_size: 128
+# cb_num_blocks: 512
+# extra_args: ["--default-seed", "42"]

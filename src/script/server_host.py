@@ -1,11 +1,21 @@
 """
-server_host.py — Đóng gói việc HOST model local (vLLM openai-server hoặc
-llama-server) thành module cấu hình được, cùng nguyên lý với
-`lm_eval_runner.py`: dataclass config, nạp/validate từ YAML, script (`host.py`)
-chỉ nạp rồi chạy.
+server_host.py — Đóng gói việc HOST model local (vLLM openai-server,
+llama-server, hoặc `transformers serve`) thành module cấu hình được, cùng
+nguyên lý với `lm_eval_runner.py`: dataclass config, nạp/validate từ YAML,
+script (`host.py`) chỉ nạp rồi chạy. 3 backend: `backend: vllm` ->
+VLLMServerConfig, `backend: llama_cpp` -> LlamaServerConfig, `backend:
+transformers` -> TransformersServerConfig.
+
+Lưu ý riêng cho `transformers`: module này chỉ phục vụ trường hợp bạn muốn 1
+SERVER SỐNG RIÊNG (giống vllm/llama-server). Nếu chỉ cần nạp model
+`transformers` trực tiếp vào tiến trình chạy eval — không cần server riêng —
+dùng thẳng backend "hf" có sẵn trong lm_eval qua `lm_eval_runner.py`'s
+`ModelConfig(backend="hf", args={"pretrained": ...})`, không liên quan gì
+tới file này.
 
 ĐỘC LẬP với lm_eval_runner.py/run.py — dùng đứng riêng:
-    - Chạy `python host.py --config configs/host_vllm_gemma.yaml` ở 1
+    - Chạy `python host.py --config configs/host_vllm_gemma.yaml` (hoặc
+      `host_llama_qwen.yaml` / `host_transformers_gemma.yaml`) ở 1
       terminal/cell, giữ server sống, rồi ở chỗ khác trỏ `base_url` trong
       config đánh giá (`configs/gemma_api_server.yaml`) tới đúng server này.
     - Hoặc gọi trực tiếp từ code khác (notebook, script khác) qua
@@ -17,6 +27,7 @@ chỉ nạp rồi chạy.
 from __future__ import annotations
 
 import atexit
+import json
 import os
 import subprocess
 import sys
@@ -190,7 +201,104 @@ class LlamaServerConfig:
         return cls(**{k: v for k, v in d.items() if k != "backend"})
 
 
-ServerConfig = VLLMServerConfig | LlamaServerConfig
+# =========================================================================
+# Config: transformers serve (`transformers serve [FORCE_MODEL] ...`)
+# =========================================================================
+# Khác bản chất với vLLM/llama.cpp ở 1 điểm: `transformers` KHÔNG hỗ trợ gọi
+# qua `python -m transformers` (không có __main__.py — đã verify: lệnh này
+# báo lỗi "transformers is a package and cannot be directly executed"), nên
+# phải gọi thẳng binary CLI `transformers` (cài qua pip, nằm trong PATH của
+# venv/conda env đang dùng) — giống cách gọi `llama-server` hơn là `vllm`.
+#
+# Lưu ý quan trọng: đây là backend HOST RIÊNG (server quá trình dài, có HTTP
+# API) — khác với backend "hf" có sẵn trong lm_eval (`ModelConfig(backend="hf",
+# args={"pretrained": ...})`), vốn nạp model TRỰC TIẾP vào cùng tiến trình
+# chạy eval, KHÔNG cần host.py/server_host.py gì cả. Dùng "hf" nếu bạn không
+# cần 1 server độc lập; dùng TransformersServerConfig (backend: transformers
+# trong file host config) nếu muốn 1 server sống riêng để nhiều lần `run.py`
+# cùng kết nối tới, giống hệt cách dùng vllm/llama_cpp.
+@dataclass
+class TransformersServerConfig:
+    model: str  # FORCE_MODEL — model duy nhất được preload, dùng cho mọi request
+    binary: str = "transformers"  # đổi thành full path nếu không nằm trong PATH
+    host: str = "localhost"
+    port: int = 8000
+    device: str = "auto"
+    dtype: str = "auto"
+    attn_implementation: str | None = None  # vd "flash_attention_2"
+    continuous_batching: bool = False
+    quantization: str | None = None  # "bnb-4bit" | "bnb-8bit"
+    reasoning: str = "auto"  # "on" | "off" | "auto"
+    chat_template_kwargs: dict[str, Any] | None = None  # vd {"enable_thinking": true}
+    trust_remote_code: bool = False
+    model_timeout: int | None = None
+    cb_block_size: int | None = None
+    cb_num_blocks: int | None = None
+    cb_max_batch_tokens: int | None = None
+    cb_max_memory_percent: float | None = None
+    cb_use_cuda_graph: bool = False
+    enable_cors: bool = False
+    log_level: str | None = None
+    extra_args: list[str] = field(default_factory=list)
+    env: dict[str, str] = field(default_factory=dict)
+    log_dir: str = "."
+    start_timeout_s: float = 600.0
+
+    @property
+    def base_url(self) -> str:
+        return f"http://{self.host}:{self.port}/v1"
+
+    def health_url(self) -> str:
+        return f"http://{self.host}:{self.port}/health"
+
+    def build_command(self) -> list[str]:
+        cmd = [
+            self.binary, "serve", self.model,
+            "--host", self.host, "--port", str(self.port),
+            "--device", self.device, "--dtype", self.dtype,
+            "--reasoning", self.reasoning,
+        ]
+        if self.attn_implementation:
+            cmd += ["--attn-implementation", self.attn_implementation]
+        if self.continuous_batching:
+            cmd.append("--continuous-batching")
+        if self.quantization:
+            cmd += ["--quantization", self.quantization]
+        if self.chat_template_kwargs:
+            cmd += ["--chat-template-kwargs", json.dumps(self.chat_template_kwargs)]
+        if self.trust_remote_code:
+            cmd.append("--trust-remote-code")
+        if self.model_timeout is not None:
+            cmd += ["--model-timeout", str(self.model_timeout)]
+        if self.cb_block_size is not None:
+            cmd += ["--cb-block-size", str(self.cb_block_size)]
+        if self.cb_num_blocks is not None:
+            cmd += ["--cb-num-blocks", str(self.cb_num_blocks)]
+        if self.cb_max_batch_tokens is not None:
+            cmd += ["--cb-max-batch-tokens", str(self.cb_max_batch_tokens)]
+        if self.cb_max_memory_percent is not None:
+            cmd += ["--cb-max-memory-percent", str(self.cb_max_memory_percent)]
+        if self.cb_use_cuda_graph:
+            cmd.append("--cb-use-cuda-graph")
+        if self.enable_cors:
+            cmd.append("--enable-cors")
+        if self.log_level:
+            cmd += ["--log-level", self.log_level]
+        cmd += self.extra_args
+        return cmd
+
+    def build_env(self) -> dict[str, str]:
+        e = os.environ.copy()
+        e.update({k: str(v) for k, v in self.env.items()})
+        return e
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "TransformersServerConfig":
+        _check_keys("server(transformers)", d, set(cls.__dataclass_fields__) | {"backend"})
+        return cls(**{k: v for k, v in d.items() if k != "backend"})
+
+
+ServerConfig = VLLMServerConfig | LlamaServerConfig | TransformersServerConfig
 
 
 def load_server_config(path: str | Path) -> ServerConfig:
@@ -200,7 +308,11 @@ def load_server_config(path: str | Path) -> ServerConfig:
         return VLLMServerConfig.from_dict(raw)
     if backend == "llama_cpp":
         return LlamaServerConfig.from_dict(raw)
-    raise ValueError(f"[config] 'backend' phải là 'vllm' hoặc 'llama_cpp', nhận được: {backend!r}")
+    if backend == "transformers":
+        return TransformersServerConfig.from_dict(raw)
+    raise ValueError(
+        f"[config] 'backend' phải là 'vllm', 'llama_cpp' hoặc 'transformers', nhận được: {backend!r}"
+    )
 
 
 # =========================================================================
@@ -313,6 +425,12 @@ def host(config: ServerConfig) -> ServerHandle:
         return ServerHandle(
             cmd=config.build_command(model_path), health_url=config.health_url(),
             log_path=Path(config.log_dir) / "llama_server.log",
+            start_timeout_s=config.start_timeout_s, env=config.build_env(),
+        )
+    if isinstance(config, TransformersServerConfig):
+        return ServerHandle(
+            cmd=config.build_command(), health_url=config.health_url(),
+            log_path=Path(config.log_dir) / "transformers_server.log",
             start_timeout_s=config.start_timeout_s, env=config.build_env(),
         )
     raise TypeError(f"Config không hợp lệ: {type(config)}")

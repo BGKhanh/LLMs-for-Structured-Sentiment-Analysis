@@ -1,0 +1,24 @@
+# Phương án 3 — hf: nạp model `transformers` TRỰC TIẾP vào tiến trình chạy
+# run.py này. KHÔNG cần host.py/server_host.py, không có server/HTTP nào cả.
+model:
+  mode: hf
+  batch_size: auto        # để HFLM tự dò batch size lớn nhất vừa VRAM; có thể cố định số nguyên
+  args:
+    pretrained: google/gemma-4-26B-A4B-it
+    dtype: bfloat16
+    device: cuda:0
+    trust_remote_code: false
+    # parallelize: true          # chia model qua nhiều GPU (naive), bỏ comment nếu cần
+    # max_memory_per_gpu: 20GiB
+    # max_length: 16384
+
+run:
+  datasets: [vitoed_new]
+  include_path: ./src/tasks
+  output_root: results/lm_eval
+  apply_chat_template: true
+  log_samples: true
+  confirm_run_unsafe_code: true
+  seeds: {random: 0, numpy: 1234, torch: 1234, fewshot: 42}
+
+scenarios: default_ssa

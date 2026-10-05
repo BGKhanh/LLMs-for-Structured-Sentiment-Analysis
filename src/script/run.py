@@ -4,11 +4,20 @@
     python run.py --config configs/gemma_local.yaml --dry-run                 # chỉ in kế hoạch, không chạy
     python run.py --config configs/gemma_local.yaml --only re2,3_shot         # chạy lọc vài scenario
     python run.py --config configs/gemma_local.yaml --dataset mpqa            # ghi đè danh sách dataset
+
+Riêng cho `model.mode: hf` (backend "hf" có sẵn trong lm_eval, nạp
+`transformers` trực tiếp — xem `configs/hf.yaml`) VÀ muốn chạy
+data-parallel nhiều GPU: bọc lệnh trên bằng `accelerate launch`, KHÔNG sửa gì
+trong code — run.py là script Python thường, `accelerate launch` tự spawn N
+tiến trình (mỗi GPU 1 tiến trình) rồi chạy đúng y nguyên script/args này
+trong từng tiến trình:
+
+    accelerate launch run.py --config configs/gemma_hf.yaml
 """
 import argparse
 import os
 
-from lm_eval_runner import LMEvalRunner, load_experiment
+from lm_eval_runner import LMEvalRunner, _is_main_process, load_experiment
 
 
 def main() -> None:
@@ -33,10 +42,11 @@ def main() -> None:
     os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 
     runner = LMEvalRunner(exp.model, exp.run)
-    print(f"Model: backend={exp.model.backend} tag={exp.model.tag} | datasets={datasets} | {len(scenarios)} scenario")
-    for ds in datasets:
-        for sc in scenarios:
-            print(f"  {runner.output_dir(ds, sc)}  <-  {sc.task} (num_fewshot={sc.num_fewshot})")
+    if _is_main_process():
+        print(f"Model: backend={exp.model.backend} tag={exp.model.tag} | datasets={datasets} | {len(scenarios)} scenario")
+        for ds in datasets:
+            for sc in scenarios:
+                print(f"  {runner.output_dir(ds, sc)}  <-  {sc.task} (num_fewshot={sc.num_fewshot})")
     if args.dry_run:
         return
     runner.run_all(scenarios, datasets)
