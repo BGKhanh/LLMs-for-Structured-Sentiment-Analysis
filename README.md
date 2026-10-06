@@ -43,7 +43,7 @@ This repository is intended for researchers and practitioners who wish to evalua
 │   └── vastai_notebook_lm_eval.ipynb   # Setup + example lm_eval / server cells
 ├── src/
 │   ├── config/                         # YAML configs for evaluation and model hosting
-│   │   ├── local.yaml                  # vLLM in-process (mode: local_load)
+│   │   ├── local.yaml                  # vLLM in-process (mode: vllm)
 │   │   ├── api_server.yaml             # HTTP client to an OpenAI-compatible server
 │   │   ├── host_vllm.yaml              # Start vLLM OpenAI server
 │   │   └── host_llama.yaml             # Start llama-server (GGUF)
@@ -158,7 +158,7 @@ cd lm-evaluation-harness
 pip install -e ".[api,vllm,hf]"
 ```
 
-> Extra `[api]` is required for `model.mode: api_server` (`local-chat-completions`). Extra `[vllm]` is required for in-process vLLM (`model.mode: local_load`).
+> Extra `[api]` is required for `model.mode: api_server` (`local-chat-completions`). Extra `[vllm]` is required for in-process vLLM (`model.mode: vllm`).
 
 ---
 
