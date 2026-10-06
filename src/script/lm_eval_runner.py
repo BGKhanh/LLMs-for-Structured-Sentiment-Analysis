@@ -11,6 +11,7 @@ Khối chính:
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,17 @@ from lm_eval.api.registry import get_model
 from lm_eval.loggers import EvaluationTracker
 from lm_eval.tasks import TaskManager
 from lm_eval.utils import make_table, simple_parse_args_string
+
+
+def _is_main_process() -> bool:
+    """True khi KHÔNG chạy đa tiến trình (bình thường), hoặc khi chạy đa tiến
+    trình qua `accelerate launch` (cho backend "hf" đa-GPU data-parallel) VÀ
+    đây là tiến trình rank 0. Dùng cùng 2 biến môi trường `accelerate launch`
+    thật sự set (`RANK`, `LOCAL_RANK`) — đã verify khớp với chính cách
+    `lm_eval/evaluator.py` tự kiểm tra rank nội bộ. Chỉ ảnh hưởng việc IN RA
+    CONSOLE (tránh N tiến trình cùng in log trùng lặp) — simple_evaluate() đã
+    tự xử lý đúng việc chỉ rank 0 mới thực sự có `results` để ghi file."""
+    return int(os.environ.get("RANK", "0")) == 0 and int(os.environ.get("LOCAL_RANK", "0")) == 0
 
 
 # =========================================================================
@@ -80,16 +92,6 @@ class ModelConfig:
 
     @classmethod
     def hf(cls, pretrained: str, batch_size: int | str = "auto", **extra: Any) -> "ModelConfig":
-        """Backend "hf" có sẵn trong lm_eval — nạp model `transformers` TRỰC
-        TIẾP vào tiến trình đang chạy LMEvalRunner. KHÔNG cần
-        host.py/server_host.py, không có server/HTTP nào cả — khác
-        'vllm' (cũng nạp trong tiến trình này nhưng qua vLLM
-        engine) và `api_server` (cần 1 server ngoài). `extra` ví dụ (đúng
-        tên tham số của `HFLM.__init__`, lm_eval/models/huggingface.py):
-        dtype="bfloat16", device="cuda:0", trust_remote_code=True,
-        parallelize=True (chia model qua nhiều GPU naively),
-        max_memory_per_gpu="20GiB", max_length=16384. `batch_size="auto"`
-        (mặc định) để HFLM tự dò batch size lớn nhất vừa VRAM."""
         return cls("hf", {"pretrained": pretrained, **extra}, batch_size)
 
     @classmethod
@@ -97,7 +99,7 @@ class ModelConfig:
         _check_keys("model", d, {"mode", "backend", "args", "batch_size"})
         mode, backend = d.get("mode"), d.get("backend")
         if (mode is None) == (backend is None):
-            raise ValueError("[config] 'model' cần ĐÚNG MỘT trong 2 hướng: `mode` api_server hoặc `backend` (tên backend lm-eval bất kỳ).")
+            raise ValueError("[config] 'model' cần ĐÚNG MỘT trong các khoá: `mode` (vllm | api_server | hf) hoặc `backend` (tên backend lm-eval bất kỳ).")
         args = dict(d.get("args") or {})
         if mode == "vllm":
             if "pretrained" not in args:
@@ -302,19 +304,24 @@ class LMEvalRunner:
         if rc.log_samples and samples:
             for t in results["configs"]:
                 tracker.save_results_samples(task_name=t, samples=samples[t])
-        if print_table:
+        if print_table and _is_main_process():
             print(f"=== [{dataset} / {scenario.label}] task={scenario.task} num_fewshot={scenario.num_fewshot} -> {out_dir} ===")
             print(make_table(results))
         return results
 
     def run_all(self, scenarios: list[ScenarioConfig], datasets: list[str] | None = None) -> dict[tuple[str, str], dict[str, Any]]:
-        """Duyệt dataset (ngoài) x scenario (trong). Trả về {(dataset, label): results}."""
+        """Duyệt dataset (ngoài) x scenario (trong). Trả về {(dataset, label): results}.
+        Khi chạy qua `accelerate launch` (nhiều tiến trình), MỌI tiến trình đều
+        chạy đúng vòng lặp này (bắt buộc — HFLM cần tất cả rank cùng tham gia
+        để chia dữ liệu đồng đều), chỉ có in log ra console là được gate theo
+        rank 0 (xem `_is_main_process()`) để tránh N dòng log trùng lặp."""
         datasets = datasets or self.run_config.datasets
         total, out = len(datasets) * len(scenarios), {}
         n = 0
         for ds in datasets:
             for sc in scenarios:
                 n += 1
-                print(f"--- [{n}/{total}] dataset={ds} scenario={sc.label} ---")
+                if _is_main_process():
+                    print(f"--- [{n}/{total}] dataset={ds} scenario={sc.label} ---")
                 out[(ds, sc.label)] = self.run(sc, ds)
         return out

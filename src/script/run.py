@@ -6,13 +6,25 @@
     python run.py --config configs/gemma_local.yaml --dataset mpqa            # ghi đè danh sách dataset
 
 Riêng cho `model.mode: hf` (backend "hf" có sẵn trong lm_eval, nạp
-`transformers` trực tiếp — xem `configs/hf.yaml`) VÀ muốn chạy
+`transformers` trực tiếp — xem `configs/gemma_hf.yaml`) VÀ muốn chạy
 data-parallel nhiều GPU: bọc lệnh trên bằng `accelerate launch`, KHÔNG sửa gì
 trong code — run.py là script Python thường, `accelerate launch` tự spawn N
 tiến trình (mỗi GPU 1 tiến trình) rồi chạy đúng y nguyên script/args này
 trong từng tiến trình:
 
     accelerate launch run.py --config configs/gemma_hf.yaml
+
+Cơ chế (đã verify từ source `lm_eval/models/huggingface.py` +
+`lm_eval/evaluator.py`): `HFLM` tự phát hiện đang chạy dưới `accelerate
+launch` qua biến môi trường `WORLD_SIZE`/`RANK` mà `accelerate launch` set
+cho mỗi tiến trình, tự chia dữ liệu eval đều cho các GPU (data-parallel) —
+KHÔNG cần cấu hình gì thêm phía `lm_eval_runner.py`. Nếu KHÔNG bọc
+`accelerate launch` (chạy `python run.py` bình thường), `HFLM` tự lùi về
+single-process/single-GPU — không lỗi, chỉ không có song song đa GPU.
+`simple_evaluate()` chỉ trả kết quả thật ở tiến trình rank 0 (các rank khác
+trả `None`) — `LMEvalRunner.run()` đã xử lý đúng việc này, và các dòng log
+console được tự gate chỉ in ở rank 0 (xem `_is_main_process()` trong
+lm_eval_runner.py) để tránh N tiến trình in log trùng lặp.
 """
 import argparse
 import os
