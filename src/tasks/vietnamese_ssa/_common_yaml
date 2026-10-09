@@ -11,7 +11,7 @@ generation_kwargs:
   max_gen_toks: 2048
   temperature: 0.0
   top_p: 0.95
-  top_k: 50
+  # top_k: 50     # May cause API request error when inference via transformers serve 
   do_sample: false
 
 filter_list:

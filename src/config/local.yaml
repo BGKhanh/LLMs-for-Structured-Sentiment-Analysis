@@ -6,6 +6,8 @@ model:
     pretrained: google/gemma-4-E2B-it
     max_model_len: 16384
     gpu_memory_utilization: 0.95
+    enable_thinking: False
+    preserve_thinking: False
 
 run:
   datasets: [vitoed]          # có thể nhiều dataset: [vitoed_new, opener_en, mpqa]
