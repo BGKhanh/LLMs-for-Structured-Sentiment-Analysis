@@ -242,3 +242,10 @@ example for CoT reasoning generated/
 check_image.ps1
 
 divided_data/
+
+data/vitoed/__MACOSX/
+data/vitoed/dev_difference_ids.json
+data/vitoed/removed_sent_ids_test.json
+data/dev.json
+data/test.json
+data/train.json
