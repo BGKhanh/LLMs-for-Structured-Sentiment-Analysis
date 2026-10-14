@@ -1,8 +1,7 @@
-# Phương án 1 — vllm: vLLM nạp weight trực tiếp vào tiến trình chạy run.py.
 model:
   mode: vllm
   batch_size: 32
-  args:
+  args:  # Tham số phụ thuộc vào framework (hf, vllm,...)
     pretrained: google/gemma-4-E2B-it
     max_model_len: 16384
     gpu_memory_utilization: 0.95
@@ -16,7 +15,7 @@ run:
   log_samples: true
   confirm_run_unsafe_code: true
   seeds: {random: 0, numpy: 1234, torch: 1234, fewshot: 42}
-  # extra_metadata: {clean_data: true, plus_mode: false}
+  extra_metadata: {clean_data_verbose: false}  # Khuyến nghị tắt khi chạy nhiều kịch bản, bật khi muốn xem chi tiết clean_data information (mặc định true)
   # gen_kwargs áp dụng cho CẢ 11 kịch bản (scenario nào tự khai gen_kwargs riêng thì đè lên phần này):
   # gen_kwargs: {temperature: 0.7, do_sample: true}
 

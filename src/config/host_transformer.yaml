@@ -2,16 +2,28 @@
 # trong `transformers` từ CLI `transformers serve ...` — cần: pip install
 # "transformers[serving]"). Chạy: python host.py --config configs/host_transformers_gemma.yaml
 #
-
+# Lưu ý: đây là backend HOST RIÊNG (server sống, HTTP API) — nếu bạn chỉ cần
+# nạp model transformers TRỰC TIẾP vào tiến trình chạy eval (không cần server
+# riêng), dùng thẳng backend "hf" có sẵn trong lm_eval qua configs đánh giá:
+#   model: {backend: hf, args: {pretrained: google/gemma-4-26B-A4B-it, dtype: bfloat16}}
+# — không cần host.py/server_host.py gì cả trong trường hợp đó.
 backend: transformers
 model: google/gemma-4-26B-A4B-it
 host: 127.0.0.1
 port: 8000
 device: cuda:0
 dtype: bfloat16
-reasoning: "on"
+# CẢNH BÁO khi dùng với lm_eval (local-chat-completions): lm_eval CHỈ đọc `message.content`,
+# KHÔNG đọc `reasoning_content`. Khi reasoning bật, server tách phần "thinking" sang
+# `reasoning_content`, và nếu output kết thúc/bị cắt trước khi sang phần trả lời thì `content`
+# = "" -> mọi sample thành chuỗi rỗng -> điểm 0. Với bài SSA (cần JSON trả lời trực tiếp)
+# nên để "off". Muốn đánh giá thinking mode: để "on" và đảm bảo max_gen_toks đủ lớn cho cả
+# thinking + câu trả lời (run.gen_kwargs: {max_gen_toks: 8192}), rồi kiểm tra `resps` trong
+# samples_*.jsonl xem content có rỗng không.
+# Lưu ý: `reasoning` on/off GHI ĐÈ `chat_template_kwargs.enable_thinking` (verify từ source
+# serve.py); chỉ "auto" mới giữ nguyên chat_template_kwargs.
+reasoning: "off"
 continuous_batching: true
-chat_template_kwargs: {enable_thinking: true}
 trust_remote_code: false
 log_dir: results/lm_eval
 # attn_implementation: flash_attention_2

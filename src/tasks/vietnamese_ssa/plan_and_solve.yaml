@@ -19,9 +19,7 @@ doc_to_target: "{{opinions_json}}"
 # from). Locking it to 0 makes the harness print a clear one-line notice
 # ("num_fewshot has been set to 0 ... Manual configuration will be
 # ignored.") instead of a stack trace if someone passes --num_fewshot > 0
-# by mistake.
-num_fewshot: 0
- 
+# by mistake. 
 num_fewshot: 0
 
 metadata:
