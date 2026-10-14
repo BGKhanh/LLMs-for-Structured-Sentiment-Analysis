@@ -12,14 +12,14 @@ This repository extends **LM Evaluation Harness** by providing benchmark tasks, 
 
 Experiments are **config-driven**: evaluation settings live in YAML under `src/config/`, and Python entrypoints (`src/script/run.py`, `src/script/host.py`) only load a config and run. The same tasks remain usable from the `lm_eval` CLI and from the example notebook.
 
-The repository is compatible with multiple inference backends—including **vLLM** (in-process or OpenAI server), **llama.cpp** (`llama-server`), and other OpenAI-compatible APIs—allowing experiments to be conducted consistently on both high-performance servers and local deployments.
+The repository is compatible with multiple inference backends—including **vLLM** (in-process or OpenAI server), **llama.cpp** (`llama-server`), **transformers serve** (FastAPI OpenAI-compatible server), and other OpenAI-compatible APIs—allowing experiments to be conducted consistently on both high-performance servers and local deployments.
 
 ### Key Features
 
 - Structured Sentiment Analysis benchmark tasks built on **LM Evaluation Harness**.
 - Four prompting techniques as separate tasks (grouped under tag `vietnamese_ssa`).
 - YAML experiment configs: load the model **once**, then run many datasets × scenarios.
-- Independent YAML configs to host **vLLM** or **llama-server**.
+- Independent YAML configs to host **vLLM**, **llama-server**, or **transformers serve**.
 - Support for multilingual SSA datasets (language is inferred from the dataset name).
 - Automatic parsing and validation of structured outputs.
 - Reproducible experiment configurations with Docker support.
@@ -28,15 +28,13 @@ This repository is intended for researchers and practitioners who wish to evalua
 
 ---
 
-
-
 ## Repository Structure
 
 ```text
 .
 ├── data/
-│   └── vitoed/                         # Vietnamese SSA dataset (train/dev/test.json)
-├── semeval22_structured_sentiment/     # SemEval-2022 Task 10 data, preprocessing, official eval
+│   └── vitoed/                         # Vietnamese SSA dataset (train.json, dev.json, test.json)
+├── semeval22_structured_sentiment/     # SemEval-2022 Task 10 data & official evaluation
 │   ├── data/                           # opener_en, opener_es, mpqa, norec, multibooked_*, darmstadt_unis
 │   └── evaluation/
 ├── notebook/
@@ -46,12 +44,13 @@ This repository is intended for researchers and practitioners who wish to evalua
 │   │   ├── local.yaml                  # vLLM in-process (mode: vllm)
 │   │   ├── api_server.yaml             # HTTP client to an OpenAI-compatible server
 │   │   ├── host_vllm.yaml              # Start vLLM OpenAI server
-│   │   └── host_llama.yaml             # Start llama-server (GGUF)
+│   │   ├── host_llama.yaml             # Start llama-server (GGUF)
+│   │   └── host_transformer.yaml       # Start transformers serve (FastAPI OpenAI-compatible)
 │   ├── script/
 │   │   ├── run.py                      # CLI: load experiment YAML and evaluate
 │   │   ├── lm_eval_runner.py           # Library: Model/Run/Scenario configs + LMEvalRunner
 │   │   ├── host.py                     # CLI: load server YAML and keep the process alive
-│   │   └── server_host.py              # Library: vLLM / llama.cpp process lifecycle
+│   │   └── server_host.py              # Library: vLLM / llama.cpp / transformers process lifecycle
 │   ├── tasks/
 │   │   └── vietnamese_ssa/             # LM Evaluation Harness task YAMLs + utils.py
 │   │       ├── _common_yaml            # Shared metrics, filters, generation_kwargs (no .yaml suffix)
@@ -61,71 +60,92 @@ This repository is intended for researchers and practitioners who wish to evalua
 │   │       ├── plan_and_solve.yaml
 │   │       └── utils.py
 │   ├── prompt_templates/               # System prompts, CoT example pools, prompt blocks
+│   │   ├── blocks.py
+│   │   └── shared.py
 │   └── utils/                          # Postprocessing / JSON extraction
+│       └── postprocessing.py
 ├── Dockerfile
 ├── requirements.txt
 └── README.md
 ```
 
-
-
 ### Directory Overview
 
-
-| Path                              | Description                                                                                                |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `data/vitoed/`                    | Vietnamese SSA splits (`train.json`, `dev.json`, `test.json`). Registered dataset name: `vitoed`.          |
-| `semeval22_structured_sentiment/` | Multilingual SemEval-2022 SSA datasets and official evaluation code.                                       |
-| `src/config/`                     | Experiment YAMLs (`local.yaml`, `api_server.yaml`) and server YAMLs (`host_vllm.yaml`, `host_llama.yaml`). |
-| `src/script/`                     | Config loaders and runners. Evaluation (`run.py`) is independent of hosting (`host.py`).                   |
-| `src/tasks/vietnamese_ssa/`       | One YAML per prompting technique; few-shot sampling is native harness `fewshot_config`.                    |
-| `src/prompt_templates/`           | System prompts per language and static CoT example pools.                                                  |
-| `src/utils/`                      | Postprocessing for parsing structured model outputs.                                                       |
-| `notebook/`                       | Example notebook for Vast.ai / Docker workflows.                                                           |
-
+| Path | Description |
+| :--- | :--- |
+| `data/vitoed/` | Vietnamese SSA splits (`train.json`, `dev.json`, `test.json`). Registered dataset name: `vitoed`. |
+| `semeval22_structured_sentiment/` | Multilingual SemEval-2022 SSA datasets and official evaluation code. |
+| `src/config/` | Experiment YAMLs (`local.yaml`, `api_server.yaml`) and server YAMLs (`host_vllm.yaml`, `host_llama.yaml`, `host_transformer.yaml`). |
+| `src/script/` | Config loaders and runners. Evaluation (`run.py`) is independent of hosting (`host.py`). Supports vLLM, llama.cpp, and transformers backends. |
+| `src/tasks/vietnamese_ssa/` | One YAML per prompting technique; few-shot sampling is native harness `fewshot_config`. |
+| `src/prompt_templates/` | System prompts per language and static CoT example pools. |
+| `src/utils/` | Postprocessing for parsing structured model outputs. |
+| `notebook/` | Example notebook for Vast.ai / Docker workflows. |
 
 ---
-
-
 
 ## Installation
 
 This repository supports two installation methods:
 
-- **Docker (Recommended):** CUDA, PyTorch, vLLM, and a pinned `llama-server` binary. **LM Evaluation Harness is installed at container runtime** (not baked into the image) so its version can be pinned per experiment.
+- **Docker (Recommended):** Pre-configured environment with CUDA 13.0, PyTorch 2.11.0, vLLM 0.23.0, and pinned `llama-server` binary. **LM Evaluation Harness is installed at container runtime** (not baked into the image) so its version can be pinned per experiment.
 - **Local Environment:** Install the required dependencies manually on your system.
 
 ---
 
-
-
 ### Option 1. Docker (Recommended)
 
-Build from this repository (Dockerfile tracks CUDA 13.0, PyTorch 2.11, vLLM 0.23.0, and llama.cpp `v0.4.0` for `llama-server`):
+Docker images are hosted on Docker Hub:  
+🔗 **Docker Hub Repository:** [kgb0630/lm-eval-vastai](https://hub.docker.com/r/kgb0630/lm-eval-vastai)
+
+#### Pull Published Image
+
+Pull the latest official image (version **v14**):
 
 ```bash
-docker build -t kgb0630/lm-eval-vastai:v12 .
+docker pull kgb0630/lm-eval-vastai:v14
 ```
 
-Or pull a published tag if you already pushed one to Docker Hub:
+#### Build from Source
+
+Build directly from this repository:
 
 ```bash
-docker pull kgb0630/lm-eval-vastai:<tag>
+# Standard image (~12.9 GB)
+docker build -t kgb0630/lm-eval-vastai:v14 .
+
+# Lite variant (~11.1 GB, prunes FlashInfer Blackwell DC cubin for non-datacenter GPUs):
+docker build --build-arg PRUNE_FLASHINFER_BLACKWELL_DC=1 -t kgb0630/lm-eval-vastai:v14-lite .
 ```
+
+#### Launch the Container
 
 Launch the container with GPU support (mount the repo into `/workspace`):
 
 ```bash
 docker run --gpus all -it --rm \
     -v $(pwd):/workspace \
-    kgb0630/lm-eval-vastai:v12
+    kgb0630/lm-eval-vastai:v14
 ```
 
 Inside the container, install LM Evaluation Harness (see below), then run evaluation from the **repository root**.
 
+#### Docker Image Version Summary
+
+The Dockerfile has evolved to optimize image footprint, compilation speed, and hardware compatibility:
+
+- **v5 – v7**: Added `cuda-nvcc` for JIT compilation on new GPU architectures (SM120); shifted `flash-attn` and `lm-evaluation-harness` to runtime installation to allow per-experiment pinning.
+- **v8 – v9**: Upgraded `vllm` to `0.23.0` (improved support for Gemma 4); pinned `llama.cpp` to release tag `v0.4.0` (`ARG LLAMA_CPP_REF=v0.4.0`) for deterministic builds.
+- **v10 – v11**: Fixed FlashInfer JIT RAM exhaustion by capping Ninja concurrency with `MAX_JOBS`; added `cuda-nvrtc-dev-13-0` and explicit `CMAKE_CUDA_ARCHITECTURES`.
+- **v12**: Enabled `GGML_CUDA_FA_ALL_QUANTS` and `GGML_CUDA_GRAPHS` in `llama.cpp` for accelerated Flash Attention kernels and CUDA Graph execution.
+- **v14 (Latest; v13 merged into v14)**:
+  - **Significant size reduction**: Decreased image size from **15.8 GB to 12.9 GB** (and **11.1 GB** for the lite variant with `PRUNE_FLASHINFER_BLACKWELL_DC=1`).
+  - **Optimized layer cache**: Moved `COPY llama-server` to the final stage, preventing layer cache invalidation of the heavy torch/pip layers (~4.4 GB) upon llama.cpp rebuilds.
+  - **Cleaned static libraries**: Stripped unused `*_static.a` libraries (cublas, curand, nvrtc) in the same `RUN apt` step.
+  - **Slim base runtime**: Switched base to `nvidia/cuda:13.0.3-base-ubuntu24.04`, resolving missing runtime dependencies via `LD_LIBRARY_PATH` mapped to pip-installed wheels.
+  - **Broad GPU coverage**: Full support for NVIDIA architectures from Ampere (`sm_80`), Ada Lovelace (`sm_89`), Hopper (`sm_90`) to Blackwell (`sm_120`, e.g., RTX 5060 Ti).
+
 ---
-
-
 
 ### Option 2. Local Environment
 
@@ -141,8 +161,6 @@ Install the project dependencies:
 ```bash
 pip install -r requirements.txt
 ```
-
-
 
 #### Install LM Evaluation Harness
 
@@ -161,8 +179,6 @@ pip install -e ".[api,vllm,hf]"
 > Extra `[api]` is required for `model.mode: api_server` (`local-chat-completions`). Extra `[vllm]` is required for in-process vLLM (`model.mode: vllm`).
 
 ---
-
-
 
 ### Optional: FlashAttention
 
@@ -184,8 +200,6 @@ Since FlashAttention depends on your **CUDA**, **PyTorch**, **Python**, and **GP
 
 ---
 
-
-
 ### Verify the Installation
 
 ```bash
@@ -194,22 +208,26 @@ lm_eval --help
 
 If the installation is successful, the command above will display the available command-line options.
 
-### Requirements
-
-
-| Component     | Version                                       |
-| ------------- | --------------------------------------------- |
-| Python        | >= 3.12                                       |
-| CUDA          | >= 13.0 (recommended; image uses CUDA 13.0.3) |
-| Docker        | Optional                                      |
-| NVIDIA Driver | Compatible with installed CUDA                |
-
-
-Pinned stack in `requirements.txt` / `Dockerfile`: PyTorch **2.11.0** (cu130), vLLM **0.23.0**, Transformers `>=5.10,<5.15`.
-
 ---
 
+### Requirements
 
+| Component | Version / Requirement | Notes |
+| :--- | :--- | :--- |
+| **Python** | `>= 3.12` | Default environment uses Python 3.12 (Ubuntu 24.04 LTS). |
+| **PyTorch** | `2.11.0` (cu130) | **Critical:** Required for CUDA 13.0 compatibility and JIT kernels. |
+| **CUDA** | `>= 13.0` | Recommended CUDA 13.0.3 (pre-installed in Docker image). |
+| **NVIDIA GPU & Driver** | Compute capability `>= 8.0` (Driver `>= 580.xx` for CUDA 13.0+) | Supports Ampere (RTX 30xx, A100), Ada Lovelace (RTX 40xx), Hopper (H100), and Blackwell (RTX 50xx, B100/B200). |
+| **llama.cpp (`llama-server`)** | `v0.4.0` | Pinned tag in Docker image for reproducible GGUF hosting. |
+| **Docker** | **Recommended** | Strongly recommended to avoid CUDA/C++ ABI conflicts. |
+
+Core Python packages are defined in [`requirements.txt`](file:///d:/FINAL_PROJECT/requirements.txt). Key packages include:
+- `vllm == 0.23.0`: High-performance LLM inference engine.
+- `transformers >= 5.10.0, < 5.15.0`: Core Hugging Face model loading and `transformers serve` backend.
+- `bitsandbytes >= 0.49.0`: 4-bit / 8-bit quantization support.
+- Auxiliary utilities for serving, tokenization, and distributed execution (`fastapi`, `accelerate`, etc.).
+
+---
 
 ## Running Evaluation
 
@@ -232,8 +250,6 @@ There are three equivalent workflows:
 Dataset selection is **not** `--metadata '{"language":"vi"}'`. Pass a registered **dataset name**; language is looked up in `DATASET_LANGUAGES` (`src/prompt_templates/shared.py`).
 
 ---
-
-
 
 ### Config-driven evaluation (`run.py`)
 
@@ -272,14 +288,12 @@ python src/script/run.py --config src/config/api_server.yaml
 
 If the YAML has `scenarios: default_ssa`, the runner uses 11 standard scenarios:
 
-
-| Label                       | Task                            | `--num_fewshot`   |
-| --------------------------- | ------------------------------- | ----------------- |
-| `re2`                       | `vietnamese_ssa_re_reading`     | 0                 |
-| `pas`                       | `vietnamese_ssa_plan_and_solve` | 0                 |
-| `0_shot` … `10_shot`        | `vietnamese_ssa_few_shot`       | 0, 1, 3, 5, 7, 10 |
-| `1_shot_cot` … `5_shot_cot` | `vietnamese_ssa_few_shot_cot`   | 1, 3, 5           |
-
+| Label | Task | `--num_fewshot` |
+| :--- | :--- | :--- |
+| `re2` | `vietnamese_ssa_re_reading` | 0 |
+| `pas` | `vietnamese_ssa_plan_and_solve` | 0 |
+| `0_shot` … `10_shot` | `vietnamese_ssa_few_shot` | 0, 1, 3, 5, 7, 10 |
+| `1_shot_cot` … `5_shot_cot` | `vietnamese_ssa_few_shot_cot` | 1, 3, 5 |
 
 You can instead list scenarios explicitly in YAML (`label`, `task`, `num_fewshot`, optional `gen_kwargs`). Per-scenario `gen_kwargs` override `run.gen_kwargs`, which override the task YAML.
 
@@ -287,26 +301,32 @@ Optional `run.extra_metadata` is merged into the TaskManager metadata (for examp
 
 ---
 
-
-
 ### Hosting an inference server (`host.py`)
 
 Use a **separate** terminal (or notebook cell). Evaluation (`run.py`) does not start the server.
 
+The repository provides three dedicated server backends:
+
 ```bash
+# 1. vLLM OpenAI-compatible server
 python src/script/host.py --config src/config/host_vllm.yaml
+
+# 2. llama.cpp server (GGUF models)
 python src/script/host.py --config src/config/host_llama.yaml
+
+# 3. Transformers serve (FastAPI OpenAI-compatible endpoint)
+python src/script/host.py --config src/config/host_transformer.yaml
 ```
 
-The process waits until the health endpoint is ready, then stays up until Ctrl+C. Logs go under `log_dir` (`vllm_server.log` or `llama_server.log`).
+The process waits until the health endpoint is ready, then stays up until Ctrl+C. Logs go under `log_dir` (`vllm_server.log`, `llama_server.log`, or `transformers_server.log`).
+
+**Transformers Serve Note (`host_transformer.yaml`):**
+- Uses `transformers serve` to expose an OpenAI-compatible `/v1/chat/completions` API via FastAPI.
+- **Reasoning Mode Warning:** With `lm_eval` (`local-chat-completions`), the evaluator only extracts text from `message.content` (ignoring `reasoning_content`). When reasoning is enabled, the server splits thought tokens into `reasoning_content`; if output cuts off before the answer finishes, `content` remains empty, yielding a score of 0. For SSA extraction, keep `reasoning: "off"` unless `max_gen_toks` is explicitly expanded (e.g., `8192`) and verified.
 
 **Gated Hugging Face models:** set `HF_TOKEN` / `HUGGINGFACE_HUB_TOKEN` / `HUGGINGFACE_API_KEY` before starting the host.
 
-You can still launch servers by hand (`python -m vllm.entrypoints.openai.api_server` or `llama-server`); `host.py` is the same flags, parameterized.
-
 ---
-
-
 
 ### Notebook workflow
 
@@ -314,15 +334,11 @@ You can still launch servers by hand (`python -m vllm.entrypoints.openai.api_ser
 notebook/vastai_notebook_lm_eval.ipynb
 ```
 
-The notebook covers environment setup, a sample `lm_eval` command, and cells to host vLLM / llama-server. Prefer aligning new runs with `src/config/*.yaml` so CLI and notebook share the same knobs.
+The notebook covers environment setup, a sample `lm_eval` command, and cells to host vLLM / llama-server / transformers serve. Prefer aligning new runs with `src/config/*.yaml` so CLI and notebook share the same knobs.
 
 ---
 
-
-
 ### Command-line `lm_eval` (single task)
-
-
 
 #### Native vLLM backend
 
@@ -344,9 +360,7 @@ lm_eval \
   --confirm_run_unsafe_code
 ```
 
-
-
-#### OpenAI-compatible API
+#### OpenAI-compatible API (vLLM / llama-server / transformers serve)
 
 After a server is listening:
 
@@ -371,18 +385,14 @@ lm_eval \
 
 Use `--tasks vietnamese_ssa` to run all four technique tasks in one CLI call, or a single task:
 
-
-| `<TASK_NAME>`                   | Technique                 | Notes                                                                                                                                     |
-| ------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `vietnamese_ssa_few_shot`       | Plain few-shot            | `--num_fewshot` sampled from the `train` split (seeded)                                                                                   |
-| `vietnamese_ssa_re_reading`     | Re-reading                | Question repeated twice; same live sampling as few-shot                                                                                   |
-| `vietnamese_ssa_few_shot_cot`   | Few-shot Chain-of-Thought | Examples come from a static pool in `src/prompt_templates/shared.py`, not `train`. Max `--num_fewshot` is the pool size for that language |
-| `vietnamese_ssa_plan_and_solve` | Plan-and-Solve            | Instruction-only; YAML locks `num_fewshot: 0`. PS+: `--metadata '{"dataset":"vitoed","plus_mode":true}'`                                  |
-
+| `<TASK_NAME>` | Technique | Notes |
+| :--- | :--- | :--- |
+| `vietnamese_ssa_few_shot` | Plain few-shot | `--num_fewshot` sampled from the `train` split (seeded) |
+| `vietnamese_ssa_re_reading` | Re-reading | Question repeated twice; same live sampling as few-shot |
+| `vietnamese_ssa_few_shot_cot` | Few-shot Chain-of-Thought | Examples come from a static pool in `src/prompt_templates/shared.py`, not `train`. Max `--num_fewshot` is the pool size for that language |
+| `vietnamese_ssa_plan_and_solve` | Plan-and-Solve | Instruction-only; YAML locks `num_fewshot: 0`. PS+: `--metadata '{"dataset":"vitoed","plus_mode":true}'` |
 
 ---
-
-
 
 ## Troubleshooting: `ValueError: Tasks not found: <task_name>`
 
@@ -413,41 +423,34 @@ Other checks:
 
 ---
 
-
-
 ## Reproducibility Notes: Reasoning/Thinking Mode
 
 For reasoning-capable models (e.g. the Gemma-4 family), whether **"thinking" mode is enabled** has a **major impact on SF1**. Always set it **explicitly** and record the value used alongside reported numbers.
 
-
-| Backend                          | Flag                                                                                                                                                                                       |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Native vLLM / vLLM OpenAI server | `--default-chat-template-kwargs '{"enable_thinking": true|false}'` (plus `--reasoning-parser <name>` on the OpenAI server). In `host_vllm.yaml`: `enable_thinking` and `reasoning_parser`. |
-| `llama.cpp` (`llama-server`)     | `--reasoning on|off` (optional `--reasoning-budget N`, `--reasoning-format`). In `host_llama.yaml`: `reasoning`.                                                                           |
-
+| Backend | Flag / Setting | Notes |
+| :--- | :--- | :--- |
+| **Native vLLM / vLLM OpenAI server** | `--default-chat-template-kwargs '{"enable_thinking": true\|false}'` (plus `--reasoning-parser <name>` on OpenAI server). In `host_vllm.yaml`: `enable_thinking` and `reasoning_parser`. | Supported directly in vLLM chat templates. |
+| **`llama.cpp` (`llama-server`)** | `--reasoning on\|off` (optional `--reasoning-budget N`, `--reasoning-format`). In `host_llama.yaml`: `reasoning`. | Built-in CLI reasoning flag in `llama-server`. |
+| **`transformers serve`** | In `host_transformer.yaml`: `reasoning: "off"`. | Overrides `chat_template_kwargs.enable_thinking`. Keep "off" for direct JSON responses unless budget is configured. |
 
 Seeds used by `run.py` / the documented CLI: `random=0`, `numpy=1234`, `torch=1234`, `fewshot=42`, plus `PYTHONHASHSEED=42` and `CUBLAS_WORKSPACE_CONFIG=:4096:8`.
 
 ---
 
-
-
 ## Supported Datasets
 
 Registered names must match `DATASET_LANGUAGES` in `src/prompt_templates/shared.py` (and `_DATASET_ROOTS` in `src/tasks/vietnamese_ssa/utils.py`). Use these strings in `run.datasets`, `--dataset`, and `--metadata '{"dataset":"..."}'`.
 
-
-| Dataset key      | Language   | On disk                                      | Source       |
-| ---------------- | ---------- | -------------------------------------------- | ------------ |
-| `vitoed`         | Vietnamese | `data/vitoed/`                               | Internal     |
-| `norec`          | Norwegian  | `semeval22_structured_sentiment/data/norec/` | SemEval-2022 |
-| `opener_en`      | English    | `.../data/opener_en/`                        | SemEval-2022 |
-| `opener_es`      | Spanish    | `.../data/opener_es/`                        | SemEval-2022 |
-| `multibooked_ca` | Catalan    | `.../data/multibooked_ca/`                   | SemEval-2022 |
-| `multibooked_eu` | Basque     | `.../data/multibooked_eu/`                   | SemEval-2022 |
-| `darmstadt_unis` | English    | `.../data/darmstadt_unis/`                   | SemEval-2022 |
-| `mpqa`           | English    | `.../data/mpqa/`                             | MPQA Corpus  |
-
+| Dataset key | Language | On disk | Source |
+| :--- | :--- | :--- | :--- |
+| `vitoed` | Vietnamese | `data/vitoed/` | Internal |
+| `norec` | Norwegian | `semeval22_structured_sentiment/data/norec/` | SemEval-2022 |
+| `opener_en` | English | `.../data/opener_en/` | SemEval-2022 |
+| `opener_es` | Spanish | `.../data/opener_es/` | SemEval-2022 |
+| `multibooked_ca` | Catalan | `.../data/multibooked_ca/` | SemEval-2022 |
+| `multibooked_eu` | Basque | `.../data/multibooked_eu/` | SemEval-2022 |
+| `darmstadt_unis` | English | `.../data/darmstadt_unis/` | SemEval-2022 |
+| `mpqa` | English | `.../data/mpqa/` | MPQA Corpus |
 
 Override the directory with metadata `dataset_dir` if needed. Gold opinions are cleaned by default (`clean_data: true`); set `clean_data: false` in `run.extra_metadata` or CLI `--metadata` to disable.
 
@@ -455,11 +458,13 @@ Override the directory with metadata `dataset_dir` if needed. Gold opinions are 
 
 ---
 
-
-
 ## Evaluation Metrics
 
 Model predictions are evaluated following the official **SemEval-2022 Task 10** evaluation protocol (wired in `_common_yaml` via `utils.process_results` and metric aggregators).
+
+Please refer to the official task repository for evaluation details, scoring scripts, and benchmark specifications:
+
+- **SemEval-2022 Task 10:** [https://github.com/jerbarnes/semeval22_structured_sentiment](https://github.com/jerbarnes/semeval22_structured_sentiment)
 
 Each predicted opinion is a structured tuple:
 
@@ -470,22 +475,18 @@ Each predicted opinion is a structured tuple:
 
 Predicted and gold tuples are matched using weighted span overlap.
 
-
-| Metric          | Description                                                                                                 |
-| --------------- | ----------------------------------------------------------------------------------------------------------- |
-| **SF1**         | Sentiment Graph F1 — official metric. Overlap on Holder, Target, and Expression *and* exact Polarity match. |
-| **NSF1**        | Same as SF1 but polarity-agnostic.                                                                          |
-| **Holder F1**   | Span F1 on the opinion Holder only.                                                                         |
-| **Target F1**   | Span F1 on the opinion Target only.                                                                         |
-| **Exp F1**      | Span F1 on the Polar Expression only.                                                                       |
-| **Targeted F1** | Exact (non-weighted) Target span match, plus Polarity match.                                                |
-
+| Metric | Description |
+| :--- | :--- |
+| **SF1** | Sentiment Graph F1 — official metric. Overlap on Holder, Target, and Expression *and* exact Polarity match. |
+| **NSF1** | Same as SF1 but polarity-agnostic. |
+| **Holder F1** | Span F1 on the opinion Holder only. |
+| **Target F1** | Span F1 on the opinion Target only. |
+| **Exp F1** | Span F1 on the Polar Expression only. |
+| **Targeted F1** | Exact (non-weighted) Target span match, plus Polarity match. |
 
 Unlike traditional sentiment classification, SSA requires correctly predicting both polarity and the relationships among opinion components. Official evaluation is performed on complete opinion graphs rather than isolated spans.
 
 ---
-
-
 
 ## Results
 
@@ -493,15 +494,11 @@ This repository is part of ongoing research. Benchmark results will be added to 
 
 ---
 
-
-
 ## License
 
 TBD. A license has not yet been selected for this repository — until one is added, all rights are reserved by the authors and the code should not be reused or redistributed without permission. Note that the bundled datasets (`semeval22_structured_sentiment/`, `data/`) are governed by their own original licenses/terms, independent of whatever license is eventually chosen for the code in this repository; please refer to the SemEval-2022 Task 10 organizers for dataset terms.
 
 ---
-
-
 
 ## Citation
 
@@ -621,6 +618,4 @@ year = {2005}
   pages={1-6},
   keywords={Modeling;Head;Labeling;Social networking (online);Printing;Training;Sentiment analysis;Conferences;Multilingual;Signal detection;targeted sentiment analysis;dataset;social media texts},
   doi={10.1109/MAPR72750.2026.11685817}}
-
 ```
-
