@@ -15,6 +15,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from copy import deepcopy
 
 import yaml
 from lm_eval import simple_evaluate
@@ -259,12 +260,33 @@ class LMEvalRunner:
         self._lm: LM | None = None
         self._task_managers: dict[str, TaskManager] = {}
 
+    # @property
+    # def lm(self) -> LM:
+    #     if self._lm is None:
+    #         cls = get_model(self.model_config.backend)
+    #         self._lm = cls.create_from_arg_string(self.model_config.to_arg_string(),
+    #                                               {"batch_size": self.model_config.batch_size})
+    #     return self._lm
     @property
     def lm(self) -> LM:
         if self._lm is None:
             cls = get_model(self.model_config.backend)
-            self._lm = cls.create_from_arg_string(self.model_config.to_arg_string(),
-                                                  {"batch_size": self.model_config.batch_size})
+            model_args = deepcopy(self.model_config.args)
+
+            chat_template_args = model_args.get("chat_template_args")
+            if (
+                chat_template_args is not None
+                and not isinstance(chat_template_args, dict)
+            ):
+                raise TypeError(
+                    "model.args.chat_template_args must be a YAML mapping/dict, "
+                    f"not {type(chat_template_args).__name__}."
+                )
+
+            self._lm = cls(
+                **model_args,
+                batch_size=self.model_config.batch_size,
+            )
         return self._lm
 
     def task_manager(self, dataset: str) -> TaskManager:
